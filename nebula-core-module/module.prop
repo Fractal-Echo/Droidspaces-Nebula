@@ -1,0 +1,6 @@
+id=nebula_core
+name=Droidspaces: Nebula Core
+version=0.2.0
+versionCode=3
+author=Richtofen, Droidspaces Nebula contributors
+description=Privileged execution plane for Droidspaces: Nebula fixed control protocol.

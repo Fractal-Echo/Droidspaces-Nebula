@@ -33,6 +33,14 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import io.droidspaces.nebula.core.NebulaCapability;
+import io.droidspaces.nebula.core.NebulaCoreClient;
+import io.droidspaces.nebula.core.NebulaCoreStatus;
+import io.droidspaces.nebula.core.NebulaVersions;
+import io.droidspaces.nebula.features.nubia.NubiaDeviceAdapter;
+import io.droidspaces.nebula.features.redmagic.RedMagicButtonAdapter;
+import io.droidspaces.nebula.features.redmagic.RedMagicPerformanceAdapter;
+
 public final class MainActivity extends Activity {
     private static final int BG = 0xFF111417;
     private static final int PANEL = 0xFF1B2026;
@@ -159,8 +167,17 @@ public final class MainActivity extends Activity {
 
     private LinearLayout laneContainer;
     private LinearLayout targetProfileContainer;
+    private LinearLayout coreContainer;
+    private LinearLayout deviceToolsContainer;
+    private LinearLayout performanceContainer;
+    private LinearLayout redMagicButtonContainer;
     private TextView reportView;
     private String selectedTargetProfileId = "recovery_safe";
+    private final NebulaCoreClient coreClient = new NebulaCoreClient();
+    private final NubiaDeviceAdapter nubiaDeviceAdapter = new NubiaDeviceAdapter();
+    private final RedMagicPerformanceAdapter redMagicPerformanceAdapter = new RedMagicPerformanceAdapter();
+    private final RedMagicButtonAdapter redMagicButtonAdapter = new RedMagicButtonAdapter();
+    private NebulaCoreStatus coreStatus = NebulaCoreStatus.absent("Not refreshed");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -216,13 +233,45 @@ public final class MainActivity extends Activity {
         share.setOnClickListener(v -> shareReport());
         actions.addView(share, weightedButtonParams());
 
-        TextView targetTitle = text("DroidSpace targets", 18, TEXT, Typeface.BOLD);
+        TextView coreTitle = text("Nebula Core", 18, TEXT, Typeface.BOLD);
+        coreTitle.setPadding(0, 0, 0, dp(8));
+        root.addView(coreTitle);
+
+        coreContainer = new LinearLayout(this);
+        coreContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(coreContainer);
+
+        TextView targetTitle = text("Targets", 18, TEXT, Typeface.BOLD);
         targetTitle.setPadding(0, 0, 0, dp(8));
         root.addView(targetTitle);
 
         targetProfileContainer = new LinearLayout(this);
         targetProfileContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(targetProfileContainer);
+
+        TextView deviceToolsTitle = text("Device Tools", 18, TEXT, Typeface.BOLD);
+        deviceToolsTitle.setPadding(0, dp(2), 0, dp(8));
+        root.addView(deviceToolsTitle);
+
+        deviceToolsContainer = new LinearLayout(this);
+        deviceToolsContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(deviceToolsContainer);
+
+        TextView performanceTitle = text("Performance", 18, TEXT, Typeface.BOLD);
+        performanceTitle.setPadding(0, dp(2), 0, dp(8));
+        root.addView(performanceTitle);
+
+        performanceContainer = new LinearLayout(this);
+        performanceContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(performanceContainer);
+
+        TextView redMagicButtonTitle = text("RedMagic Button", 18, TEXT, Typeface.BOLD);
+        redMagicButtonTitle.setPadding(0, dp(2), 0, dp(8));
+        root.addView(redMagicButtonTitle);
+
+        redMagicButtonContainer = new LinearLayout(this);
+        redMagicButtonContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(redMagicButtonContainer);
 
         TextView laneTitle = text("Proof lanes", 18, TEXT, Typeface.BOLD);
         laneTitle.setPadding(0, dp(2), 0, dp(8));
@@ -247,10 +296,26 @@ public final class MainActivity extends Activity {
     }
 
     private void refresh() {
+        coreStatus = coreClient.loadStatus();
+        coreContainer.removeAllViews();
+        coreContainer.addView(buildCoreCard(coreStatus));
+
         targetProfileContainer.removeAllViews();
         for (TargetProfile profile : targetProfiles) {
             targetProfileContainer.addView(buildTargetProfileCard(profile));
         }
+
+        deviceToolsContainer.removeAllViews();
+        deviceToolsContainer.addView(buildCapabilityCard(
+                "Audited Nubia capability status", nubiaDeviceAdapter.discover(this)));
+
+        performanceContainer.removeAllViews();
+        performanceContainer.addView(buildCapabilityCard(
+                "Audited RedMagic capability status", redMagicPerformanceAdapter.discover(this)));
+
+        redMagicButtonContainer.removeAllViews();
+        redMagicButtonContainer.addView(buildCapabilityCard(
+                "Mapping disabled in pass 01", redMagicButtonAdapter.discover(this)));
 
         laneContainer.removeAllViews();
         for (Lane lane : lanes) {
@@ -259,17 +324,120 @@ public final class MainActivity extends Activity {
         reportView.setText(buildReport());
     }
 
-    private View buildTargetProfileCard(TargetProfile profile) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        card.setBackground(round(PANEL, dp(8), LINE));
+    private View buildCoreCard(NebulaCoreStatus status) {
+        LinearLayout card = baseCard();
 
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardParams.bottomMargin = dp(12);
-        card.setLayoutParams(cardParams);
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("Droidspaces: Nebula Core", 19, TEXT, Typeface.BOLD));
+        TextView meta = text("app=" + NebulaVersions.APP_VERSION
+                + "  expectedModule=" + NebulaVersions.MODULE_VERSION
+                + "  protocol=" + NebulaVersions.CORE_PROTOCOL_VERSION,
+                12, MUTED, Typeface.NORMAL);
+        meta.setTypeface(Typeface.MONOSPACE);
+        meta.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(meta);
+
+        top.addView(chip(coreStatusLabel(status), coreStatusColor(status)));
+
+        TextView detail = text(coreDetail(status), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(10), 0, 0);
+        card.addView(detail);
+
+        if (status.hasVisibleError()) {
+            TextView error = text(status.visibleError(), 13, YELLOW, Typeface.NORMAL);
+            error.setPadding(0, dp(10), 0, 0);
+            card.addView(error);
+        }
+
+        return card;
+    }
+
+    private String coreStatusLabel(NebulaCoreStatus status) {
+        if (!status.installed) return "Read-only";
+        if (status.hasVisibleError()) return "Check";
+        return status.daemonRunning ? "Running" : "State";
+    }
+
+    private int coreStatusColor(NebulaCoreStatus status) {
+        if (!status.installed) return BLUE;
+        if (status.hasVisibleError()) return YELLOW;
+        return status.daemonRunning ? GREEN : BLUE;
+    }
+
+    private String coreDetail(NebulaCoreStatus status) {
+        return "moduleInstalled=" + status.installed
+                + "\nmoduleVersion=" + status.moduleVersion
+                + "\nprotocolVersion=" + status.protocolVersion
+                + "\nsafeMode=" + status.safeMode
+                + "\nprofile=" + status.profile.wireName
+                + "\ndaemonRunning=" + status.daemonRunning
+                + "\nserviceStatus=" + status.serviceStatus
+                + "\ngitCommit=" + status.gitCommit;
+    }
+
+    private View buildCapabilityCard(String title, List<NebulaCapability> capabilities) {
+        LinearLayout card = baseCard();
+        card.addView(text(title, 19, TEXT, Typeface.BOLD));
+        for (NebulaCapability capability : capabilities) {
+            card.addView(buildCapabilityRow(capability));
+        }
+        return card;
+    }
+
+    private View buildCapabilityRow(NebulaCapability capability) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(4));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(top);
+
+        TextView label = text(capability.title, 15, TEXT, Typeface.BOLD);
+        top.addView(label, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        top.addView(chip(capability.status, capabilityColor(capability.status)));
+
+        TextView detail = text(capability.detail + "\nsource=" + capability.source
+                        + "  mutating=" + capability.mutating,
+                12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(6), 0, 0);
+        row.addView(detail);
+
+        return row;
+    }
+
+    private int capabilityColor(String status) {
+        if (status == null) return BLUE;
+        if (status.contains("confirmed") || status.contains("visible")
+                || status.contains("available") || status.contains("permission")) {
+            return GREEN;
+        }
+        if (status.contains("blocked") || status.contains("BLOCKED")
+                || status.contains("disabled") || status.contains("required")
+                || status.contains("reference")) {
+            return YELLOW;
+        }
+        if (status.contains("missing") || status.contains("unconfirmed")) {
+            return RED;
+        }
+        return BLUE;
+    }
+
+    private View buildTargetProfileCard(TargetProfile profile) {
+        LinearLayout card = baseCard();
 
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
@@ -339,16 +507,7 @@ public final class MainActivity extends Activity {
     }
 
     private View buildLaneCard(Lane lane) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        card.setBackground(round(PANEL, dp(8), LINE));
-
-        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        cardParams.bottomMargin = dp(12);
-        card.setLayoutParams(cardParams);
+        LinearLayout card = baseCard();
 
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
@@ -527,7 +686,10 @@ public final class MainActivity extends Activity {
 
     private String buildReport() {
         StringBuilder sb = new StringBuilder();
-        sb.append("DroidSpaces Nebula Doctor v0.1.1\n");
+        sb.append("DroidSpaces Nebula Doctor v").append(NebulaVersions.APP_VERSION).append('\n');
+        sb.append("Expected Nebula Core module: ").append(NebulaVersions.MODULE_VERSION).append('\n');
+        sb.append("Expected Nebula Core protocol: ").append(NebulaVersions.CORE_PROTOCOL_VERSION).append('\n');
+        sb.append("App Git commit: ").append(NebulaVersions.GIT_COMMIT).append('\n');
         sb.append("Generated: ").append(new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm:ss Z", Locale.US).format(new Date())).append('\n');
         sb.append("Device: ").append(Build.MANUFACTURER).append(' ')
@@ -538,7 +700,20 @@ public final class MainActivity extends Activity {
         sb.append("SDK: ").append(Build.VERSION.SDK_INT).append('\n');
         sb.append("ABIs: ").append(Arrays.toString(Build.SUPPORTED_ABIS)).append("\n\n");
 
-        sb.append("[DroidSpace targets]\n");
+        sb.append("[Nebula Core]\n");
+        sb.append("  installed=").append(coreStatus.installed).append('\n');
+        sb.append("  moduleVersion=").append(coreStatus.moduleVersion).append('\n');
+        sb.append("  protocolVersion=").append(coreStatus.protocolVersion).append('\n');
+        sb.append("  safeMode=").append(coreStatus.safeMode).append('\n');
+        sb.append("  profile=").append(coreStatus.profile.wireName).append('\n');
+        sb.append("  daemonRunning=").append(coreStatus.daemonRunning).append('\n');
+        sb.append("  serviceStatus=").append(coreStatus.serviceStatus).append('\n');
+        if (coreStatus.hasVisibleError()) {
+            sb.append("  error=").append(coreStatus.visibleError()).append('\n');
+        }
+        sb.append('\n');
+
+        sb.append("[Targets]\n");
         for (TargetProfile profile : targetProfiles) {
             sb.append("  ").append(profile.label).append(": ")
                     .append(profileStatusLabel(profile)).append('\n');
@@ -549,6 +724,10 @@ public final class MainActivity extends Activity {
             sb.append("    enabled=").append(profile.enabled).append('\n');
         }
         sb.append('\n');
+
+        appendCapabilities(sb, "Device Tools", nubiaDeviceAdapter.discover(this));
+        appendCapabilities(sb, "Performance", redMagicPerformanceAdapter.discover(this));
+        appendCapabilities(sb, "RedMagic Button", redMagicButtonAdapter.discover(this));
 
         for (Lane lane : lanes) {
             LaneStatus laneStatus = evaluate(lane);
@@ -568,6 +747,16 @@ public final class MainActivity extends Activity {
             sb.append('\n');
         }
         return sb.toString();
+    }
+
+    private void appendCapabilities(StringBuilder sb, String title, List<NebulaCapability> capabilities) {
+        sb.append("[").append(title).append("]\n");
+        for (NebulaCapability capability : capabilities) {
+            sb.append("  ").append(capability.id).append(": ").append(capability.status).append('\n');
+            sb.append("    source=").append(capability.source).append('\n');
+            sb.append("    mutating=").append(capability.mutating).append('\n');
+        }
+        sb.append('\n');
     }
 
     private void copyReport() {
@@ -624,6 +813,20 @@ public final class MainActivity extends Activity {
         view.setMinWidth(dp(72));
         view.setBackground(round(color, dp(20), color));
         return view;
+    }
+
+    private LinearLayout baseCard() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(14), dp(14), dp(14));
+        card.setBackground(round(PANEL, dp(8), LINE));
+
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.bottomMargin = dp(12);
+        card.setLayoutParams(cardParams);
+        return card;
     }
 
     private Button actionButton(String label, int color) {

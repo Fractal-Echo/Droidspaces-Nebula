@@ -10,6 +10,7 @@
         <package android:name="io.waylandie.display" />
         <package android:name="com.codex.steamdisplay" />
         <package android:name="com.elitedarkkaiser.redmagic" />
+        <package android:name="com.khanhnguyen9872.nubiatoolkit" />
         <package android:name="cn.nubia.gameassist" />
         <package android:name="cn.nubia.gamelauncher" />
     </queries>

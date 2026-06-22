@@ -1,0 +1,310 @@
+#!/system/bin/sh
+set -u
+
+PROTOCOL_VERSION=1
+MODULE_ID=nebula_core
+DATA_DIR=${NEBULA_DATA_DIR:-/data/adb/nebula}
+LOG_DIR="$DATA_DIR/logs"
+STATE_DIR="$DATA_DIR/state"
+LOG_FILE="$LOG_DIR/nebula-core.log"
+PROFILE_FILE="$STATE_DIR/profile"
+SAFE_MODE_FILE="$DATA_DIR/safe_mode"
+SCRIPT_DIR=${0%/*}
+MODDIR=${NEBULA_MODULE_DIR:-${SCRIPT_DIR%/*}}
+MODULE_PROP=${NEBULA_MODULE_PROP:-$MODDIR/module.prop}
+
+ensure_dirs() {
+  mkdir -p "$LOG_DIR" "$STATE_DIR"
+  if [ ! -s "$PROFILE_FILE" ]; then
+    printf '%s\n' safe > "$PROFILE_FILE"
+  fi
+}
+
+prop_value() {
+  key=$1
+  if [ -f "$MODULE_PROP" ]; then
+    sed -n "s/^$key=//p" "$MODULE_PROP" | head -n 1
+  fi
+}
+
+module_version() {
+  value=$(prop_value version)
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' unknown
+  fi
+}
+
+module_version_code() {
+  value=$(prop_value versionCode)
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' 0
+  fi
+}
+
+git_commit() {
+  value=${NEBULA_GIT_COMMIT:-unknown}
+  printf '%s' "$value"
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g'
+}
+
+json_bool() {
+  if [ "$1" = "1" ]; then
+    printf '%s' true
+  else
+    printf '%s' false
+  fi
+}
+
+safe_mode_value() {
+  if [ -f "$SAFE_MODE_FILE" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+current_profile() {
+  if [ -s "$PROFILE_FILE" ]; then
+    value=$(head -n 1 "$PROFILE_FILE")
+  else
+    value=safe
+  fi
+  case "$value" in
+    safe|phone|dock|compatibility) printf '%s' "$value" ;;
+    *) printf '%s' safe ;;
+  esac
+}
+
+daemon_running_value() {
+  pid_file="$STATE_DIR/service.pid"
+  if [ -s "$pid_file" ]; then
+    pid=$(head -n 1 "$pid_file")
+    case "$pid" in
+      *[!0-9]*|'') printf '%s' 0 ;;
+      *)
+        if kill -0 "$pid" 2>/dev/null; then
+          printf '%s' 1
+        else
+          printf '%s' 0
+        fi
+        ;;
+    esac
+  else
+    printf '%s' 0
+  fi
+}
+
+service_status() {
+  if [ "$(daemon_running_value)" = "1" ]; then
+    printf '%s' running
+  elif [ -d "$STATE_DIR" ]; then
+    printf '%s' state_ready
+  else
+    printf '%s' missing_state
+  fi
+}
+
+log_command() {
+  ensure_dirs
+  printf '%s command=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$1" >> "$LOG_FILE"
+}
+
+status_json() {
+  ensure_dirs
+  safe=$(safe_mode_value)
+  daemon=$(daemon_running_value)
+  profile=$(current_profile)
+  printf '{"protocol_version":%s,"module_id":"%s","module_version":"%s","module_version_code":%s,"git_commit":"%s","safe_mode":%s,"profile":"%s","daemon_running":%s,"service_status":"%s"}\n' \
+    "$PROTOCOL_VERSION" \
+    "$MODULE_ID" \
+    "$(json_escape "$(module_version)")" \
+    "$(module_version_code)" \
+    "$(json_escape "$(git_commit)")" \
+    "$(json_bool "$safe")" \
+    "$profile" \
+    "$(json_bool "$daemon")" \
+    "$(service_status)"
+}
+
+capabilities_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"capabilities":[' "$PROTOCOL_VERSION"
+  printf '{"id":"profile.safe","title":"Recovery / Safe Mode","status":"available","mutating":false,"source":"nebula-core"},'
+  printf '{"id":"profile.phone","title":"Phone / App Mode","status":"available_no_launch","mutating":false,"source":"nebula-core"},'
+  printf '{"id":"profile.dock","title":"Dock Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
+  printf '{"id":"profile.compatibility","title":"Compatibility Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
+  printf '{"id":"safe-mode","title":"Safe mode","status":"available","mutating":true,"source":"nebula-core"},'
+  printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"}'
+  printf ']}\n'
+}
+
+profile_get_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"profile":"%s","safe_mode":%s}\n' \
+    "$PROTOCOL_VERSION" "$(current_profile)" "$(json_bool "$(safe_mode_value)")"
+}
+
+blocked_profile_json() {
+  profile=$1
+  printf '{"protocol_version":%s,"ok":false,"profile":"%s","error":"BLOCKED_NOT_READY"}\n' \
+    "$PROTOCOL_VERSION" "$profile"
+}
+
+profile_set() {
+  ensure_dirs
+  profile=$1
+  case "$profile" in
+    safe)
+      touch "$SAFE_MODE_FILE"
+      printf '%s\n' safe > "$PROFILE_FILE"
+      printf '{"protocol_version":%s,"ok":true,"profile":"safe","safe_mode":true}\n' "$PROTOCOL_VERSION"
+      ;;
+    phone)
+      rm -f "$SAFE_MODE_FILE"
+      printf '%s\n' phone > "$PROFILE_FILE"
+      printf '{"protocol_version":%s,"ok":true,"profile":"phone","safe_mode":false,"launch_started":false}\n' "$PROTOCOL_VERSION"
+      ;;
+    dock|compatibility)
+      blocked_profile_json "$profile"
+      return 75
+      ;;
+    *)
+      printf '{"protocol_version":%s,"ok":false,"error":"UNKNOWN_PROFILE"}\n' "$PROTOCOL_VERSION"
+      return 2
+      ;;
+  esac
+}
+
+safe_mode_get_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"safe_mode":%s}\n' \
+    "$PROTOCOL_VERSION" "$(json_bool "$(safe_mode_value)")"
+}
+
+safe_mode_enable() {
+  ensure_dirs
+  touch "$SAFE_MODE_FILE"
+  printf '%s\n' safe > "$PROFILE_FILE"
+  printf '{"protocol_version":%s,"ok":true,"safe_mode":true,"profile":"safe"}\n' "$PROTOCOL_VERSION"
+}
+
+logs_tail_json() {
+  ensure_dirs
+  lines=$1
+  case "$lines" in
+    ''|*[!0-9]*) lines=50 ;;
+  esac
+  if [ "$lines" -lt 1 ]; then lines=1; fi
+  if [ "$lines" -gt 500 ]; then lines=500; fi
+  printf '{"protocol_version":%s,"lines":[' "$PROTOCOL_VERSION"
+  if [ -f "$LOG_FILE" ]; then
+    out=$(tail -n "$lines" "$LOG_FILE" 2>/dev/null || true)
+    if [ -n "$out" ]; then
+      first=1
+      printf '%s\n' "$out" | while IFS= read -r line; do
+        if [ "$first" = "1" ]; then
+          first=0
+        else
+          printf ','
+        fi
+        printf '"%s"' "$(json_escape "$line")"
+      done
+    fi
+  fi
+  printf ']}\n'
+}
+
+usage_json() {
+  printf '{"protocol_version":%s,"ok":false,"error":"USAGE"}\n' "$PROTOCOL_VERSION"
+}
+
+main() {
+  cmd=${1:-}
+  case "$cmd" in
+    status)
+      if [ "${2:-}" = "--json" ]; then
+        log_command "status"
+        status_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    capabilities)
+      if [ "${2:-}" = "--json" ]; then
+        log_command "capabilities"
+        capabilities_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    profile)
+      sub=${2:-}
+      case "$sub" in
+        get)
+          if [ "${3:-}" = "--json" ]; then
+            log_command "profile_get"
+            profile_get_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        set)
+          target=${3:-}
+          log_command "profile_set_$target"
+          profile_set "$target"
+          ;;
+        *)
+          usage_json
+          return 2
+          ;;
+      esac
+      ;;
+    safe-mode)
+      sub=${2:-}
+      case "$sub" in
+        get)
+          if [ "${3:-}" = "--json" ]; then
+            log_command "safe_mode_get"
+            safe_mode_get_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        enable)
+          log_command "safe_mode_enable"
+          safe_mode_enable
+          ;;
+        *)
+          usage_json
+          return 2
+          ;;
+      esac
+      ;;
+    logs)
+      if [ "${2:-}" = "tail" ] && [ "${3:-}" = "--lines" ]; then
+        log_command "logs_tail"
+        logs_tail_json "${4:-50}"
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    *)
+      usage_json
+      return 2
+      ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,11 @@
+{
+  "protocol_version": 1,
+  "default_profile": "safe",
+  "safe_mode_default": true,
+  "mutating_device_controls_enabled": false,
+  "target_auto_launch_on_boot": false,
+  "blocked_profiles": [
+    "dock",
+    "compatibility"
+  ]
+}

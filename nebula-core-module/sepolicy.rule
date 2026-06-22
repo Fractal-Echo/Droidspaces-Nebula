@@ -1,0 +1,2 @@
+# No SELinux policy rules are installed in pass 01.
+# The preserved bridge policy evidence did not contain a required Nebula Core rule.
