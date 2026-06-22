@@ -22,7 +22,8 @@ public final class NebulaCoreClient {
             "profile set dock",
             "profile set compatibility",
             "safe-mode get --json",
-            "safe-mode enable"
+            "safe-mode enable",
+            "redmagic probe --json"
     ));
 
     public NebulaCoreStatus loadStatus() {
@@ -80,6 +81,13 @@ public final class NebulaCoreClient {
         }
         return runFixed("logs", "tail", "--lines",
                 String.valueOf(NebulaCoreProtocol.sanitizeTailLines(lines)));
+    }
+
+    public CommandResult redMagicProbe() {
+        if (!isModulePathVisible()) {
+            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
+        }
+        return runFixed("redmagic", "probe", "--json");
     }
 
     private boolean isModulePathVisible() {

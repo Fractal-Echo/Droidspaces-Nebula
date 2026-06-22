@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.droidspaces.nebula.core.NebulaCapability;
+import io.droidspaces.nebula.core.RedMagicProbe;
 import io.droidspaces.nebula.features.nubia.DeviceCapabilityProvider;
 
 public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvider {
@@ -15,6 +16,10 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
 
     @Override
     public List<NebulaCapability> discover(Context context) {
+        return discover(context, RedMagicProbe.unavailable("probe not requested"));
+    }
+
+    public List<NebulaCapability> discover(Context context, RedMagicProbe probe) {
         List<NebulaCapability> capabilities = new ArrayList<>();
         boolean controlCenter = hasPackage(context, REDMAGIC_CONTROL_PACKAGE);
         boolean nx809j = isNx809j();
@@ -42,6 +47,46 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
                 "Paths are documented from RedMagic Control Center and PowerDeck, but no writes are exposed in pass 01.",
                 true,
                 "HardwareController.kt and RedMagicPowerDeck docs/node-map.md"));
+
+        capabilities.add(new NebulaCapability(
+                "redmagic.probe.device",
+                "Device detected",
+                probe.available ? "probe_available" : "read_only_unavailable",
+                probe.deviceSummary,
+                false,
+                "nebula-core redmagic probe --json"));
+
+        capabilities.add(new NebulaCapability(
+                "redmagic.probe.fan",
+                "Fan telemetry",
+                probe.available ? "probe_available" : "read_only_unavailable",
+                probe.fanSummary,
+                false,
+                "nebula-core redmagic probe --json"));
+
+        capabilities.add(new NebulaCapability(
+                "redmagic.probe.performance",
+                "Performance mode",
+                probe.available ? "probe_available" : "unsupported_or_unavailable",
+                probe.performanceSummary,
+                false,
+                "nebula-core redmagic probe --json"));
+
+        capabilities.add(new NebulaCapability(
+                "redmagic.probe.display",
+                "Refresh state",
+                probe.available ? "probe_available" : "unsupported_or_unavailable",
+                probe.displaySummary,
+                false,
+                "nebula-core redmagic probe --json"));
+
+        capabilities.add(new NebulaCapability(
+                "redmagic.probe.thermal",
+                "Thermal readings",
+                probe.available ? "probe_available" : "read_only_unavailable",
+                probe.thermalSummary,
+                false,
+                "nebula-core redmagic probe --json"));
 
         capabilities.add(new NebulaCapability(
                 "redmagic.gpp.allgame",

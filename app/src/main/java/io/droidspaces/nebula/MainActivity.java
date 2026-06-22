@@ -35,8 +35,11 @@ import java.util.Locale;
 
 import io.droidspaces.nebula.core.NebulaCapability;
 import io.droidspaces.nebula.core.NebulaCoreClient;
+import io.droidspaces.nebula.core.NebulaCoreProtocol;
 import io.droidspaces.nebula.core.NebulaCoreStatus;
 import io.droidspaces.nebula.core.NebulaVersions;
+import io.droidspaces.nebula.core.CommandResult;
+import io.droidspaces.nebula.core.RedMagicProbe;
 import io.droidspaces.nebula.features.nubia.NubiaDeviceAdapter;
 import io.droidspaces.nebula.features.redmagic.RedMagicButtonAdapter;
 import io.droidspaces.nebula.features.redmagic.RedMagicPerformanceAdapter;
@@ -178,6 +181,7 @@ public final class MainActivity extends Activity {
     private final RedMagicPerformanceAdapter redMagicPerformanceAdapter = new RedMagicPerformanceAdapter();
     private final RedMagicButtonAdapter redMagicButtonAdapter = new RedMagicButtonAdapter();
     private NebulaCoreStatus coreStatus = NebulaCoreStatus.absent("Not refreshed");
+    private RedMagicProbe redMagicProbe = RedMagicProbe.unavailable("Not refreshed");
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -297,6 +301,7 @@ public final class MainActivity extends Activity {
 
     private void refresh() {
         coreStatus = coreClient.loadStatus();
+        redMagicProbe = loadRedMagicProbe(coreStatus);
         coreContainer.removeAllViews();
         coreContainer.addView(buildCoreCard(coreStatus));
 
@@ -311,7 +316,8 @@ public final class MainActivity extends Activity {
 
         performanceContainer.removeAllViews();
         performanceContainer.addView(buildCapabilityCard(
-                "Audited RedMagic capability status", redMagicPerformanceAdapter.discover(this)));
+                "Audited RedMagic capability status",
+                redMagicPerformanceAdapter.discover(this, redMagicProbe)));
 
         redMagicButtonContainer.removeAllViews();
         redMagicButtonContainer.addView(buildCapabilityCard(
@@ -322,6 +328,19 @@ public final class MainActivity extends Activity {
             laneContainer.addView(buildLaneCard(lane));
         }
         reportView.setText(buildReport());
+    }
+
+    private RedMagicProbe loadRedMagicProbe(NebulaCoreStatus status) {
+        if (!status.installed || status.hasVisibleError()) {
+            return RedMagicProbe.unavailable("Module unavailable; app remains read-only.");
+        }
+        CommandResult result = coreClient.redMagicProbe();
+        if (!result.ok()) {
+            String reason = result.stderr.isEmpty() ? result.stdout : result.stderr;
+            if (reason.isEmpty()) reason = "exit " + result.exitCode;
+            return RedMagicProbe.unavailable(reason);
+        }
+        return NebulaCoreProtocol.parseRedMagicProbe(result.stdout);
     }
 
     private View buildCoreCard(NebulaCoreStatus status) {
@@ -711,6 +730,7 @@ public final class MainActivity extends Activity {
         if (coreStatus.hasVisibleError()) {
             sb.append("  error=").append(coreStatus.visibleError()).append('\n');
         }
+        sb.append("  redMagicProbe=").append(redMagicProbe.available).append('\n');
         sb.append('\n');
 
         sb.append("[Targets]\n");
@@ -726,7 +746,7 @@ public final class MainActivity extends Activity {
         sb.append('\n');
 
         appendCapabilities(sb, "Device Tools", nubiaDeviceAdapter.discover(this));
-        appendCapabilities(sb, "Performance", redMagicPerformanceAdapter.discover(this));
+        appendCapabilities(sb, "Performance", redMagicPerformanceAdapter.discover(this, redMagicProbe));
         appendCapabilities(sb, "RedMagic Button", redMagicButtonAdapter.discover(this));
 
         for (Lane lane : lanes) {

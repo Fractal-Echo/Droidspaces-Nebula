@@ -63,6 +63,10 @@ public final class NebulaCoreProtocol {
         return capabilities;
     }
 
+    public static RedMagicProbe parseRedMagicProbe(String json) {
+        return RedMagicProbe.fromJson(json);
+    }
+
     public static boolean isAllowedProfile(NebulaProfile profile) {
         return profile == NebulaProfile.SAFE || profile == NebulaProfile.PHONE
                 || profile == NebulaProfile.DOCK || profile == NebulaProfile.COMPATIBILITY;

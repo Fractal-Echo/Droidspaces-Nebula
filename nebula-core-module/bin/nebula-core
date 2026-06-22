@@ -12,6 +12,10 @@ SAFE_MODE_FILE="$DATA_DIR/safe_mode"
 SCRIPT_DIR=${0%/*}
 MODDIR=${NEBULA_MODULE_DIR:-${SCRIPT_DIR%/*}}
 MODULE_PROP=${NEBULA_MODULE_PROP:-$MODDIR/module.prop}
+REDMAGIC_SOURCE_COMMIT=e94d36e8204c228c6e8781157dea22946cf715e3
+REDMAGIC_SOURCE_FAN="Redmagic-Control-Center HardwareController.kt:25-28,48-77@$REDMAGIC_SOURCE_COMMIT"
+REDMAGIC_SOURCE_THERMAL="Redmagic-Control-Center HardwareController.kt:275-288@$REDMAGIC_SOURCE_COMMIT"
+REDMAGIC_SOURCE_IDENTITY="Redmagic-Control-Center DeviceCapabilityScanner.kt:33-36@$REDMAGIC_SOURCE_COMMIT"
 
 ensure_dirs() {
   mkdir -p "$LOG_DIR" "$STATE_DIR"
@@ -52,6 +56,25 @@ git_commit() {
 
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g'
+}
+
+json_string() {
+  printf '"%s"' "$(json_escape "$1")"
+}
+
+json_string_or_null() {
+  if [ -n "$1" ]; then
+    json_string "$1"
+  else
+    printf '%s' null
+  fi
+}
+
+json_int_or_null() {
+  case "$1" in
+    ''|*[!0-9-]*) printf '%s' null ;;
+    *) printf '%s' "$1" ;;
+  esac
 }
 
 json_bool() {
@@ -141,7 +164,8 @@ capabilities_json() {
   printf '{"id":"profile.dock","title":"Dock Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
   printf '{"id":"profile.compatibility","title":"Compatibility Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
   printf '{"id":"safe-mode","title":"Safe mode","status":"available","mutating":true,"source":"nebula-core"},'
-  printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"}'
+  printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"},'
+  printf '{"id":"redmagic.probe","title":"RM11 Pro read-only RedMagic probe","status":"available_read_only","mutating":false,"source":"%s"}' "$(json_escape "$REDMAGIC_SOURCE_FAN")"
   printf ']}\n'
 }
 
@@ -221,6 +245,271 @@ logs_tail_json() {
   printf ']}\n'
 }
 
+list_append_json_string() {
+  current=$1
+  item=$2
+  if [ -n "$current" ]; then
+    printf '%s,"%s"' "$current" "$(json_escape "$item")"
+  else
+    printf '"%s"' "$(json_escape "$item")"
+  fi
+}
+
+is_test_denied_path() {
+  path=$1
+  deny_list=${NEBULA_TEST_DENY_PATHS:-}
+  old_ifs=$IFS
+  IFS=:
+  for denied in $deny_list; do
+    if [ "$denied" = "$path" ]; then
+      IFS=$old_ifs
+      return 0
+    fi
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+resolve_read_path() {
+  path=$1
+  root=${NEBULA_SYSROOT:-}
+  if [ -n "$root" ]; then
+    printf '%s%s' "$root" "$path"
+  else
+    printf '%s' "$path"
+  fi
+}
+
+is_allowlisted_read_path() {
+  case "$1" in
+    /sys/kernel/fan/fan_enable|\
+    /sys/kernel/fan/fan_speed_level|\
+    /sys/kernel/fan/fan_speed_count|\
+    /sys/class/thermal/thermal_zone0/temp|\
+    /sys/class/thermal/thermal_zone1/temp|\
+    /sys/class/thermal/thermal_zone2/temp|\
+    /sys/class/thermal/thermal_zone3/temp|\
+    /sys/devices/virtual/thermal/thermal_zone0/temp|\
+    /sys/devices/virtual/thermal/thermal_zone1/temp|\
+    /sys/devices/virtual/thermal/thermal_zone2/temp|\
+    /sys/devices/virtual/thermal/thermal_zone3/temp)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+read_allowlisted_file() {
+  path=$1
+  if ! is_allowlisted_read_path "$path"; then
+    return 8
+  fi
+  actual=$(resolve_read_path "$path")
+  if [ ! -e "$actual" ]; then
+    return 2
+  fi
+  if is_test_denied_path "$path"; then
+    return 3
+  fi
+  if [ ! -r "$actual" ]; then
+    return 3
+  fi
+  head -n 1 "$actual" 2>/dev/null | cut -c 1-128
+}
+
+path_present() {
+  path=$1
+  actual=$(resolve_read_path "$path")
+  [ -e "$actual" ]
+}
+
+read_prop() {
+  name=$1
+  case "$name" in
+    ro.product.manufacturer|ro.product.model|ro.product.product.name|\
+    ro.product.device|ro.board.platform|ro.product.marketname|ro.build.fingerprint)
+      ;;
+    *)
+      return 8
+      ;;
+  esac
+  prop_dir=${NEBULA_TEST_PROP_DIR:-}
+  if [ -n "$prop_dir" ] && [ -f "$prop_dir/$name" ]; then
+    head -n 1 "$prop_dir/$name" 2>/dev/null | cut -c 1-128
+    return 0
+  fi
+  if command -v getprop >/dev/null 2>&1; then
+    getprop "$name" 2>/dev/null | head -n 1 | cut -c 1-128
+  fi
+}
+
+read_kernel_release() {
+  if [ -n "${NEBULA_TEST_KERNEL:-}" ]; then
+    printf '%s' "$NEBULA_TEST_KERNEL"
+  else
+    uname -r 2>/dev/null | head -n 1 | cut -c 1-128
+  fi
+}
+
+value_or_unknown() {
+  if [ -n "$1" ]; then
+    printf '%s' "$1"
+  else
+    printf '%s' unknown
+  fi
+}
+
+normalize_temp_c() {
+  raw=$1
+  case "$raw" in
+    ''|*[!0-9.-]*) printf '%s' null; return ;;
+  esac
+  case "$raw" in
+    *.*) printf '%s' "$raw"; return ;;
+  esac
+  if [ "$raw" -gt 1000 ] 2>/dev/null && [ "$raw" -lt 200000 ] 2>/dev/null; then
+    whole=$((raw / 1000))
+    frac=$((raw % 1000))
+    printf '%s.%03d' "$whole" "$frac"
+  elif [ "$raw" -gt -100 ] 2>/dev/null && [ "$raw" -lt 200 ] 2>/dev/null; then
+    printf '%s' "$raw"
+  else
+    printf '%s' null
+  fi
+}
+
+redmagic_probe_json() {
+  manufacturer=$(value_or_unknown "$(read_prop ro.product.manufacturer)")
+  model=$(value_or_unknown "$(read_prop ro.product.model)")
+  product=$(value_or_unknown "$(read_prop ro.product.product.name)")
+  device=$(value_or_unknown "$(read_prop ro.product.device)")
+  board_platform=$(value_or_unknown "$(read_prop ro.board.platform)")
+  kernel=$(value_or_unknown "$(read_kernel_release)")
+
+  fan_errors=
+  fan_present=0
+  fan_supported=0
+  fan_enabled=
+  fan_rpm=
+  fan_level=
+
+  for fan_path in /sys/kernel/fan/fan_enable /sys/kernel/fan/fan_speed_level /sys/kernel/fan/fan_speed_count; do
+    if path_present "$fan_path"; then
+      fan_present=1
+      fan_supported=1
+    fi
+  done
+
+  if [ "$fan_present" = "1" ]; then
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      case "$value" in
+        1) fan_enabled=true ;;
+        0) fan_enabled=false ;;
+        *) fan_enabled= ;;
+      esac
+    elif [ "$rc" = "3" ]; then
+      fan_errors=$(list_append_json_string "$fan_errors" "permission_denied:/sys/kernel/fan/fan_enable")
+    fi
+
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_count)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      fan_rpm=$value
+    elif [ "$rc" = "3" ]; then
+      fan_errors=$(list_append_json_string "$fan_errors" "permission_denied:/sys/kernel/fan/fan_speed_count")
+    fi
+
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_level)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      fan_level=$value
+    elif [ "$rc" = "3" ]; then
+      fan_errors=$(list_append_json_string "$fan_errors" "permission_denied:/sys/kernel/fan/fan_speed_level")
+    fi
+  else
+    fan_errors=$(list_append_json_string "$fan_errors" "missing:/sys/kernel/fan")
+  fi
+
+  thermal_errors=
+  thermal_readings=
+  thermal_supported=0
+  first=1
+  for thermal_path in \
+    /sys/class/thermal/thermal_zone0/temp \
+    /sys/class/thermal/thermal_zone1/temp \
+    /sys/class/thermal/thermal_zone2/temp \
+    /sys/class/thermal/thermal_zone3/temp \
+    /sys/devices/virtual/thermal/thermal_zone0/temp \
+    /sys/devices/virtual/thermal/thermal_zone1/temp \
+    /sys/devices/virtual/thermal/thermal_zone2/temp \
+    /sys/devices/virtual/thermal/thermal_zone3/temp
+  do
+    if path_present "$thermal_path"; then
+      value=$(read_allowlisted_file "$thermal_path")
+      rc=$?
+      if [ "$rc" = "0" ]; then
+        thermal_supported=1
+        temp_c=$(normalize_temp_c "$value")
+        entry=$(printf '{"path":"%s","raw":"%s","temp_c":%s,"source":"%s"}' \
+          "$(json_escape "$thermal_path")" \
+          "$(json_escape "$value")" \
+          "$temp_c" \
+          "$(json_escape "$REDMAGIC_SOURCE_THERMAL")")
+        if [ "$first" = "1" ]; then
+          thermal_readings=$entry
+          first=0
+        else
+          thermal_readings="$thermal_readings,$entry"
+        fi
+      elif [ "$rc" = "3" ]; then
+        thermal_errors=$(list_append_json_string "$thermal_errors" "permission_denied:$thermal_path")
+      fi
+    fi
+  done
+  if [ "$thermal_supported" = "0" ] && [ -z "$thermal_errors" ]; then
+    thermal_errors=$(list_append_json_string "$thermal_errors" "missing:thermal_temp_allowlist")
+  fi
+
+  if [ -z "$fan_enabled" ]; then
+    fan_enabled_json=null
+  else
+    fan_enabled_json=$fan_enabled
+  fi
+
+  printf '{'
+  printf '"protocol_version":%s,' "$PROTOCOL_VERSION"
+  printf '"command":"redmagic probe",'
+  printf '"device":{"manufacturer":%s,"model":%s,"product":%s,"device":%s,"board_platform":%s,"kernel":%s,"source":%s},' \
+    "$(json_string "$manufacturer")" \
+    "$(json_string "$model")" \
+    "$(json_string "$product")" \
+    "$(json_string "$device")" \
+    "$(json_string "$board_platform")" \
+    "$(json_string "$kernel")" \
+    "$(json_string "$REDMAGIC_SOURCE_IDENTITY")"
+  printf '"fan":{"supported":%s,"present":%s,"enabled":%s,"rpm":%s,"level":%s,"source":%s,"errors":[%s]},' \
+    "$(json_bool "$fan_supported")" \
+    "$(json_bool "$fan_present")" \
+    "$fan_enabled_json" \
+    "$(json_int_or_null "$fan_rpm")" \
+    "$(json_int_or_null "$fan_level")" \
+    "$(json_string "$REDMAGIC_SOURCE_FAN")" \
+    "$fan_errors"
+  printf '"performance":{"supported":false,"mode":null,"source":"no_confirmed_read_only_source","errors":["NO_CONFIRMED_READ_ONLY_SOURCE"]},'
+  printf '"display":{"supported":false,"refresh_rate_hz":null,"source":"no_confirmed_read_only_source","errors":["NO_CONFIRMED_READ_ONLY_SOURCE"]},'
+  printf '"thermal":{"supported":%s,"readings":[%s],"source":%s,"errors":[%s]},' \
+    "$(json_bool "$thermal_supported")" \
+    "$thermal_readings" \
+    "$(json_string "$REDMAGIC_SOURCE_THERMAL")" \
+    "$thermal_errors"
+  printf '"redmagic_button":{"supported":false,"configured":false,"reason":"disabled_in_pass_02"}'
+  printf '}\n'
+}
+
 usage_json() {
   printf '{"protocol_version":%s,"ok":false,"error":"USAGE"}\n' "$PROTOCOL_VERSION"
 }
@@ -295,6 +584,14 @@ main() {
       if [ "${2:-}" = "tail" ] && [ "${3:-}" = "--lines" ]; then
         log_command "logs_tail"
         logs_tail_json "${4:-50}"
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    redmagic)
+      if [ "${2:-}" = "probe" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        redmagic_probe_json
       else
         usage_json
         return 2
