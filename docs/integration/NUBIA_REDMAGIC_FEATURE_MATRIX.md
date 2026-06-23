@@ -25,7 +25,8 @@ Source restoration:
 | Super resolution unlock | NubiaToolkit | `SuperResolutionHook.hookPluginUtils`, `hookSuperResolutionHelper` | Apache-2.0 | Expose/support Superior Pic Quality gates. | Mutating behavior | LSPosed/root | LSPosed hook, Settings provider, system property path by analysis | RedMagic relevant; exact NX809J render effect unconfirmed | Disable hook; clear related settings/properties if later used | Medium-high because vendor behavior is unclear | Future app + hook/module | REFERENCE_ONLY |
 | Watermark length | NubiaToolkit | `WatermarkLengthHook.hookWaterMarkWatcher` | Apache-2.0 | Increase Game Launcher watermark text limit. | Mutating UI behavior | LSPosed/root | LSPosed hook | RedMagic relevant, NX809J not live-confirmed | Disable hook | Low | Future hook lane | UNKNOWN |
 | Fan enable/level/PWM/RPM | Redmagic-Control-Center | `HardwareController.enableFan`, `setFanLevel`, `setFanPwm`, `readFanRpm` | Author permission, attribution required | Cooling fan control/status. | Mutating/read-only | Root | sysfs | NX809J candidate from Control Center and PowerDeck node map; not live-tested | Snapshot prior values, write previous enable/level/PWM | Medium | Module | REIMPLEMENT later; status only in pass 01 |
-| Micropump | Redmagic-Control-Center | `HardwareController.enablePump`, `setPumpProfile` | Author permission, attribution required | Liquid cooling pump control/status. | Mutating/read-only | Root | procfs | NX809J candidate from Control Center and PowerDeck | Snapshot enable/freq/speed, restore previous values | Medium | Module | REIMPLEMENT later; status only in pass 01 |
+| Micropump read-only telemetry | Redmagic-Control-Center | `HardwareController.readPumpEnabled`, `readPumpFreq`, `readPumpSpeed`; `DashboardSnapshot.readPumpEnabled/readPumpFreq/readPumpSpeed`; `DeviceCapabilityScanner.scan` | Author permission, attribution required | Liquid-cooling pump support, presence, enabled state, and vendor speed telemetry. | Read-only | Root likely | procfs | NX809J candidate from Control Center; live support must be reported from exact nodes only | None | Low | Module + app | PORT in pass 03 |
+| Micropump control/profile writes | Redmagic-Control-Center | `HardwareController.enablePump`, `setPumpProfile`; `AutoPumpService.applyPumpRule`; `PumpDialogUi` | Author permission, attribution required | Liquid-cooling pump enable/profile control. | Mutating | Root | procfs writes/service/UI callbacks | NX809J candidate from Control Center and PowerDeck | Snapshot enable/freq/speed, restore previous values if ever enabled | Medium | Future module | REJECT_MUTATING for pass 03 |
 | RGB LEDs | Redmagic-Control-Center | `setFanLedEnabled`, `setLogoLedEffect`, `setShoulderLedEffect` | Author permission, attribution required | Fan/logo/shoulder lighting. | Mutating | Root | sysfs | NX809J candidate; not live-tested | Snapshot LED effect/cfg, restore/off | Low-medium | Module + app UI | REIMPLEMENT later; status only in pass 01 |
 | Shoulder triggers | Redmagic-Control-Center | `enableTriggers`, `disableTriggers`, `TriggerRootService` | Author permission, attribution required | Enable/handle shoulder trigger input. | Mutating | Root/accessibility | sysfs, input event, shell command | NX809J candidate via `nubia_tgk_aw_sar*` event names; not live-tested | Disable custom service, restore SAR mode, stock fallback | Medium-high | Module later | REIMPLEMENT later; disabled in pass 01 |
 | Magic Key / slider | Redmagic-Control-Center | `setSliderStockFunction`, `setSliderLaunchApp`, `readSliderState`, `MagicKeyActions` | Author permission, attribution required | Map physical slider/Magic Key actions. | Mutating/read-only | Root | Settings provider, system setting, global setting | NX809J candidate; setting names proven in source only | Restore previous `fourth_physical_key_function_value` and app value | Medium | Module later | REIMPLEMENT later; disabled in pass 01 |
@@ -49,11 +50,13 @@ Selected for port/reimplementation now:
 - Module status/version/protocol display.
 - Nubia/RedMagic capability discovery cards.
 - RedMagic button audit card, disabled.
+- RedMagic liquid-cooling pump read-only probe in pass 03.
 
 Deferred or rejected:
 
 - Any LSPosed hook activation.
 - Any fan/pump/LED/trigger/slider/haptic write.
+- Pump `freq` and `mode` value semantics until units/meaning are proven.
 - GPP property auto-set at boot.
 - Lossless Scaling/Vulkan/frame-generation integration.
 - Generic performance tuning modules.

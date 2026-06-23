@@ -42,9 +42,9 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
 
         capabilities.add(new NebulaCapability(
                 "redmagic.performance.nodes",
-                "Fan, pump, LED, trigger nodes",
+                "Hardware control nodes",
                 nx809j ? "audited_blocked" : "model_unconfirmed",
-                "Paths are documented from RedMagic Control Center and PowerDeck, but no writes are exposed in pass 01.",
+                "Paths are documented from RedMagic Control Center and PowerDeck; pass 03 exposes only read-only telemetry.",
                 true,
                 "HardwareController.kt and RedMagicPowerDeck docs/node-map.md"));
 
@@ -58,11 +58,19 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
 
         capabilities.add(new NebulaCapability(
                 "redmagic.probe.fan",
-                "Fan telemetry",
+                "Internal Fan telemetry",
                 probe.available ? "probe_available" : "read_only_unavailable",
                 probe.fanSummary,
                 false,
                 "nebula-core redmagic probe --json"));
+
+        capabilities.add(new NebulaCapability(
+                "redmagic.probe.pump",
+                "Liquid Cooling Pump",
+                pumpStatus(probe),
+                probe.pumpSummary,
+                false,
+                "nebula-core redmagic pump probe --json"));
 
         capabilities.add(new NebulaCapability(
                 "redmagic.probe.performance",
@@ -116,5 +124,18 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
 
     private boolean equalsIgnoreCase(String expected, String actual) {
         return actual != null && expected.equalsIgnoreCase(actual);
+    }
+
+    private String pumpStatus(RedMagicProbe probe) {
+        if (!probe.available) {
+            return "read_only_unavailable";
+        }
+        if (probe.pumpSupported) {
+            return "probe_available";
+        }
+        if (probe.pumpPresent) {
+            return "present_no_readable_telemetry";
+        }
+        return "unsupported_or_unavailable";
     }
 }

@@ -28,7 +28,7 @@ KSU module:
 
 `NEBULA_CORE_PROTOCOL_VERSION=1`
 
-Allowed pass 01 commands:
+Allowed fixed commands:
 
 | Command | Result |
 | --- | --- |
@@ -40,6 +40,8 @@ Allowed pass 01 commands:
 | `safe-mode get --json` | Safe-mode state. |
 | `safe-mode enable` | Enables safe mode and stores safe profile. |
 | `logs tail --lines N` | Returns the last 1-500 module log lines as JSON. |
+| `redmagic probe --json` | Read-only aggregate RM11 Pro RedMagic telemetry. |
+| `redmagic pump probe --json` | Read-only liquid-cooling pump telemetry from fixed micropump nodes. |
 
 Blocked pass 01 activations:
 
@@ -81,6 +83,7 @@ Pass 01 defaults:
 - No compositor/display/backend start.
 - No unrestricted shell console in the APK.
 - Mutating Nubia/RedMagic controls are represented as audited status only.
+- The RedMagic pump probe reads only fixed source-derived `/proc/driver/micropump` nodes and never exposes pump enable, disable, speed, mode, or profile setters.
 
 ## Source Integration
 

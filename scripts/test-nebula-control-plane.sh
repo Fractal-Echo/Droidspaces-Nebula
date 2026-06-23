@@ -52,7 +52,16 @@ python3 - "$caps" <<'PY'
 import json, sys
 obj = json.loads(sys.argv[1])
 ids = {item["id"] for item in obj["capabilities"]}
-required = {"profile.safe", "profile.phone", "profile.dock", "profile.compatibility", "safe-mode", "logs.tail", "redmagic.probe"}
+required = {
+    "profile.safe",
+    "profile.phone",
+    "profile.dock",
+    "profile.compatibility",
+    "safe-mode",
+    "logs.tail",
+    "redmagic.probe",
+    "redmagic.pump.probe",
+}
 missing = sorted(required - ids)
 if missing:
     raise SystemExit(f"missing capabilities: {missing}")
@@ -60,11 +69,18 @@ PY
 
 fixture="$tmp/fixture"
 props="$tmp/props"
-mkdir -p "$fixture/sys/kernel/fan" "$fixture/sys/class/thermal/thermal_zone0" "$props"
+mkdir -p \
+  "$fixture/sys/kernel/fan" \
+  "$fixture/sys/class/thermal/thermal_zone0" \
+  "$fixture/proc/driver/micropump" \
+  "$props"
 printf 1 > "$fixture/sys/kernel/fan/fan_enable"
 printf 4200 > "$fixture/sys/kernel/fan/fan_speed_count"
 printf 4 > "$fixture/sys/kernel/fan/fan_speed_level"
 printf 41000 > "$fixture/sys/class/thermal/thermal_zone0/temp"
+printf 1 > "$fixture/proc/driver/micropump/enable"
+printf 4 > "$fixture/proc/driver/micropump/freq"
+printf 80 > "$fixture/proc/driver/micropump/speed"
 printf nubia > "$props/ro.product.manufacturer"
 printf NX809J > "$props/ro.product.model"
 printf NX809J > "$props/ro.product.product.name"
@@ -80,7 +96,7 @@ probe="$(
 python3 - "$probe" <<'PY'
 import json, sys
 obj = json.loads(sys.argv[1])
-for key in ["protocol_version", "command", "device", "fan", "performance", "display", "thermal", "redmagic_button"]:
+for key in ["protocol_version", "command", "device", "fan", "pump", "performance", "display", "thermal", "redmagic_button"]:
     if key not in obj:
         raise SystemExit(f"missing probe key: {key}")
 assert obj["command"] == "redmagic probe"
@@ -90,11 +106,45 @@ assert obj["fan"]["present"] is True
 assert obj["fan"]["enabled"] is True
 assert obj["fan"]["rpm"] == 4200
 assert obj["fan"]["level"] == 4
+assert obj["pump"]["supported"] is True
+assert obj["pump"]["present"] is True
+assert obj["pump"]["enabled"] is True
+assert obj["pump"]["speed"] == 80
+assert obj["pump"]["rpm"] is None
+assert obj["pump"]["level"] is None
+assert obj["pump"]["flow_rate"] is None
+assert obj["pump"]["flow_rate_unit"] is None
+assert obj["pump"]["mode"] is None
+assert obj["pump"]["confidence"] == "confirmed"
+assert "/proc/driver/micropump/speed" in obj["pump"]["sources"]
 assert obj["performance"]["supported"] is False
 assert obj["display"]["supported"] is False
 assert obj["thermal"]["supported"] is True
 assert obj["thermal"]["readings"][0]["temp_c"] == 41.0
 assert obj["redmagic_button"]["reason"] == "disabled_in_pass_02"
+PY
+
+pump_probe="$(
+  NEBULA_SYSROOT="$fixture" \
+  sh "$cli" redmagic pump probe --json
+)"
+python3 - "$pump_probe" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "redmagic pump probe"
+pump = obj["pump"]
+assert pump["supported"] is True
+assert pump["present"] is True
+assert pump["enabled"] is True
+assert pump["speed"] == 80
+assert pump["rpm"] is None
+assert pump["level"] is None
+assert pump["flow_rate"] is None
+assert pump["flow_rate_unit"] is None
+assert pump["mode"] is None
+assert pump["confidence"] == "confirmed"
+assert pump["errors"] == []
 PY
 
 missing_probe="$(NEBULA_SYSROOT="$tmp/missing" sh "$cli" redmagic probe --json)"
@@ -103,13 +153,27 @@ import json, sys
 obj = json.loads(sys.argv[1])
 assert obj["fan"]["supported"] is False
 assert obj["fan"]["present"] is False
+assert obj["pump"]["supported"] is False
+assert obj["pump"]["present"] is False
 assert obj["thermal"]["supported"] is False
 assert obj["fan"]["errors"]
+assert "missing:/proc/driver/micropump" in obj["pump"]["errors"]
+PY
+
+missing_pump_probe="$(NEBULA_SYSROOT="$tmp/missing" sh "$cli" redmagic pump probe --json)"
+python3 - "$missing_pump_probe" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+pump = obj["pump"]
+assert pump["supported"] is False
+assert pump["present"] is False
+assert pump["sources"] == []
+assert "missing:/proc/driver/micropump" in pump["errors"]
 PY
 
 denied_probe="$(
   NEBULA_SYSROOT="$fixture" \
-  NEBULA_TEST_DENY_PATHS="/sys/kernel/fan/fan_speed_count" \
+  NEBULA_TEST_DENY_PATHS="/sys/kernel/fan/fan_speed_count:/proc/driver/micropump/speed" \
   sh "$cli" redmagic probe --json
 )"
 python3 - "$denied_probe" <<'PY'
@@ -118,14 +182,57 @@ obj = json.loads(sys.argv[1])
 assert obj["fan"]["supported"] is True
 assert obj["fan"]["rpm"] is None
 assert "permission_denied:/sys/kernel/fan/fan_speed_count" in obj["fan"]["errors"]
+assert obj["pump"]["supported"] is True
+assert obj["pump"]["speed"] is None
+assert "permission_denied:/proc/driver/micropump/speed" in obj["pump"]["errors"]
+PY
+
+malformed_fixture="$tmp/malformed"
+mkdir -p "$malformed_fixture/proc/driver/micropump"
+printf 1 > "$malformed_fixture/proc/driver/micropump/enable"
+printf 4 > "$malformed_fixture/proc/driver/micropump/freq"
+printf fast > "$malformed_fixture/proc/driver/micropump/speed"
+malformed_pump="$(
+  NEBULA_SYSROOT="$malformed_fixture" \
+  sh "$cli" redmagic pump probe --json
+)"
+python3 - "$malformed_pump" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+pump = obj["pump"]
+assert pump["supported"] is True
+assert pump["speed"] is None
+assert "invalid_numeric:/proc/driver/micropump/speed:fast" in pump["errors"]
+PY
+
+range_fixture="$tmp/out-of-range"
+mkdir -p "$range_fixture/proc/driver/micropump"
+printf 1 > "$range_fixture/proc/driver/micropump/enable"
+printf 4 > "$range_fixture/proc/driver/micropump/freq"
+printf 500 > "$range_fixture/proc/driver/micropump/speed"
+range_pump="$(
+  NEBULA_SYSROOT="$range_fixture" \
+  sh "$cli" redmagic pump probe --json
+)"
+python3 - "$range_pump" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+pump = obj["pump"]
+assert pump["supported"] is True
+assert pump["speed"] is None
+assert "out_of_range:/proc/driver/micropump/speed:500" in pump["errors"]
 PY
 
 set +e
 extra_arg="$(sh "$cli" redmagic probe --json /etc/passwd 2>/dev/null)"
 extra_code=$?
+pump_extra_arg="$(sh "$cli" redmagic pump probe --json /proc/driver/micropump/speed 2>/dev/null)"
+pump_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
+[[ "$pump_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'
@@ -151,6 +258,6 @@ if rg -n 'cat "?[$][{]?[A-Za-z0-9_]+|/etc/passwd|/proc/kmsg' "$repo_root/nebula-
 fi
 
 rg -n 'NEBULA_CORE_PROTOCOL_VERSION = 1|NEBULA_CORE_PROTOCOL_VERSION=1' "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreProtocol.java" >/dev/null
-rg -n 'protocolMismatch|moduleVersionMismatch|Invalid module JSON|parseRedMagicProbe' "$repo_root/app/src/main/java/io/droidspaces/nebula/core" >/dev/null
+rg -n 'protocolMismatch|moduleVersionMismatch|Invalid module JSON|parseRedMagicProbe|redMagicPumpProbe' "$repo_root/app/src/main/java/io/droidspaces/nebula/core" >/dev/null
 
 echo "Nebula control plane host tests passed."

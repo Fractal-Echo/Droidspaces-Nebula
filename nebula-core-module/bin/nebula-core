@@ -14,6 +14,7 @@ MODDIR=${NEBULA_MODULE_DIR:-${SCRIPT_DIR%/*}}
 MODULE_PROP=${NEBULA_MODULE_PROP:-$MODDIR/module.prop}
 REDMAGIC_SOURCE_COMMIT=e94d36e8204c228c6e8781157dea22946cf715e3
 REDMAGIC_SOURCE_FAN="Redmagic-Control-Center HardwareController.kt:25-28,48-77@$REDMAGIC_SOURCE_COMMIT"
+REDMAGIC_SOURCE_PUMP="Redmagic-Control-Center HardwareController.kt:30-32,80-98; DashboardSnapshot.kt:16-18; DeviceCapabilityScanner.kt:43-45@$REDMAGIC_SOURCE_COMMIT"
 REDMAGIC_SOURCE_THERMAL="Redmagic-Control-Center HardwareController.kt:275-288@$REDMAGIC_SOURCE_COMMIT"
 REDMAGIC_SOURCE_IDENTITY="Redmagic-Control-Center DeviceCapabilityScanner.kt:33-36@$REDMAGIC_SOURCE_COMMIT"
 
@@ -74,6 +75,13 @@ json_int_or_null() {
   case "$1" in
     ''|*[!0-9-]*) printf '%s' null ;;
     *) printf '%s' "$1" ;;
+  esac
+}
+
+is_unsigned_integer() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
   esac
 }
 
@@ -165,7 +173,8 @@ capabilities_json() {
   printf '{"id":"profile.compatibility","title":"Compatibility Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
   printf '{"id":"safe-mode","title":"Safe mode","status":"available","mutating":true,"source":"nebula-core"},'
   printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"},'
-  printf '{"id":"redmagic.probe","title":"RM11 Pro read-only RedMagic probe","status":"available_read_only","mutating":false,"source":"%s"}' "$(json_escape "$REDMAGIC_SOURCE_FAN")"
+  printf '{"id":"redmagic.probe","title":"RM11 Pro read-only RedMagic probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_FAN")"
+  printf '{"id":"redmagic.pump.probe","title":"RM11 Pro read-only liquid-cooling pump probe","status":"available_read_only","mutating":false,"source":"%s"}' "$(json_escape "$REDMAGIC_SOURCE_PUMP")"
   printf ']}\n'
 }
 
@@ -285,6 +294,9 @@ is_allowlisted_read_path() {
     /sys/kernel/fan/fan_enable|\
     /sys/kernel/fan/fan_speed_level|\
     /sys/kernel/fan/fan_speed_count|\
+    /proc/driver/micropump/enable|\
+    /proc/driver/micropump/freq|\
+    /proc/driver/micropump/speed|\
     /sys/class/thermal/thermal_zone0/temp|\
     /sys/class/thermal/thermal_zone1/temp|\
     /sys/class/thermal/thermal_zone2/temp|\
@@ -378,6 +390,123 @@ normalize_temp_c() {
   else
     printf '%s' null
   fi
+}
+
+pump_json_payload() {
+  pump_errors=
+  pump_sources=
+  pump_present=0
+  pump_supported=0
+  pump_enabled=
+  pump_speed=
+
+  for pump_path in \
+    /proc/driver/micropump/enable \
+    /proc/driver/micropump/freq \
+    /proc/driver/micropump/speed \
+    /proc/driver/micropump/mode
+  do
+    if path_present "$pump_path"; then
+      pump_present=1
+    fi
+  done
+
+  if path_present /proc/driver/micropump/enable; then
+    value=$(read_allowlisted_file /proc/driver/micropump/enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      pump_sources=$(list_append_json_string "$pump_sources" "/proc/driver/micropump/enable")
+      if [ -z "$value" ]; then
+        pump_errors=$(list_append_json_string "$pump_errors" "empty:/proc/driver/micropump/enable")
+      elif is_unsigned_integer "$value"; then
+        case "$value" in
+          0) pump_enabled=false; pump_supported=1 ;;
+          1) pump_enabled=true; pump_supported=1 ;;
+          *) pump_errors=$(list_append_json_string "$pump_errors" "out_of_range:/proc/driver/micropump/enable:$value") ;;
+        esac
+      else
+        pump_errors=$(list_append_json_string "$pump_errors" "invalid_numeric:/proc/driver/micropump/enable:$value")
+      fi
+    elif [ "$rc" = "3" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "permission_denied:/proc/driver/micropump/enable")
+    fi
+  fi
+
+  if path_present /proc/driver/micropump/freq; then
+    value=$(read_allowlisted_file /proc/driver/micropump/freq)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      pump_sources=$(list_append_json_string "$pump_sources" "/proc/driver/micropump/freq")
+      if [ -z "$value" ]; then
+        pump_errors=$(list_append_json_string "$pump_errors" "empty:/proc/driver/micropump/freq")
+      elif is_unsigned_integer "$value"; then
+        if [ "$value" -le 100 ] 2>/dev/null; then
+          pump_supported=1
+        else
+          pump_errors=$(list_append_json_string "$pump_errors" "out_of_range:/proc/driver/micropump/freq:$value")
+        fi
+      else
+        pump_errors=$(list_append_json_string "$pump_errors" "invalid_numeric:/proc/driver/micropump/freq:$value")
+      fi
+    elif [ "$rc" = "3" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "permission_denied:/proc/driver/micropump/freq")
+    fi
+  fi
+
+  if path_present /proc/driver/micropump/speed; then
+    value=$(read_allowlisted_file /proc/driver/micropump/speed)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      pump_sources=$(list_append_json_string "$pump_sources" "/proc/driver/micropump/speed")
+      if [ -z "$value" ]; then
+        pump_errors=$(list_append_json_string "$pump_errors" "empty:/proc/driver/micropump/speed")
+      elif is_unsigned_integer "$value"; then
+        if [ "$value" -le 100 ] 2>/dev/null; then
+          pump_speed=$value
+          pump_supported=1
+        else
+          pump_errors=$(list_append_json_string "$pump_errors" "out_of_range:/proc/driver/micropump/speed:$value")
+        fi
+      else
+        pump_errors=$(list_append_json_string "$pump_errors" "invalid_numeric:/proc/driver/micropump/speed:$value")
+      fi
+    elif [ "$rc" = "3" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "permission_denied:/proc/driver/micropump/speed")
+    fi
+  fi
+
+  if [ "$pump_present" = "0" ]; then
+    pump_errors=$(list_append_json_string "$pump_errors" "missing:/proc/driver/micropump")
+    pump_confidence=unsupported
+  elif [ "$pump_supported" = "1" ]; then
+    pump_confidence=confirmed
+  else
+    if [ -z "$pump_errors" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "presence_only:/proc/driver/micropump")
+    fi
+    pump_confidence=candidate
+  fi
+
+  if [ -z "$pump_enabled" ]; then
+    pump_enabled_json=null
+  else
+    pump_enabled_json=$pump_enabled
+  fi
+
+  printf '{"supported":%s,"present":%s,"enabled":%s,"rpm":null,"speed":%s,"level":null,"flow_rate":null,"flow_rate_unit":null,"mode":null,"sources":[%s],"confidence":%s,"errors":[%s]}' \
+    "$(json_bool "$pump_supported")" \
+    "$(json_bool "$pump_present")" \
+    "$pump_enabled_json" \
+    "$(json_int_or_null "$pump_speed")" \
+    "$pump_sources" \
+    "$(json_string "$pump_confidence")" \
+    "$pump_errors"
+}
+
+redmagic_pump_probe_json() {
+  printf '{"protocol_version":%s,"command":"redmagic pump probe","pump":' "$PROTOCOL_VERSION"
+  pump_json_payload
+  printf '}\n'
 }
 
 redmagic_probe_json() {
@@ -479,6 +608,7 @@ redmagic_probe_json() {
   else
     fan_enabled_json=$fan_enabled
   fi
+  pump_payload=$(pump_json_payload)
 
   printf '{'
   printf '"protocol_version":%s,' "$PROTOCOL_VERSION"
@@ -499,6 +629,7 @@ redmagic_probe_json() {
     "$(json_int_or_null "$fan_level")" \
     "$(json_string "$REDMAGIC_SOURCE_FAN")" \
     "$fan_errors"
+  printf '"pump":%s,' "$pump_payload"
   printf '"performance":{"supported":false,"mode":null,"source":"no_confirmed_read_only_source","errors":["NO_CONFIRMED_READ_ONLY_SOURCE"]},'
   printf '"display":{"supported":false,"refresh_rate_hz":null,"source":"no_confirmed_read_only_source","errors":["NO_CONFIRMED_READ_ONLY_SOURCE"]},'
   printf '"thermal":{"supported":%s,"readings":[%s],"source":%s,"errors":[%s]},' \
@@ -592,6 +723,8 @@ main() {
     redmagic)
       if [ "${2:-}" = "probe" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
         redmagic_probe_json
+      elif [ "${2:-}" = "pump" ] && [ "${3:-}" = "probe" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        redmagic_pump_probe_json
       else
         usage_json
         return 2
