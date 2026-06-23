@@ -143,6 +143,7 @@ settings_dir="$tmp/settings"
 mkdir -p "$settings_dir"
 printf 0 > "$settings_dir/global_adb_enabled"
 printf 0 > "$settings_dir/global_adb_wifi_enabled"
+printf 0 > "$settings_dir/global_enable_wireless_switch"
 adb_wifi_status="$(
   NEBULA_SETTINGS_DIR="$settings_dir" \
   sh "$cli" adb-wifi status --json
@@ -154,6 +155,8 @@ assert obj["protocol_version"] == 1
 assert obj["command"] == "adb-wifi status"
 assert obj["adb_debugging"] is False
 assert obj["wireless_debugging"] is False
+assert obj["settings_wireless_debugging"] is False
+assert obj["ui_wireless_switch"] is False
 assert obj["auto_enable"] is False
 assert obj["errors"] == []
 PY
@@ -171,11 +174,14 @@ assert obj["ok"] is True
 assert obj["applied"] is True
 assert obj["adb_debugging"] is True
 assert obj["wireless_debugging"] is True
+assert obj["settings_wireless_debugging"] is True
+assert obj["ui_wireless_switch"] is True
 assert obj["auto_enable"] is True
 assert obj["errors"] == []
 PY
 [[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
 [[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
+[[ "$(cat "$settings_dir/global_enable_wireless_switch")" == "1" ]]
 [[ -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
 [[ -s "$NEBULA_DATA_DIR/state/adb_wifi.state" ]]
 
@@ -192,11 +198,14 @@ assert obj["ok"] is True
 assert obj["current_session_changed"] is False
 assert obj["adb_debugging"] is True
 assert obj["wireless_debugging"] is True
+assert obj["settings_wireless_debugging"] is True
+assert obj["ui_wireless_switch"] is True
 assert obj["auto_enable"] is False
 PY
 [[ ! -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
 [[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
 [[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
+[[ "$(cat "$settings_dir/global_enable_wireless_switch")" == "1" ]]
 
 fixture="$tmp/fixture"
 props="$tmp/props"
@@ -651,7 +660,7 @@ if rg -n 'setprop|service (start|stop|restart)|am start|cmd activity|input tap' 
   exit 1
 fi
 
-if rg -n 'settings put' "$repo_root/nebula-core-module/bin/nebula-core" | rg -v 'settings put global (adb_enabled|adb_wifi_enabled) 1'; then
+if rg -n 'settings put' "$repo_root/nebula-core-module/bin/nebula-core" | rg -v 'settings put global (adb_enabled|adb_wifi_enabled|enable_wireless_switch) 1'; then
   echo "nebula-core contains forbidden non-ADB settings mutation strings" >&2
   exit 1
 fi

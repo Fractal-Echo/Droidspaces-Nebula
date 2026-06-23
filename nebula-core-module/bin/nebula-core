@@ -235,7 +235,7 @@ capabilities_json() {
   printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"},'
   printf '{"id":"snapshot.cooling","title":"Cooling snapshot and rollback dry-run","status":"available_state_only","mutating":false,"source":"nebula-core state"},'
   printf '{"id":"legacy.modules","title":"Protected legacy Droidspaces module status","status":"available_read_only","mutating":false,"source":"protected module audit"},'
-  printf '{"id":"adb.wifi","title":"ADB Wi-Fi guardrail","status":"available_opt_in","mutating":true,"source":"Android Settings.Global adb_wifi_enabled"}'
+  printf '{"id":"adb.wifi","title":"ADB Wi-Fi guardrail","status":"available_opt_in","mutating":true,"source":"Android Settings.Global adb_wifi_enabled,enable_wireless_switch"}'
   printf ']}\n'
 }
 
@@ -311,6 +311,17 @@ adb_wifi_read_wireless_enabled() {
   settings get global adb_wifi_enabled 2>/dev/null | head -n 1 | tr -d '\r'
 }
 
+adb_wifi_read_ui_switch() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/global_enable_wireless_switch" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/global_enable_wireless_switch" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  settings get global enable_wireless_switch 2>/dev/null | head -n 1 | tr -d '\r'
+}
+
 adb_wifi_write_adb_enabled() {
   if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
     mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
@@ -329,11 +340,29 @@ adb_wifi_write_wireless_enabled() {
   settings put global adb_wifi_enabled 1 >/dev/null 2>&1
 }
 
+adb_wifi_write_ui_switch() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
+    printf '%s\n' 1 > "$NEBULA_SETTINGS_DIR/global_enable_wireless_switch"
+    return $?
+  fi
+  settings put global enable_wireless_switch 1 >/dev/null 2>&1
+}
+
 adb_wifi_bool_json() {
   case "$1" in
     1) printf '%s' true ;;
     0) printf '%s' false ;;
     *) printf '%s' null ;;
+  esac
+}
+
+adb_wifi_effective_value() {
+  wifi_value=$1
+  switch_value=$2
+  case "$switch_value" in
+    1|0) printf '%s' "$switch_value" ;;
+    *) printf '%s' "$wifi_value" ;;
   esac
 }
 
@@ -350,9 +379,11 @@ adb_wifi_state_snapshot() {
   if [ ! -s "$ADB_WIFI_STATE_FILE" ]; then
     adb_value=$(adb_wifi_read_adb_enabled 2>/dev/null || printf unknown)
     wifi_value=$(adb_wifi_read_wireless_enabled 2>/dev/null || printf unknown)
+    switch_value=$(adb_wifi_read_ui_switch 2>/dev/null || printf unknown)
     {
       printf 'adb_enabled=%s\n' "$adb_value"
       printf 'adb_wifi_enabled=%s\n' "$wifi_value"
+      printf 'enable_wireless_switch=%s\n' "$switch_value"
     } > "$ADB_WIFI_STATE_FILE"
   fi
 }
@@ -371,11 +402,21 @@ adb_wifi_status_payload() {
     wifi_value=
     errors=$(list_append_json_string "$errors" "unreadable:settings_global_adb_wifi_enabled")
   fi
+  switch_value=$(adb_wifi_read_ui_switch)
+  switch_rc=$?
+  if [ "$switch_rc" != "0" ]; then
+    switch_value=
+    errors=$(list_append_json_string "$errors" "unreadable:settings_global_enable_wireless_switch")
+  fi
+  effective_value=$(adb_wifi_effective_value "$wifi_value" "$switch_value")
 
   printf '"adb_debugging":%s,' "$(adb_wifi_bool_json "$adb_value")"
-  printf '"wireless_debugging":%s,' "$(adb_wifi_bool_json "$wifi_value")"
+  printf '"wireless_debugging":%s,' "$(adb_wifi_bool_json "$effective_value")"
+  printf '"settings_wireless_debugging":%s,' "$(adb_wifi_bool_json "$wifi_value")"
+  printf '"ui_wireless_switch":%s,' "$(adb_wifi_bool_json "$switch_value")"
+  printf '"ui_switch_source":"Android Settings.Global enable_wireless_switch",'
   printf '"auto_enable":%s,' "$(json_bool "$(adb_wifi_auto_value)")"
-  printf '"source":"Android Settings.Global adb_enabled,adb_wifi_enabled",'
+  printf '"source":"Android Settings.Global adb_enabled,adb_wifi_enabled,enable_wireless_switch",'
   printf '"errors":[%s]' "$errors"
 }
 
@@ -398,6 +439,10 @@ adb_wifi_enable_json() {
   if ! adb_wifi_write_wireless_enabled; then
     ok=0
     errors=$(list_append_json_string "$errors" "write_failed:settings_global_adb_wifi_enabled")
+  fi
+  if ! adb_wifi_write_ui_switch; then
+    ok=0
+    errors=$(list_append_json_string "$errors" "write_failed:settings_global_enable_wireless_switch")
   fi
   if [ "$ok" = "1" ]; then
     touch "$ADB_WIFI_AUTO_FILE" 2>/dev/null || {

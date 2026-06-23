@@ -20,7 +20,7 @@ shell_su_diagnostic() {
   local serial="$1"
   local output="$2"
   "$adb" -s "$serial" shell su -c \
-    "id; getenforce; settings get global adb_enabled; settings get global adb_wifi_enabled; $module_cli status --json; $module_cli adb-wifi status --json; tail -n 40 /data/adb/nebula/logs/nebula-core.log" \
+    "id; getenforce; settings get global adb_enabled; settings get global adb_wifi_enabled; settings get global enable_wireless_switch; $module_cli status --json; $module_cli adb-wifi status --json; tail -n 40 /data/adb/nebula/logs/nebula-core.log" \
     > "$output" 2>&1 || true
 }
 
@@ -40,7 +40,7 @@ printf 'pre_serial=%s\n' "$serial" | tee -a "$log_dir/reboot-start.txt"
 "$adb" -s "$serial" get-state | tee "$log_dir/pre-adb-state.txt"
 "$adb" -s "$serial" shell getprop sys.boot_completed | tee "$log_dir/pre-boot-completed.txt"
 "$adb" -s "$serial" shell \
-  'settings get global adb_enabled; settings get global adb_wifi_enabled' \
+  'settings get global adb_enabled; settings get global adb_wifi_enabled; settings get global enable_wireless_switch' \
   | tee "$log_dir/pre-adb-wifi-settings.txt"
 app_su "$serial" "$module_cli adb-wifi status --json" \
   | tee "$log_dir/pre-adb-wifi-status-app-su.json"
@@ -82,7 +82,7 @@ printf 'post_serial=%s\n' "$resolved"
 "$adb" -s "$resolved" shell getprop sys.boot_completed | tee "$log_dir/post-boot-completed.txt"
 "$adb" -s "$resolved" shell getprop ro.product.model | tee "$log_dir/post-model.txt"
 "$adb" -s "$resolved" shell \
-  'settings get global adb_enabled; settings get global adb_wifi_enabled' \
+  'settings get global adb_enabled; settings get global adb_wifi_enabled; settings get global enable_wireless_switch' \
   | tee "$log_dir/post-adb-wifi-settings.txt"
 shell_su_diagnostic "$resolved" "$log_dir/post-shell-su-diagnostic.txt"
 

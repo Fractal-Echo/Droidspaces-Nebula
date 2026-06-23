@@ -12,7 +12,8 @@ if [ -f "$DATA_DIR/state/adb_wifi_auto_enable" ]; then
     while [ "$attempt" -le 24 ]; do
       if settings get global adb_enabled >/dev/null 2>&1; then
         if settings put global adb_enabled 1 >/dev/null 2>&1 && \
-           settings put global adb_wifi_enabled 1 >/dev/null 2>&1; then
+           settings put global adb_wifi_enabled 1 >/dev/null 2>&1 && \
+           settings put global enable_wireless_switch 1 >/dev/null 2>&1; then
           printf '%s adb wifi early auto-enable applied attempt=%s\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" \
             "$attempt" >> "$DATA_DIR/logs/nebula-core.log"

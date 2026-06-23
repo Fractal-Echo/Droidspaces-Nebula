@@ -835,27 +835,38 @@ public final class MainActivity extends Activity {
     }
 
     private String adbWifiStatus() {
-        int value = globalSettingInt("adb_wifi_enabled", -1);
+        int value = adbWifiEffectiveSetting();
         if (value == 1) return "Enabled";
         if (value == 0) return "Disabled";
         return "Android";
     }
 
     private int adbWifiColor() {
-        int value = globalSettingInt("adb_wifi_enabled", -1);
+        int value = adbWifiEffectiveSetting();
         if (value == 1) return GREEN;
         if (value == 0) return YELLOW;
         return BLUE;
     }
 
+    private int adbWifiEffectiveSetting() {
+        int uiSwitch = globalSettingInt("enable_wireless_switch", -1);
+        if (uiSwitch == 1 || uiSwitch == 0) {
+            return uiSwitch;
+        }
+        return globalSettingInt("adb_wifi_enabled", -1);
+    }
+
     private String adbWifiDetail() {
         int wireless = globalSettingInt("adb_wifi_enabled", -1);
+        int uiSwitch = globalSettingInt("enable_wireless_switch", -1);
         int adb = globalSettingInt("adb_enabled", -1);
-        return "wirelessDebugging=" + settingLabel(wireless)
+        return "wirelessDebugging=" + settingLabel(adbWifiEffectiveSetting())
+                + "\nuiWirelessSwitch=" + settingLabel(uiSwitch)
+                + "\nsettingsWireless=" + settingLabel(wireless)
                 + "\nadbDebugging=" + settingLabel(adb)
                 + "\n" + adbWifiModuleDetail()
                 + "\ncontrol=Nebula Core opt-in"
-                + "\nmutation=adb_wifi_enable_only";
+                + "\nmutation=fixed_adb_wifi_settings_only";
     }
 
     private String adbWifiModuleDetail() {
@@ -871,11 +882,22 @@ public final class MainActivity extends Activity {
             if (!object.has("auto_enable") || object.isNull("auto_enable")) {
                 return "moduleAuto=unknown";
             }
-            return "moduleAuto=" + (object.optBoolean("auto_enable", false)
-                    ? "enabled" : "disabled");
+            String auto = object.optBoolean("auto_enable", false) ? "enabled" : "disabled";
+            String uiSwitch = jsonBoolLabel(object, "ui_wireless_switch");
+            String settingsWireless = jsonBoolLabel(object, "settings_wireless_debugging");
+            return "moduleAuto=" + auto
+                    + "\nmoduleUiSwitch=" + uiSwitch
+                    + "\nmoduleSettingsWireless=" + settingsWireless;
         } catch (JSONException error) {
             return "moduleAuto=invalid_json";
         }
+    }
+
+    private String jsonBoolLabel(JSONObject object, String key) {
+        if (!object.has(key) || object.isNull(key)) {
+            return "unknown";
+        }
+        return object.optBoolean(key, false) ? "enabled" : "disabled";
     }
 
     private void enableAdbWifiWithNebula() {
