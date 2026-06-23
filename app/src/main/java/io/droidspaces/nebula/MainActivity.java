@@ -19,6 +19,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -54,6 +56,9 @@ public final class MainActivity extends Activity {
     private static final int GREEN = 0xFF4CC38A;
     private static final int YELLOW = 0xFFF2C14E;
     private static final int RED = 0xFFF07178;
+    private static final int NEON = 0xFF69FF35;
+    private static final int CYAN = 0xFF00D9E8;
+    private static final int HOT = 0xFFFF2E4F;
     private static final int LINE = 0xFF303A44;
 
     private static final String SIGNER_TERMUX =
@@ -171,6 +176,9 @@ public final class MainActivity extends Activity {
     private LinearLayout laneContainer;
     private LinearLayout targetProfileContainer;
     private LinearLayout coreContainer;
+    private LinearLayout autoCoolingContainer;
+    private LinearLayout systemTargetContainer;
+    private LinearLayout statusRailContainer;
     private LinearLayout deviceToolsContainer;
     private LinearLayout performanceContainer;
     private LinearLayout redMagicButtonContainer;
@@ -206,30 +214,33 @@ public final class MainActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(20), dp(18), dp(24));
+        root.setPadding(dp(14), dp(18), dp(14), dp(24));
         scroll.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView title = text("DroidSpaces Nebula", 28, TEXT, Typeface.BOLD);
-        root.addView(title);
+        root.addView(buildDeckHeader());
+        systemTargetContainer = new LinearLayout(this);
+        systemTargetContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(systemTargetContainer);
 
-        TextView subtitle = text("Selector and doctor for RM11 Pro desktop, Wayland, and PowerDeck lanes.",
-                15, MUTED, Typeface.NORMAL);
-        subtitle.setPadding(0, dp(6), 0, dp(14));
-        root.addView(subtitle);
+        root.addView(buildHeroPanel());
+
+        statusRailContainer = new LinearLayout(this);
+        statusRailContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(statusRailContainer);
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, 0, 0, dp(14));
+        actions.setPadding(0, 0, 0, dp(12));
         root.addView(actions);
 
         Button refresh = actionButton("Refresh", BLUE);
         refresh.setOnClickListener(v -> refresh());
         actions.addView(refresh, weightedButtonParams());
 
-        Button copy = actionButton("Copy report", GREEN);
+        Button copy = actionButton("Copy report", NEON);
         copy.setOnClickListener(v -> copyReport());
         actions.addView(copy, weightedButtonParams());
 
@@ -237,49 +248,43 @@ public final class MainActivity extends Activity {
         share.setOnClickListener(v -> shareReport());
         actions.addView(share, weightedButtonParams());
 
-        TextView coreTitle = text("Nebula Core", 18, TEXT, Typeface.BOLD);
-        coreTitle.setPadding(0, 0, 0, dp(8));
-        root.addView(coreTitle);
+        root.addView(sectionTitle("System Layer"));
 
         coreContainer = new LinearLayout(this);
         coreContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(coreContainer);
 
-        TextView targetTitle = text("Targets", 18, TEXT, Typeface.BOLD);
-        targetTitle.setPadding(0, 0, 0, dp(8));
-        root.addView(targetTitle);
+        root.addView(sectionTitle("Automation"));
+
+        autoCoolingContainer = new LinearLayout(this);
+        autoCoolingContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(autoCoolingContainer);
+
+        root.addView(sectionTitle("Targets"));
 
         targetProfileContainer = new LinearLayout(this);
         targetProfileContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(targetProfileContainer);
 
-        TextView deviceToolsTitle = text("Device Tools", 18, TEXT, Typeface.BOLD);
-        deviceToolsTitle.setPadding(0, dp(2), 0, dp(8));
-        root.addView(deviceToolsTitle);
+        root.addView(sectionTitle("Device Tools"));
 
         deviceToolsContainer = new LinearLayout(this);
         deviceToolsContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(deviceToolsContainer);
 
-        TextView performanceTitle = text("Performance", 18, TEXT, Typeface.BOLD);
-        performanceTitle.setPadding(0, dp(2), 0, dp(8));
-        root.addView(performanceTitle);
+        root.addView(sectionTitle("Performance"));
 
         performanceContainer = new LinearLayout(this);
         performanceContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(performanceContainer);
 
-        TextView redMagicButtonTitle = text("RedMagic Button", 18, TEXT, Typeface.BOLD);
-        redMagicButtonTitle.setPadding(0, dp(2), 0, dp(8));
-        root.addView(redMagicButtonTitle);
+        root.addView(sectionTitle("RedMagic Button"));
 
         redMagicButtonContainer = new LinearLayout(this);
         redMagicButtonContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(redMagicButtonContainer);
 
-        TextView laneTitle = text("Proof lanes", 18, TEXT, Typeface.BOLD);
-        laneTitle.setPadding(0, dp(2), 0, dp(8));
-        root.addView(laneTitle);
+        root.addView(sectionTitle("Runtime Lanes"));
 
         laneContainer = new LinearLayout(this);
         laneContainer.setOrientation(LinearLayout.VERTICAL);
@@ -302,8 +307,18 @@ public final class MainActivity extends Activity {
     private void refresh() {
         coreStatus = coreClient.loadStatus();
         redMagicProbe = loadRedMagicProbe(coreStatus);
+
+        systemTargetContainer.removeAllViews();
+        systemTargetContainer.addView(buildSystemTargetBar());
+
+        statusRailContainer.removeAllViews();
+        statusRailContainer.addView(buildStatusRail());
+
         coreContainer.removeAllViews();
         coreContainer.addView(buildCoreCard(coreStatus));
+
+        autoCoolingContainer.removeAllViews();
+        autoCoolingContainer.addView(buildAutoCoolingCard(redMagicProbe));
 
         targetProfileContainer.removeAllViews();
         for (TargetProfile profile : targetProfiles) {
@@ -341,6 +356,154 @@ public final class MainActivity extends Activity {
             return RedMagicProbe.unavailable(reason);
         }
         return NebulaCoreProtocol.parseRedMagicProbe(result.stdout);
+    }
+
+    private View buildDeckHeader() {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(dp(4), 0, dp(4), dp(12));
+
+        TextView brand = text("REDMAGIC // NEBULA", 17, TEXT, Typeface.BOLD);
+        brand.setLetterSpacing(0.08f);
+        header.addView(brand, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView device = text("RM11 PRO", 14, HOT, Typeface.BOLD);
+        device.setGravity(Gravity.RIGHT);
+        device.setLetterSpacing(0.08f);
+        header.addView(device);
+        return header;
+    }
+
+    private View buildHeroPanel() {
+        FrameLayout hero = new FrameLayout(this);
+        hero.setBackground(round(0xFF05080A, dp(4), 0xFF163027));
+
+        ImageView art = new ImageView(this);
+        art.setImageResource(R.drawable.nebula_logo_hero_v2);
+        art.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        art.setAlpha(0.94f);
+        hero.addView(art, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        LinearLayout overlay = new LinearLayout(this);
+        overlay.setOrientation(LinearLayout.VERTICAL);
+        overlay.setGravity(Gravity.BOTTOM);
+        overlay.setPadding(dp(16), dp(14), dp(16), dp(14));
+        hero.addView(overlay, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        TextView lane = text("WAYLAND // DROIDSPACES // POWERDECK", 12, CYAN, Typeface.BOLD);
+        lane.setLetterSpacing(0.18f);
+        overlay.addView(lane);
+
+        TextView title = text("DROIDSPACES: NEBULA", 28, TEXT, Typeface.BOLD);
+        title.setPadding(0, dp(4), 0, 0);
+        overlay.addView(title);
+
+        TextView sub = text("ONE APP. ONE CORE MODULE. AUTOMATED WHEN PROVEN.", 12, MUTED, Typeface.BOLD);
+        sub.setLetterSpacing(0.1f);
+        sub.setPadding(0, dp(4), 0, 0);
+        overlay.addView(sub);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(360));
+        params.bottomMargin = dp(12);
+        hero.setLayoutParams(params);
+        return hero;
+    }
+
+    private View buildSystemTargetBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(12), dp(12), dp(12), dp(12));
+        bar.setBackground(round(0xFF0A0E13, dp(4), 0xFF29313B));
+
+        bar.addView(identityBlock("SYSTEM LAYER", "NEBULA CORE",
+                coreStatus.installed ? "ONLINE" : "READ-ONLY", NEON),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView mark = text("N", 30, HOT, Typeface.BOLD);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(round(0x22000000, dp(18), 0x5531FF42));
+        LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+        markParams.setMargins(dp(8), 0, dp(8), 0);
+        bar.addView(mark, markParams);
+
+        bar.addView(identityBlock("DEVICE TARGET", "RM11 PRO",
+                Build.VERSION.RELEASE == null ? "ANDROID" : "ANDROID " + Build.VERSION.RELEASE,
+                HOT), new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = dp(12);
+        bar.setLayoutParams(params);
+        return bar;
+    }
+
+    private View identityBlock(String eyebrow, String title, String detail, int color) {
+        LinearLayout block = new LinearLayout(this);
+        block.setOrientation(LinearLayout.VERTICAL);
+        block.setPadding(dp(4), 0, dp(4), 0);
+
+        TextView eyebrowView = text(eyebrow, 10, MUTED, Typeface.BOLD);
+        eyebrowView.setLetterSpacing(0.18f);
+        block.addView(eyebrowView);
+
+        TextView titleView = text(title, 18, color, Typeface.BOLD);
+        titleView.setLetterSpacing(0.05f);
+        titleView.setPadding(0, dp(3), 0, 0);
+        block.addView(titleView);
+
+        TextView detailView = text(detail, 11, TEXT, Typeface.BOLD);
+        detailView.setLetterSpacing(0.08f);
+        detailView.setPadding(0, dp(4), 0, 0);
+        block.addView(detailView);
+        return block;
+    }
+
+    private View buildStatusRail() {
+        LinearLayout rail = new LinearLayout(this);
+        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setPadding(0, 0, 0, dp(12));
+        rail.addView(statusCell("DROIDSPACES", "runtime active", NEON), weightedButtonParams());
+        rail.addView(statusCell("WAYLANDIE", "bridge ready", CYAN), weightedButtonParams());
+        rail.addView(statusCell("ADRENO 840", "Turnip 26.2", TEXT), weightedButtonParams());
+        rail.addView(statusCell("NTSYNC", "kernel enabled", TEXT), weightedButtonParams());
+        rail.addView(statusCell("SELINUX", "enforcing", TEXT), weightedButtonParams());
+        rail.addView(statusCell("POWERDECK", coolingPolicyLabel(redMagicProbe), HOT), weightedButtonParams());
+        return rail;
+    }
+
+    private View statusCell(String title, String detail, int color) {
+        LinearLayout cell = new LinearLayout(this);
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setPadding(dp(5), dp(8), dp(5), dp(8));
+        cell.setBackground(round(0xFF0C1115, dp(2), 0xFF25313A));
+
+        TextView label = text(title, 9, color, Typeface.BOLD);
+        label.setSingleLine(true);
+        cell.addView(label);
+
+        TextView value = text(detail, 8, MUTED, Typeface.NORMAL);
+        value.setSingleLine(true);
+        value.setPadding(0, dp(2), 0, 0);
+        cell.addView(value);
+        return cell;
+    }
+
+    private TextView sectionTitle(String value) {
+        TextView view = text(value.toUpperCase(Locale.US), 17, TEXT, Typeface.BOLD);
+        view.setLetterSpacing(0.14f);
+        view.setPadding(dp(4), dp(4), 0, dp(8));
+        return view;
     }
 
     private View buildCoreCard(NebulaCoreStatus status) {
@@ -402,6 +565,158 @@ public final class MainActivity extends Activity {
                 + "\ndaemonRunning=" + status.daemonRunning
                 + "\nserviceStatus=" + status.serviceStatus
                 + "\ngitCommit=" + status.gitCommit;
+    }
+
+    private View buildAutoCoolingCard(RedMagicProbe probe) {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView title = text("PowerDeck Auto Cooling", 19, TEXT, Typeface.BOLD);
+        title.setLetterSpacing(0.04f);
+        titleBox.addView(title);
+
+        TextView subtitle = text("temperature policy: " + coolingPolicyReason(probe),
+                12, MUTED, Typeface.NORMAL);
+        subtitle.setTypeface(Typeface.MONOSPACE);
+        subtitle.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(subtitle);
+
+        top.addView(chip(coolingPolicyLabel(probe), coolingPolicyColor(probe)));
+
+        card.addView(progressRow("thermal envelope", coolingLoadPercent(probe),
+                coolingPolicyColor(probe)));
+
+        LinearLayout metrics = new LinearLayout(this);
+        metrics.setOrientation(LinearLayout.HORIZONTAL);
+        metrics.setPadding(0, dp(12), 0, 0);
+        card.addView(metrics);
+
+        metrics.addView(metricTile("Thermal Max", thermalText(probe)), weightedButtonParams());
+        metrics.addView(metricTile("Internal Fan", fanText(probe)), weightedButtonParams());
+        metrics.addView(metricTile("Liquid Pump", pumpText(probe)), weightedButtonParams());
+
+        TextView guardrail = text("AUTO APPLY: DISABLED  //  snapshot + rollback required before writes",
+                12, YELLOW, Typeface.BOLD);
+        guardrail.setTypeface(Typeface.MONOSPACE);
+        guardrail.setPadding(0, dp(12), 0, 0);
+        card.addView(guardrail);
+        return card;
+    }
+
+    private String coolingPolicyLabel(RedMagicProbe probe) {
+        Double temp = probe.maxThermalC;
+        if (temp == null) return "Telemetry";
+        if (temp >= 46.0) return "Overdrive";
+        if (temp >= 42.0) return "Active";
+        if (temp >= 38.0) return "Balanced";
+        return "Silent";
+    }
+
+    private int coolingPolicyColor(RedMagicProbe probe) {
+        Double temp = probe.maxThermalC;
+        if (temp == null) return BLUE;
+        if (temp >= 46.0) return HOT;
+        if (temp >= 42.0) return YELLOW;
+        if (temp >= 38.0) return CYAN;
+        return NEON;
+    }
+
+    private String coolingPolicyReason(RedMagicProbe probe) {
+        Double temp = probe.maxThermalC;
+        if (!probe.available || temp == null) {
+            return "waiting for module thermal telemetry";
+        }
+        if (temp >= 46.0) return "fan+pump would request high response";
+        if (temp >= 42.0) return "fan+pump would request active response";
+        if (temp >= 38.0) return "fan+pump would hold balanced response";
+        return "cool enough for quiet response";
+    }
+
+    private int coolingLoadPercent(RedMagicProbe probe) {
+        Double temp = probe.maxThermalC;
+        if (temp == null) return 0;
+        int value = (int) Math.round(((temp - 30.0) / 24.0) * 100.0);
+        if (value < 0) return 0;
+        if (value > 100) return 100;
+        return value;
+    }
+
+    private String thermalText(RedMagicProbe probe) {
+        if (probe.maxThermalC == null) return "unavailable";
+        return String.format(Locale.US, "%.1f C / %d zones", probe.maxThermalC,
+                probe.thermalReadingCount);
+    }
+
+    private String fanText(RedMagicProbe probe) {
+        String state = probe.fanEnabled == null ? "unknown" : (probe.fanEnabled ? "on" : "off");
+        String rpm = probe.fanRpm == null ? "rpm ?" : probe.fanRpm + " rpm";
+        String level = probe.fanLevel == null ? "level ?" : "level " + probe.fanLevel;
+        return state + " / " + rpm + " / " + level;
+    }
+
+    private String pumpText(RedMagicProbe probe) {
+        if (!probe.pumpPresent) return "not detected";
+        String state = probe.pumpEnabled == null ? "unknown" : (probe.pumpEnabled ? "on" : "off");
+        String speed = probe.pumpSpeed == null ? "speed ?" : "speed " + probe.pumpSpeed;
+        return state + " / " + speed;
+    }
+
+    private View metricTile(String label, String value) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setPadding(dp(10), dp(10), dp(10), dp(10));
+        tile.setBackground(round(0xFF0B1014, dp(2), 0xFF25313A));
+
+        TextView valueView = text(value, 14, TEXT, Typeface.BOLD);
+        valueView.setMinHeight(dp(42));
+        tile.addView(valueView);
+
+        TextView labelView = text(label.toUpperCase(Locale.US), 10, MUTED, Typeface.BOLD);
+        labelView.setLetterSpacing(0.08f);
+        tile.addView(labelView);
+        return tile;
+    }
+
+    private View progressRow(String label, int percent, int color) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(12), 0, 0);
+
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(line);
+
+        TextView name = text(label, 12, MUTED, Typeface.NORMAL);
+        line.addView(name, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        line.addView(text(percent + "%", 12, TEXT, Typeface.BOLD));
+
+        LinearLayout track = new LinearLayout(this);
+        track.setOrientation(LinearLayout.HORIZONTAL);
+        track.setBackground(round(0xFF121A20, dp(1), 0xFF121A20));
+        LinearLayout.LayoutParams trackParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(10));
+        trackParams.topMargin = dp(6);
+        row.addView(track, trackParams);
+
+        View fill = new View(this);
+        fill.setBackgroundColor(color);
+        track.addView(fill, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(1, percent)));
+        View empty = new View(this);
+        track.addView(empty, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.MATCH_PARENT, Math.max(0, 100 - percent)));
+        return row;
     }
 
     private View buildCapabilityCard(String title, List<NebulaCapability> capabilities) {

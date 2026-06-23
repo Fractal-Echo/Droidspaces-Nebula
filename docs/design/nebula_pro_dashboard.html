@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1216, initial-scale=1.0" />
+<title>DroidSpaces: Nebula</title>
+<style>
+  :root {
+    --bg:#030406;
+    --panel:#090b0f;
+    --panel2:#0d1117;
+    --line:#202730;
+    --muted:#7c8795;
+    --text:#f4f7fb;
+    --red:#ff2340;
+    --red2:#8a0011;
+    --green:#75ff35;
+    --cyan:#00e7ed;
+    --amber:#ffc247;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;width:1216px;height:2688px;overflow:hidden;background:var(--bg);color:var(--text);font-family:"Segoe UI",Arial,sans-serif}
+  body{position:relative;background:
+    radial-gradient(circle at 50% 6%,rgba(255,35,64,.12),transparent 27%),
+    radial-gradient(circle at 20% 55%,rgba(0,231,237,.06),transparent 35%),
+    linear-gradient(#030406,#040507 75%,#020203)}
+  body:before{content:"";position:absolute;inset:0;opacity:.26;pointer-events:none;background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(to bottom,#000,transparent 82%)}
+  .app{position:relative;z-index:1;width:100%;height:100%;padding:38px 42px 44px;display:flex;flex-direction:column;gap:24px}
+  .status{height:72px;display:flex;align-items:center;justify-content:space-between;color:#dfe4e9;font-size:25px;letter-spacing:1.5px;padding:0 6px}
+  .brand-mini{display:flex;gap:15px;align-items:center;font-weight:700}.brand-mini .slash{color:var(--red)}
+  .icons{display:flex;gap:18px;align-items:center}.pill-battery{border:2px solid #dfe4e9;border-radius:5px;width:62px;height:29px;padding:3px;position:relative}.pill-battery:after{content:"";position:absolute;right:-8px;top:8px;width:5px;height:11px;border-radius:2px;background:#dfe4e9}.pill-battery i{display:block;width:86%;height:100%;background:linear-gradient(90deg,var(--green),#b8ff78);border-radius:2px}
+  .topbar{height:180px;border:1px solid #29313b;background:linear-gradient(180deg,rgba(16,20,26,.96),rgba(7,9,12,.96));display:grid;grid-template-columns:1fr 150px 1fr;align-items:center;padding:0 34px;clip-path:polygon(0 0,43% 0,47% 15%,53% 15%,57% 0,100% 0,100% 82%,97% 100%,3% 100%,0 82%);box-shadow:0 0 0 1px rgba(255,35,64,.07) inset,0 12px 50px rgba(0,0,0,.35)}
+  .sys-card{display:flex;align-items:center;gap:20px}.sys-card.right{justify-content:flex-end;text-align:right}.hex{width:76px;height:76px;display:grid;place-items:center;border:2px solid var(--green);clip-path:polygon(25% 5%,75% 5%,98% 50%,75% 95%,25% 95%,2% 50%);background:rgba(117,255,53,.07);color:var(--green);font-size:35px;font-weight:900}.right .hex{border-color:var(--red);color:var(--red);background:rgba(255,35,64,.08)}
+  .eyebrow{font-size:20px;color:var(--muted);letter-spacing:4px;margin-bottom:6px}.sys-title{font-size:31px;font-weight:800;letter-spacing:1px}.sys-title.green{color:var(--green)}.sys-title.red{color:var(--red)}.online{font-size:19px;letter-spacing:2px;margin-top:7px;color:#b5c0cc}.online b{color:var(--green)}
+  .devil{height:90px;width:74px;margin:auto;position:relative;filter:drop-shadow(0 0 16px rgba(255,35,64,.35))}.devil:before,.devil:after{content:"";position:absolute;background:var(--red);top:6px;width:13px;height:66px;clip-path:polygon(50% 0,100% 25%,70% 100%,30% 100%,0 25%)}.devil:before{left:17px;transform:rotate(-8deg)}.devil:after{right:17px;transform:rotate(8deg)}.devil i{position:absolute;left:31px;top:0;width:12px;height:82px;background:var(--red);clip-path:polygon(50% 0,100% 20%,72% 100%,28% 100%,0 20%)}
+  .hero{height:860px;position:relative;border:1px solid #202833;background:#030507;overflow:hidden;clip-path:polygon(0 0,100% 0,100% 95%,96% 100%,4% 100%,0 95%)}
+  .hero-art{position:absolute;inset:0;background-image:linear-gradient(to bottom,rgba(3,4,6,.12),rgba(3,4,6,.05) 62%,rgba(3,4,6,.92) 96%),url('../../app/src/main/res/drawable-nodpi/nebula_deck_vision.png');background-size:132% auto;background-position:center 7%;filter:saturate(1.16) contrast(1.04)}
+  .hero:after{content:"";position:absolute;inset:0;box-shadow:0 0 95px rgba(0,0,0,.88) inset;pointer-events:none}
+  .hero-info{position:absolute;left:48px;right:48px;bottom:42px;z-index:2;display:flex;align-items:end;justify-content:space-between}.hero-name small{display:block;color:var(--cyan);letter-spacing:5px;font-size:19px;margin-bottom:11px}.hero-name h1{margin:0;font-size:54px;line-height:1;letter-spacing:2px}.hero-name h1 span{color:var(--green)}.hero-name p{margin:16px 0 0;color:#aab3bd;font-size:20px;letter-spacing:2px}.launch{min-width:300px;height:92px;border:1px solid rgba(255,35,64,.8);background:linear-gradient(135deg,#c7001a,#5e000b);color:white;display:flex;align-items:center;justify-content:center;gap:14px;font-size:26px;font-weight:900;letter-spacing:2px;clip-path:polygon(7% 0,100% 0,100% 72%,91% 100%,0 100%,0 28%);box-shadow:0 0 28px rgba(255,35,64,.25)}
+  .strip{height:102px;border:1px solid #26303a;background:#080b0f;display:grid;grid-template-columns:repeat(6,1fr);align-items:center;padding:0 20px;gap:10px}.chip{height:66px;border-right:1px solid #252c35;padding:8px 14px}.chip:last-child{border:0}.chip b{display:block;font-size:20px;letter-spacing:1px}.chip span{display:block;color:var(--muted);font-size:17px;margin-top:7px}.chip .ok{color:var(--green)}.chip .cyan{color:var(--cyan)}.chip .red{color:var(--red)}
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin:4px 4px -4px}.section-title h2{font-size:25px;letter-spacing:4px;margin:0}.section-title span{color:var(--muted);font-size:17px;letter-spacing:2px}
+  .grid{height:590px;display:grid;grid-template-columns:1.15fr .85fr;grid-template-rows:1fr 1fr;gap:18px}.panel{position:relative;background:linear-gradient(145deg,#0c1015,#07090c);border:1px solid #222a33;padding:28px;clip-path:polygon(0 0,94% 0,100% 12%,100% 100%,6% 100%,0 88%);overflow:hidden}.panel.redline{border-color:#4d1520}.panel.cyanline{border-color:#123f45}.panel.greenline{border-color:#2a4a1c}.panel.big{grid-row:1/3}.panel h3{margin:0;font-size:28px;letter-spacing:1px}.panel .sub{color:var(--muted);font-size:18px;margin-top:7px}.profile-head{display:flex;justify-content:space-between;align-items:flex-start}.profile-name{font-size:48px;font-weight:900;margin-top:28px}.profile-name span{color:var(--red)}.profile-badge{border:1px solid var(--red);padding:9px 14px;color:var(--red);letter-spacing:2px;font-size:16px}.meters{margin-top:32px;display:grid;gap:23px}.meter-label{display:flex;justify-content:space-between;font-size:18px;margin-bottom:9px;color:#cbd2da}.bar{height:12px;background:#171c22;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--red2),var(--red));box-shadow:0 0 14px rgba(255,35,64,.45)}.bar.green i{background:linear-gradient(90deg,#247300,var(--green));box-shadow:0 0 14px rgba(117,255,53,.35)}.bar.cyan i{background:linear-gradient(90deg,#00636a,var(--cyan));box-shadow:0 0 14px rgba(0,231,237,.35)}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:31px}.stat{border:1px solid #1e2630;background:#090c10;padding:18px}.stat strong{display:block;font-size:29px}.stat small{color:var(--muted);font-size:16px;letter-spacing:1px}.actions{display:flex;gap:12px;margin-top:27px}.btn{flex:1;border:1px solid #303944;padding:18px;text-align:center;font-size:18px;letter-spacing:1px}.btn.primary{border-color:var(--red);color:#fff;background:rgba(255,35,64,.12)}
+  .rows{margin-top:20px}.row{display:flex;justify-content:space-between;padding:14px 0;border-bottom:1px solid #1d242c;font-size:19px}.row:last-child{border:0}.row span{color:var(--muted)}.row b.green{color:var(--green)}.row b.cyan{color:var(--cyan)}
+  .toggle{width:54px;height:28px;border-radius:20px;background:#202832;position:relative}.toggle:after{content:"";position:absolute;width:22px;height:22px;top:3px;left:3px;background:#74808d;border-radius:50%}.toggle.on{background:rgba(117,255,53,.25);box-shadow:0 0 10px rgba(117,255,53,.18)}.toggle.on:after{left:29px;background:var(--green)}.toggle.redon{background:rgba(255,35,64,.23)}.toggle.redon:after{left:29px;background:var(--red)}
+  .footer-card{height:182px;border:1px solid #27313c;background:linear-gradient(90deg,#080b0f,#0c1015);display:grid;grid-template-columns:200px 1fr 260px;align-items:center;padding:0 28px}.core-ring{width:126px;height:126px;border-radius:50%;display:grid;place-items:center;border:2px solid var(--green);box-shadow:0 0 0 13px rgba(117,255,53,.04),0 0 24px rgba(117,255,53,.15) inset;color:var(--green);font-size:48px;font-weight:900}.core-copy b{display:block;font-size:25px;letter-spacing:2px}.core-copy span{display:block;color:var(--muted);margin-top:10px;font-size:18px}.progress{height:15px;background:#171d23;margin-top:21px;position:relative}.progress i{display:block;width:86%;height:100%;background:repeating-linear-gradient(135deg,var(--green),var(--green) 12px,#2c7f10 12px,#2c7f10 20px);box-shadow:0 0 14px rgba(117,255,53,.25)}.telemetry{height:105px;border:1px solid #29323b;background:radial-gradient(circle at 50% 50%,rgba(117,255,53,.08),transparent 70%);position:relative;overflow:hidden}.telemetry svg{width:100%;height:100%}
+  .nav{height:145px;border:1px solid #28313b;background:#07090c;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;clip-path:polygon(0 0,100% 0,100% 78%,96% 100%,4% 100%,0 78%)}.nav-item{text-align:center;color:#6f7883;font-size:17px;letter-spacing:1px}.nav-item b{display:block;margin:auto auto 10px;font-size:30px}.nav-item.active{color:var(--red)}.nav-item.active b{filter:drop-shadow(0 0 10px rgba(255,35,64,.65))}
+  .red-edge{position:absolute;left:0;right:0;bottom:0;height:4px;background:linear-gradient(90deg,transparent,var(--red),transparent);box-shadow:0 0 20px var(--red)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="status">
+    <div class="brand-mini"><span>REDMAGIC</span><span class="slash">//</span><span>NEBULA</span></div>
+    <div class="icons"><span>◉</span><span>▥</span><span>5G</span><span>91%</span><div class="pill-battery"><i></i></div></div>
+  </div>
+
+  <div class="topbar">
+    <div class="sys-card">
+      <div class="hex">N</div>
+      <div><div class="eyebrow">SYSTEM LAYER</div><div class="sys-title green">NEBULA CORE</div><div class="online"><b>● ONLINE</b> · build 0.4.0</div></div>
+    </div>
+    <div class="devil"><i></i></div>
+    <div class="sys-card right">
+      <div><div class="eyebrow">DEVICE TARGET</div><div class="sys-title red">RM11 PRO</div><div class="online">OP-WILD · Android 16</div></div>
+      <div class="hex">11</div>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-art"></div>
+    <div class="hero-info">
+      <div class="hero-name">
+        <small>WAYLAND // DROIDSPACES // POWERDECK</small>
+        <h1>DROIDSPACES: <span>NEBULA</span></h1>
+        <p>WHERE THE POSSIBILITIES ARE LIMITLESS*</p>
+      </div>
+      <div class="launch">▷ ENTER DECK MODE</div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="chip"><b class="ok">DROIDSPACES</b><span>runtime active</span></div>
+    <div class="chip"><b class="cyan">WAYLANDIE</b><span>bridge ready</span></div>
+    <div class="chip"><b>ADRENO 840</b><span>Turnip 26.2</span></div>
+    <div class="chip"><b>NTSYNC</b><span>kernel enabled</span></div>
+    <div class="chip"><b>SELINUX</b><span>enforcing</span></div>
+    <div class="chip"><b class="red">POWERDECK</b><span>docked profile</span></div>
+  </div>
+
+  <div class="section-title"><h2>ACTIVE LOADOUT</h2><span>PROFILE 03 · DOCKED PERFORMANCE</span></div>
+
+  <div class="grid">
+    <div class="panel big redline">
+      <div class="profile-head"><div><h3>POWERDECK PROFILE</h3><div class="sub">Boot-safe hardware orchestration</div></div><div class="profile-badge">ARMED · SNAPSHOT READY</div></div>
+      <div class="profile-name">NEBULA <span>OVERDRIVE</span></div>
+      <div class="meters">
+        <div><div class="meter-label"><span>CPU envelope</span><b>86%</b></div><div class="bar"><i style="width:86%"></i></div></div>
+        <div><div class="meter-label"><span>GPU envelope</span><b>92%</b></div><div class="bar green"><i style="width:92%"></i></div></div>
+        <div><div class="meter-label"><span>Thermal headroom</span><b>71%</b></div><div class="bar cyan"><i style="width:71%"></i></div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><strong>42.1°C</strong><small>THERMAL TARGET</small></div>
+        <div class="stat"><strong>18,400</strong><small>FAN RPM</small></div>
+        <div class="stat"><strong>1080p</strong><small>DOCKED OUTPUT</small></div>
+        <div class="stat"><strong>120 Hz</strong><small>DISPLAY CAP</small></div>
+      </div>
+      <div class="actions"><div class="btn primary">APPLY PROFILE</div><div class="btn">DRY RUN</div><div class="btn">ROLLBACK</div></div>
+    </div>
+
+    <div class="panel cyanline">
+      <h3>LINUX RUNTIME</h3><div class="sub">DroidSpaces + WayLandIE</div>
+      <div class="rows">
+        <div class="row"><span>Container</span><b>rm11-nebula</b></div>
+        <div class="row"><span>Display</span><b class="cyan">wayland-0</b></div>
+        <div class="row"><span>Vulkan</span><b>1.4 · zero-copy</b></div>
+        <div class="row"><span>DXVK / Wine</span><b class="green">READY</b></div>
+      </div>
+    </div>
+
+    <div class="panel greenline">
+      <h3>REDMAGIC HARDWARE</h3><div class="sub">Root control broker</div>
+      <div class="rows">
+        <div class="row"><span>Active cooling</span><div class="toggle on"></div></div>
+        <div class="row"><span>Liquid pump</span><div class="toggle on"></div></div>
+        <div class="row"><span>Shoulder triggers</span><div class="toggle redon"></div></div>
+        <div class="row"><span>RGB sync</span><div class="toggle on"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer-card">
+    <div class="core-ring">N</div>
+    <div class="core-copy"><b>NEBULA CORE · ALL SYSTEMS NOMINAL</b><span>WayLandIE presenter linked · PowerDeck guardrails active · rollback snapshot available</span><div class="progress"><i></i></div></div>
+    <div class="telemetry">
+      <svg viewBox="0 0 260 105" preserveAspectRatio="none"><polyline fill="none" stroke="#75ff35" stroke-width="3" points="0,72 15,69 28,76 43,43 58,61 74,55 90,79 106,62 122,67 139,42 154,72 170,59 187,65 204,33 221,62 238,48 260,58"/><line x1="0" y1="84" x2="260" y2="84" stroke="#243027"/></svg>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-item active"><b>⌂</b>HOME</div>
+    <div class="nav-item"><b>⬡</b>PROFILES</div>
+    <div class="nav-item"><b>◇</b>RUNTIME</div>
+    <div class="nav-item"><b>⚙</b>HARDWARE</div>
+    <div class="nav-item"><b>☷</b>LOGS</div>
+  </div>
+</div>
+<div class="red-edge"></div>
+</body>
+</html>

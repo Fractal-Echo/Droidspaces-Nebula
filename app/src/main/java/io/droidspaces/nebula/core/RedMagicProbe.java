@@ -8,6 +8,13 @@ public final class RedMagicProbe {
     public final boolean available;
     public final boolean pumpSupported;
     public final boolean pumpPresent;
+    public final Boolean fanEnabled;
+    public final Integer fanRpm;
+    public final Integer fanLevel;
+    public final Boolean pumpEnabled;
+    public final Integer pumpSpeed;
+    public final Double maxThermalC;
+    public final int thermalReadingCount;
     public final String deviceSummary;
     public final String fanSummary;
     public final String pumpSummary;
@@ -17,12 +24,21 @@ public final class RedMagicProbe {
     public final String error;
 
     private RedMagicProbe(boolean available, boolean pumpSupported, boolean pumpPresent,
+            Boolean fanEnabled, Integer fanRpm, Integer fanLevel, Boolean pumpEnabled,
+            Integer pumpSpeed, Double maxThermalC, int thermalReadingCount,
             String deviceSummary, String fanSummary, String pumpSummary,
             String performanceSummary, String displaySummary, String thermalSummary,
             String error) {
         this.available = available;
         this.pumpSupported = pumpSupported;
         this.pumpPresent = pumpPresent;
+        this.fanEnabled = fanEnabled;
+        this.fanRpm = fanRpm;
+        this.fanLevel = fanLevel;
+        this.pumpEnabled = pumpEnabled;
+        this.pumpSpeed = pumpSpeed;
+        this.maxThermalC = maxThermalC;
+        this.thermalReadingCount = thermalReadingCount;
         this.deviceSummary = deviceSummary;
         this.fanSummary = fanSummary;
         this.pumpSummary = pumpSummary;
@@ -33,8 +49,9 @@ public final class RedMagicProbe {
     }
 
     public static RedMagicProbe unavailable(String reason) {
-        return new RedMagicProbe(false, false, false, "unavailable", "unavailable",
-                "unavailable", "unavailable", "unavailable", "unavailable", reason);
+        return new RedMagicProbe(false, false, false, null, null, null, null,
+                null, null, 0, "unavailable", "unavailable", "unavailable",
+                "unavailable", "unavailable", "unavailable", reason);
     }
 
     public static RedMagicProbe fromJson(String json) {
@@ -59,11 +76,16 @@ public final class RedMagicProbe {
             String displaySummary = boolText(display, "supported")
                     + ", refresh=" + nullable(display, "refresh_rate_hz") + errors(display);
             String thermalSummary = thermalSummary(thermal);
+            Double maxThermalC = maxThermalC(thermal);
+            int thermalReadingCount = thermalReadingCount(thermal);
 
             return new RedMagicProbe(true, pump != null && pump.optBoolean("supported", false),
-                    pump != null && pump.optBoolean("present", false), deviceSummary,
-                    fanSummary, pumpSummary, performanceSummary, displaySummary,
-                    thermalSummary, null);
+                    pump != null && pump.optBoolean("present", false),
+                    optBooleanOrNull(fan, "enabled"), optIntegerOrNull(fan, "rpm"),
+                    optIntegerOrNull(fan, "level"), optBooleanOrNull(pump, "enabled"),
+                    optIntegerOrNull(pump, "speed"), maxThermalC, thermalReadingCount,
+                    deviceSummary, fanSummary, pumpSummary, performanceSummary,
+                    displaySummary, thermalSummary, null);
         } catch (JSONException error) {
             return unavailable("Invalid RedMagic probe JSON: " + error.getMessage());
         }
@@ -90,6 +112,24 @@ public final class RedMagicProbe {
         return value == null ? "unavailable" : String.valueOf(value);
     }
 
+    private static Boolean optBooleanOrNull(JSONObject object, String key) {
+        if (object == null || object.isNull(key) || !object.has(key)) return null;
+        return object.optBoolean(key, false);
+    }
+
+    private static Integer optIntegerOrNull(JSONObject object, String key) {
+        if (object == null || object.isNull(key) || !object.has(key)) return null;
+        Object value = object.opt(key);
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        try {
+            return Integer.valueOf(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
     private static String errors(JSONObject object) {
         if (object == null) return "";
         JSONArray errors = object.optJSONArray("errors");
@@ -100,7 +140,7 @@ public final class RedMagicProbe {
     private static String thermalSummary(JSONObject thermal) {
         if (thermal == null) return "supported=unknown";
         JSONArray readings = thermal.optJSONArray("readings");
-        int count = readings == null ? 0 : readings.length();
+        int count = thermalReadingCount(thermal);
         StringBuilder builder = new StringBuilder();
         builder.append("supported=").append(thermal.optBoolean("supported", false));
         builder.append(", readings=").append(count);
@@ -112,6 +152,27 @@ public final class RedMagicProbe {
         }
         builder.append(errors(thermal));
         return builder.toString();
+    }
+
+    private static int thermalReadingCount(JSONObject thermal) {
+        if (thermal == null) return 0;
+        JSONArray readings = thermal.optJSONArray("readings");
+        return readings == null ? 0 : readings.length();
+    }
+
+    private static Double maxThermalC(JSONObject thermal) {
+        if (thermal == null) return null;
+        JSONArray readings = thermal.optJSONArray("readings");
+        if (readings == null || readings.length() == 0) return null;
+        Double max = null;
+        for (int i = 0; i < readings.length(); i++) {
+            JSONObject item = readings.optJSONObject(i);
+            if (item == null || item.isNull("temp_c")) continue;
+            double value = item.optDouble("temp_c", Double.NaN);
+            if (Double.isNaN(value)) continue;
+            max = max == null ? value : Math.max(max, value);
+        }
+        return max;
     }
 
     private static String pumpSummary(JSONObject pump) {
