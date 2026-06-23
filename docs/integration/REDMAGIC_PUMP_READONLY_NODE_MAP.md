@@ -27,3 +27,11 @@ Pass 03 JSON ownership:
 - `present=true` only when a fixed micropump driver node exists.
 - `enabled`, `speed`, `rpm`, `level`, `flow_rate`, and `mode` remain `null` unless the corresponding value is proven by an accepted source.
 - No pump control, speed write, profile write, service start, Binder call, LSPosed hook, property write, or settings write is implemented.
+
+Pass 04 policy preview:
+
+- The pump participates in `nebula-core cooling policy --json` only as a separate read-only channel.
+- Policy intent values are `stock`, `off`, `low`, `medium`, `high`, `maximum`, or `unavailable`.
+- `applied=false` is mandatory in pass 04.
+- Missing pump telemetry produces pump intent `unavailable` while thermal/fan preview can still be computed.
+- The rejected RedMagic Control Center automatic pump service remains rejected because it writes pump profile nodes; Nebula only reimplements the non-mutating decision preview.

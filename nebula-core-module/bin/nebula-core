@@ -12,6 +12,7 @@ SAFE_MODE_FILE="$DATA_DIR/safe_mode"
 SCRIPT_DIR=${0%/*}
 MODDIR=${NEBULA_MODULE_DIR:-${SCRIPT_DIR%/*}}
 MODULE_PROP=${NEBULA_MODULE_PROP:-$MODDIR/module.prop}
+DEFAULTS_JSON=${NEBULA_DEFAULTS_JSON:-$MODDIR/config/defaults.json}
 REDMAGIC_SOURCE_COMMIT=e94d36e8204c228c6e8781157dea22946cf715e3
 REDMAGIC_SOURCE_FAN="Redmagic-Control-Center HardwareController.kt:25-28,48-77@$REDMAGIC_SOURCE_COMMIT"
 REDMAGIC_SOURCE_PUMP="Redmagic-Control-Center HardwareController.kt:30-32,80-98; DashboardSnapshot.kt:16-18; DeviceCapabilityScanner.kt:43-45@$REDMAGIC_SOURCE_COMMIT"
@@ -83,6 +84,48 @@ is_unsigned_integer() {
     ''|*[!0-9]*) return 1 ;;
     *) return 0 ;;
   esac
+}
+
+json_number_from_milli() {
+  milli=$1
+  case "$milli" in
+    ''|*[!0-9-]*) printf '%s' null; return ;;
+  esac
+  sign=
+  case "$milli" in
+    -*) sign=-; milli=${milli#-} ;;
+  esac
+  whole=$((milli / 1000))
+  frac=$((milli % 1000))
+  printf '%s%s.%03d' "$sign" "$whole" "$frac"
+}
+
+config_bool() {
+  key=$1
+  if [ -f "$DEFAULTS_JSON" ]; then
+    sed -n \
+      -e "s/.*\"$key\"[[:space:]]*:[[:space:]]*true.*/true/p" \
+      -e "s/.*\"$key\"[[:space:]]*:[[:space:]]*false.*/false/p" \
+      "$DEFAULTS_JSON" | head -n 1
+  fi
+}
+
+config_number() {
+  key=$1
+  if [ -f "$DEFAULTS_JSON" ]; then
+    sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\([-0-9.][0-9.]*\\).*/\\1/p" "$DEFAULTS_JSON" | head -n 1
+  fi
+}
+
+config_number_default() {
+  key=$1
+  fallback=$2
+  value=$(config_number "$key")
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' "$fallback"
+  fi
 }
 
 json_bool() {
@@ -174,7 +217,8 @@ capabilities_json() {
   printf '{"id":"safe-mode","title":"Safe mode","status":"available","mutating":true,"source":"nebula-core"},'
   printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"},'
   printf '{"id":"redmagic.probe","title":"RM11 Pro read-only RedMagic probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_FAN")"
-  printf '{"id":"redmagic.pump.probe","title":"RM11 Pro read-only liquid-cooling pump probe","status":"available_read_only","mutating":false,"source":"%s"}' "$(json_escape "$REDMAGIC_SOURCE_PUMP")"
+  printf '{"id":"redmagic.pump.probe","title":"RM11 Pro read-only liquid-cooling pump probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_PUMP")"
+  printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"}'
   printf ']}\n'
 }
 
@@ -390,6 +434,322 @@ normalize_temp_c() {
   else
     printf '%s' null
   fi
+}
+
+temp_to_milli_c() {
+  raw=$1
+  case "$raw" in
+    ''|*[!0-9.]*|*.*.*) return 1 ;;
+  esac
+  case "$raw" in
+    *.*)
+      whole=${raw%%.*}
+      frac=${raw#*.}
+      case "$whole$frac" in
+        ''|*[!0-9]*) return 1 ;;
+      esac
+      frac3=$(printf '%-3.3s' "$frac" | tr ' ' '0')
+      printf '%s' $((whole * 1000 + frac3))
+      ;;
+    *)
+      if [ "$raw" -gt 1000 ] 2>/dev/null; then
+        printf '%s' "$raw"
+      else
+        printf '%s' $((raw * 1000))
+      fi
+      ;;
+  esac
+}
+
+state_rank() {
+  case "$1" in
+    COOL) printf '%s' 1 ;;
+    BALANCED) printf '%s' 2 ;;
+    HOT) printf '%s' 3 ;;
+    CRITICAL) printf '%s' 4 ;;
+    *) printf '%s' 0 ;;
+  esac
+}
+
+state_threshold_milli() {
+  state=$1
+  case "$state" in
+    BALANCED) printf '%s' "$cp_balanced_milli" ;;
+    HOT) printf '%s' "$cp_hot_milli" ;;
+    CRITICAL) printf '%s' "$cp_critical_milli" ;;
+    *) printf '%s' 0 ;;
+  esac
+}
+
+intent_for_state() {
+  supported=$1
+  state=$2
+  channel=$3
+  if [ "$supported" != "1" ]; then
+    printf '%s' unavailable
+    return
+  fi
+  case "$state" in
+    SAFE_MODE) printf '%s' stock ;;
+    UNAVAILABLE) printf '%s' stock ;;
+    COOL) printf '%s' off ;;
+    BALANCED)
+      if [ "$channel" = "fan" ]; then
+        printf '%s' medium
+      else
+        printf '%s' low
+      fi
+      ;;
+    HOT) printf '%s' high ;;
+    CRITICAL) printf '%s' maximum ;;
+    *) printf '%s' unavailable ;;
+  esac
+}
+
+cooling_policy_fields() {
+  cp_errors=
+  cp_reason=
+  cp_configured_text=$(config_bool configured)
+  cp_configured=0
+  if [ "$cp_configured_text" = "true" ]; then
+    cp_configured=1
+  fi
+
+  cp_min_c=$(config_number_default temperature_min_c 0)
+  cp_max_c=$(config_number_default temperature_max_c 120)
+  cp_balanced_c=$(config_number_default balanced_c 38)
+  cp_hot_c=$(config_number_default hot_c 42)
+  cp_critical_c=$(config_number_default critical_c 46)
+  cp_hysteresis_c=$(config_number_default hysteresis_c 2)
+  cp_dwell=$(config_number_default minimum_dwell_seconds 30)
+
+  cp_limit_min_milli=$(temp_to_milli_c "$cp_min_c") || cp_configured=0
+  cp_limit_max_milli=$(temp_to_milli_c "$cp_max_c") || cp_configured=0
+  cp_balanced_milli=$(temp_to_milli_c "$cp_balanced_c") || cp_configured=0
+  cp_hot_milli=$(temp_to_milli_c "$cp_hot_c") || cp_configured=0
+  cp_critical_milli=$(temp_to_milli_c "$cp_critical_c") || cp_configured=0
+  cp_hysteresis_milli=$(temp_to_milli_c "$cp_hysteresis_c") || cp_configured=0
+  case "$cp_dwell" in
+    ''|*[!0-9]*) cp_dwell=30; cp_configured=0 ;;
+  esac
+  if ! [ "$cp_limit_min_milli" -le "$cp_balanced_milli" ] 2>/dev/null || \
+     ! [ "$cp_balanced_milli" -le "$cp_hot_milli" ] 2>/dev/null || \
+     ! [ "$cp_hot_milli" -le "$cp_critical_milli" ] 2>/dev/null || \
+     ! [ "$cp_critical_milli" -le "$cp_limit_max_milli" ] 2>/dev/null; then
+    cp_configured=0
+  fi
+
+  if [ "$cp_configured" != "1" ]; then
+    cp_errors=$(list_append_json_string "$cp_errors" "CALIBRATION_REQUIRED")
+  fi
+
+  cp_fan_present=0
+  cp_fan_supported=0
+  cp_fan_enabled=
+  cp_fan_rpm=
+  cp_fan_level=
+  for cp_fan_path in /sys/kernel/fan/fan_enable /sys/kernel/fan/fan_speed_level /sys/kernel/fan/fan_speed_count; do
+    if path_present "$cp_fan_path"; then
+      cp_fan_present=1
+      cp_fan_supported=1
+    fi
+  done
+  if [ "$cp_fan_present" = "1" ]; then
+    cp_value=$(read_allowlisted_file /sys/kernel/fan/fan_enable)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ]; then
+      case "$cp_value" in
+        0) cp_fan_enabled=false ;;
+        1) cp_fan_enabled=true ;;
+        *) cp_reason=$(list_append_json_string "$cp_reason" "invalid_fan_enabled:/sys/kernel/fan/fan_enable") ;;
+      esac
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/sys/kernel/fan/fan_enable")
+    fi
+    cp_value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_count)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value"; then
+      cp_fan_rpm=$cp_value
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/sys/kernel/fan/fan_speed_count")
+    fi
+    cp_value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_level)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value"; then
+      cp_fan_level=$cp_value
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/sys/kernel/fan/fan_speed_level")
+    fi
+  else
+    cp_reason=$(list_append_json_string "$cp_reason" "fan_missing")
+  fi
+
+  cp_pump_present=0
+  cp_pump_supported=0
+  cp_pump_enabled=
+  cp_pump_speed=
+  cp_pump_freq=
+  for cp_pump_path in /proc/driver/micropump/enable /proc/driver/micropump/freq /proc/driver/micropump/speed /proc/driver/micropump/mode; do
+    if path_present "$cp_pump_path"; then
+      cp_pump_present=1
+    fi
+  done
+  if path_present /proc/driver/micropump/enable; then
+    cp_value=$(read_allowlisted_file /proc/driver/micropump/enable)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ]; then
+      case "$cp_value" in
+        0) cp_pump_enabled=false; cp_pump_supported=1 ;;
+        1) cp_pump_enabled=true; cp_pump_supported=1 ;;
+        *) cp_reason=$(list_append_json_string "$cp_reason" "invalid_pump_enabled:/proc/driver/micropump/enable") ;;
+      esac
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/proc/driver/micropump/enable")
+    fi
+  fi
+  if path_present /proc/driver/micropump/speed; then
+    cp_value=$(read_allowlisted_file /proc/driver/micropump/speed)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value" && [ "$cp_value" -le 100 ] 2>/dev/null; then
+      cp_pump_speed=$cp_value
+      cp_pump_supported=1
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/proc/driver/micropump/speed")
+    fi
+  fi
+  if path_present /proc/driver/micropump/freq; then
+    cp_value=$(read_allowlisted_file /proc/driver/micropump/freq)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value" && [ "$cp_value" -le 100 ] 2>/dev/null; then
+      cp_pump_freq=$cp_value
+      cp_pump_supported=1
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/proc/driver/micropump/freq")
+    fi
+  fi
+  if [ "$cp_pump_present" = "0" ]; then
+    cp_reason=$(list_append_json_string "$cp_reason" "pump_missing")
+  fi
+
+  cp_valid=0
+  cp_rejected=0
+  cp_observed_max_milli=
+  cp_sensor_name=
+  cp_sensor_source=
+  for cp_thermal_path in \
+    /sys/class/thermal/thermal_zone0/temp \
+    /sys/class/thermal/thermal_zone1/temp \
+    /sys/class/thermal/thermal_zone2/temp \
+    /sys/class/thermal/thermal_zone3/temp \
+    /sys/devices/virtual/thermal/thermal_zone0/temp \
+    /sys/devices/virtual/thermal/thermal_zone1/temp \
+    /sys/devices/virtual/thermal/thermal_zone2/temp \
+    /sys/devices/virtual/thermal/thermal_zone3/temp
+  do
+    if path_present "$cp_thermal_path"; then
+      cp_value=$(read_allowlisted_file "$cp_thermal_path")
+      cp_rc=$?
+      if [ "$cp_rc" = "0" ]; then
+        if cp_milli=$(temp_to_milli_c "$cp_value") && [ "$cp_milli" -ge "$cp_limit_min_milli" ] 2>/dev/null && [ "$cp_milli" -le "$cp_limit_max_milli" ] 2>/dev/null; then
+          cp_valid=$((cp_valid + 1))
+          if [ -z "$cp_observed_max_milli" ] || [ "$cp_milli" -gt "$cp_observed_max_milli" ] 2>/dev/null; then
+            cp_observed_max_milli=$cp_milli
+            cp_sensor_name=$cp_thermal_path
+            cp_sensor_source=$REDMAGIC_SOURCE_THERMAL
+          fi
+        else
+          cp_rejected=$((cp_rejected + 1))
+          cp_reason=$(list_append_json_string "$cp_reason" "rejected_thermal:$cp_thermal_path")
+        fi
+      elif [ "$cp_rc" = "3" ]; then
+        cp_rejected=$((cp_rejected + 1))
+        cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:$cp_thermal_path")
+      fi
+    fi
+  done
+
+  cp_state=UNAVAILABLE
+  if [ "$cp_configured" != "1" ]; then
+    cp_reason=$(list_append_json_string "$cp_reason" "CALIBRATION_REQUIRED")
+  elif [ "$(safe_mode_value)" = "1" ]; then
+    cp_state=SAFE_MODE
+    cp_reason=$(list_append_json_string "$cp_reason" "safe_mode")
+  elif [ "$cp_configured" = "1" ] && [ "$cp_valid" -gt 0 ]; then
+    if [ "$cp_observed_max_milli" -ge "$cp_critical_milli" ] 2>/dev/null; then
+      cp_state=CRITICAL
+    elif [ "$cp_observed_max_milli" -ge "$cp_hot_milli" ] 2>/dev/null; then
+      cp_state=HOT
+    elif [ "$cp_observed_max_milli" -ge "$cp_balanced_milli" ] 2>/dev/null; then
+      cp_state=BALANCED
+    else
+      cp_state=COOL
+    fi
+
+    cp_previous=${NEBULA_POLICY_PREVIOUS_STATE:-}
+    cp_age=${NEBULA_POLICY_PREVIOUS_STATE_AGE_SECONDS:-999999}
+    case "$cp_age" in
+      ''|*[!0-9]*) cp_age=999999 ;;
+    esac
+    cp_prev_rank=$(state_rank "$cp_previous")
+    cp_state_rank=$(state_rank "$cp_state")
+    if [ "$cp_prev_rank" -gt "$cp_state_rank" ] 2>/dev/null; then
+      if [ "$cp_age" -lt "$cp_dwell" ] 2>/dev/null; then
+        cp_state=$cp_previous
+        cp_reason=$(list_append_json_string "$cp_reason" "minimum_dwell_active")
+      else
+        cp_hold_threshold=$(state_threshold_milli "$cp_previous")
+        cp_hold_floor=$((cp_hold_threshold - cp_hysteresis_milli))
+        if [ "$cp_hold_threshold" -gt 0 ] 2>/dev/null && [ "$cp_observed_max_milli" -ge "$cp_hold_floor" ] 2>/dev/null; then
+          cp_state=$cp_previous
+          cp_reason=$(list_append_json_string "$cp_reason" "hysteresis_hold")
+        fi
+      fi
+    fi
+  elif [ "$cp_valid" = "0" ]; then
+    cp_reason=$(list_append_json_string "$cp_reason" "no_valid_thermal")
+  fi
+
+  cp_fan_intent=$(intent_for_state "$cp_fan_supported" "$cp_state" fan)
+  cp_pump_intent=$(intent_for_state "$cp_pump_supported" "$cp_state" pump)
+
+  if [ -z "$cp_fan_enabled" ]; then cp_fan_enabled_json=null; else cp_fan_enabled_json=$cp_fan_enabled; fi
+  if [ -z "$cp_pump_enabled" ]; then cp_pump_enabled_json=null; else cp_pump_enabled_json=$cp_pump_enabled; fi
+  if [ -z "$cp_observed_max_milli" ]; then cp_max_json=null; else cp_max_json=$(json_number_from_milli "$cp_observed_max_milli"); fi
+  if [ -z "$cp_sensor_name" ]; then cp_sensor_name_json=null; else cp_sensor_name_json=$(json_string "$cp_sensor_name"); fi
+  if [ -z "$cp_sensor_source" ]; then cp_sensor_source_json=null; else cp_sensor_source_json=$(json_string "$cp_sensor_source"); fi
+
+  printf '"preview_only":true,'
+  printf '"configured":%s,' "$(json_bool "$cp_configured")"
+  printf '"safe_mode":%s,' "$(json_bool "$(safe_mode_value)")"
+  printf '"state":%s,' "$(json_string "$cp_state")"
+  printf '"controlling_sensor":{"name":%s,"source":%s,"temperature_c":%s},' \
+    "$cp_sensor_name_json" "$cp_sensor_source_json" "$cp_max_json"
+  printf '"thermal":{"maximum_c":%s,"valid_sensor_count":%s,"rejected_sensor_count":%s},' \
+    "$cp_max_json" "$cp_valid" "$cp_rejected"
+  printf '"fan":{"supported":%s,"present":%s,"current":{"enabled":%s,"rpm":%s,"level":%s},"intent":%s,"applied":false},' \
+    "$(json_bool "$cp_fan_supported")" \
+    "$(json_bool "$cp_fan_present")" \
+    "$cp_fan_enabled_json" \
+    "$(json_int_or_null "$cp_fan_rpm")" \
+    "$(json_int_or_null "$cp_fan_level")" \
+    "$(json_string "$cp_fan_intent")"
+  printf '"pump":{"supported":%s,"present":%s,"current":{"enabled":%s,"speed":%s,"freq":%s},"intent":%s,"applied":false},' \
+    "$(json_bool "$cp_pump_supported")" \
+    "$(json_bool "$cp_pump_present")" \
+    "$cp_pump_enabled_json" \
+    "$(json_int_or_null "$cp_pump_speed")" \
+    "$(json_int_or_null "$cp_pump_freq")" \
+    "$(json_string "$cp_pump_intent")"
+  printf '"policy":{"threshold_source":"defaults.json","hysteresis_c":%s,"minimum_dwell_seconds":%s},' \
+    "$(json_number_from_milli "$cp_hysteresis_milli")" \
+    "$cp_dwell"
+  printf '"reason":[%s],"errors":[%s]' "$cp_reason" "$cp_errors"
+}
+
+cooling_policy_json() {
+  printf '{"protocol_version":%s,"command":"cooling policy",' "$PROTOCOL_VERSION"
+  cooling_policy_fields
+  printf '}\n'
 }
 
 pump_json_payload() {
@@ -609,6 +969,7 @@ redmagic_probe_json() {
     fan_enabled_json=$fan_enabled
   fi
   pump_payload=$(pump_json_payload)
+  cooling_policy_payload=$(cooling_policy_fields)
 
   printf '{'
   printf '"protocol_version":%s,' "$PROTOCOL_VERSION"
@@ -637,6 +998,7 @@ redmagic_probe_json() {
     "$thermal_readings" \
     "$(json_string "$REDMAGIC_SOURCE_THERMAL")" \
     "$thermal_errors"
+  printf '"cooling_policy":{%s},' "$cooling_policy_payload"
   printf '"redmagic_button":{"supported":false,"configured":false,"reason":"disabled_in_pass_02"}'
   printf '}\n'
 }
@@ -715,6 +1077,14 @@ main() {
       if [ "${2:-}" = "tail" ] && [ "${3:-}" = "--lines" ]; then
         log_command "logs_tail"
         logs_tail_json "${4:-50}"
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    cooling)
+      if [ "${2:-}" = "policy" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        cooling_policy_json
       else
         usage_json
         return 2

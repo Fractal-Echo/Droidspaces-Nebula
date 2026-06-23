@@ -19,6 +19,74 @@ print(obj.get(sys.argv[2], ""))
 PY
 }
 
+write_policy_defaults() {
+  local file="$1"
+  local configured="${2:-true}"
+  {
+    printf '{\n'
+    printf '  "cooling_policy": {\n'
+    printf '    "configured": %s,\n' "$configured"
+    printf '    "temperature_min_c": 0,\n'
+    printf '    "temperature_max_c": 120,\n'
+    printf '    "balanced_c": 38,\n'
+    printf '    "hot_c": 42,\n'
+    printf '    "critical_c": 46,\n'
+    printf '    "hysteresis_c": 2,\n'
+    printf '    "minimum_dwell_seconds": 30\n'
+    printf '  }\n'
+    printf '}\n'
+  } > "$file"
+}
+
+make_policy_fixture() {
+  local fixture="$1"
+  local thermal_value="${2:-41000}"
+  local fan="${3:-present}"
+  local pump="${4:-present}"
+  rm -rf "$fixture"
+  mkdir -p "$fixture/sys/class/thermal/thermal_zone0"
+  printf '%s' "$thermal_value" > "$fixture/sys/class/thermal/thermal_zone0/temp"
+  if [[ "$fan" == "present" ]]; then
+    mkdir -p "$fixture/sys/kernel/fan"
+    printf 0 > "$fixture/sys/kernel/fan/fan_enable"
+    printf 0 > "$fixture/sys/kernel/fan/fan_speed_count"
+    printf 2 > "$fixture/sys/kernel/fan/fan_speed_level"
+  fi
+  if [[ "$pump" == "present" ]]; then
+    mkdir -p "$fixture/proc/driver/micropump"
+    printf 1 > "$fixture/proc/driver/micropump/enable"
+    printf 4 > "$fixture/proc/driver/micropump/freq"
+    printf 80 > "$fixture/proc/driver/micropump/speed"
+  fi
+}
+
+policy_json_for() {
+  local fixture="$1"
+  local defaults="$2"
+  NEBULA_SYSROOT="$fixture" \
+  NEBULA_DEFAULTS_JSON="$defaults" \
+  sh "$cli" cooling policy --json
+}
+
+assert_policy_state() {
+  local json="$1"
+  local state="$2"
+  local fan_intent="$3"
+  local pump_intent="$4"
+  python3 - "$json" "$state" "$fan_intent" "$pump_intent" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "cooling policy"
+assert obj["preview_only"] is True
+assert obj["state"] == sys.argv[2], obj
+assert obj["fan"]["intent"] == sys.argv[3], obj["fan"]
+assert obj["pump"]["intent"] == sys.argv[4], obj["pump"]
+assert obj["fan"]["applied"] is False
+assert obj["pump"]["applied"] is False
+PY
+}
+
 status="$(sh "$cli" status --json)"
 [[ "$(json_field "$status" protocol_version)" == "1" ]]
 [[ "$(json_field "$status" profile)" == "safe" ]]
@@ -61,6 +129,7 @@ required = {
     "logs.tail",
     "redmagic.probe",
     "redmagic.pump.probe",
+    "cooling.policy",
 }
 missing = sorted(required - ids)
 if missing:
@@ -86,17 +155,20 @@ printf NX809J > "$props/ro.product.model"
 printf NX809J > "$props/ro.product.product.name"
 printf NX809J > "$props/ro.product.device"
 printf pineapple > "$props/ro.board.platform"
+policy_defaults="$tmp/policy-defaults.json"
+write_policy_defaults "$policy_defaults" true
 
 probe="$(
   NEBULA_SYSROOT="$fixture" \
   NEBULA_TEST_PROP_DIR="$props" \
   NEBULA_TEST_KERNEL="host-test" \
+  NEBULA_DEFAULTS_JSON="$policy_defaults" \
   sh "$cli" redmagic probe --json
 )"
 python3 - "$probe" <<'PY'
 import json, sys
 obj = json.loads(sys.argv[1])
-for key in ["protocol_version", "command", "device", "fan", "pump", "performance", "display", "thermal", "redmagic_button"]:
+for key in ["protocol_version", "command", "device", "fan", "pump", "performance", "display", "thermal", "cooling_policy", "redmagic_button"]:
     if key not in obj:
         raise SystemExit(f"missing probe key: {key}")
 assert obj["command"] == "redmagic probe"
@@ -121,6 +193,16 @@ assert obj["performance"]["supported"] is False
 assert obj["display"]["supported"] is False
 assert obj["thermal"]["supported"] is True
 assert obj["thermal"]["readings"][0]["temp_c"] == 41.0
+policy = obj["cooling_policy"]
+assert policy["preview_only"] is True
+assert policy["configured"] is True
+assert policy["state"] == "BALANCED"
+assert policy["controlling_sensor"]["temperature_c"] == 41.0
+assert policy["fan"]["intent"] == "medium"
+assert policy["fan"]["applied"] is False
+assert policy["pump"]["intent"] == "low"
+assert policy["pump"]["applied"] is False
+assert policy["policy"]["threshold_source"] == "defaults.json"
 assert obj["redmagic_button"]["reason"] == "disabled_in_pass_02"
 PY
 
@@ -145,6 +227,160 @@ assert pump["flow_rate_unit"] is None
 assert pump["mode"] is None
 assert pump["confidence"] == "confirmed"
 assert pump["errors"] == []
+PY
+
+cool_fixture="$tmp/policy-cool"
+make_policy_fixture "$cool_fixture" 37000 present present
+cool_policy="$(policy_json_for "$cool_fixture" "$policy_defaults")"
+assert_policy_state "$cool_policy" COOL off off
+
+balanced_fixture="$tmp/policy-balanced"
+make_policy_fixture "$balanced_fixture" 41000 present present
+balanced_policy="$(policy_json_for "$balanced_fixture" "$policy_defaults")"
+assert_policy_state "$balanced_policy" BALANCED medium low
+
+hot_fixture="$tmp/policy-hot"
+make_policy_fixture "$hot_fixture" 43000 present present
+hot_policy="$(policy_json_for "$hot_fixture" "$policy_defaults")"
+assert_policy_state "$hot_policy" HOT high high
+
+critical_fixture="$tmp/policy-critical"
+make_policy_fixture "$critical_fixture" 47000 present present
+critical_policy="$(policy_json_for "$critical_fixture" "$policy_defaults")"
+assert_policy_state "$critical_policy" CRITICAL maximum maximum
+
+boundary_fixture="$tmp/policy-boundary"
+make_policy_fixture "$boundary_fixture" 38000 present present
+boundary_policy="$(policy_json_for "$boundary_fixture" "$policy_defaults")"
+assert_policy_state "$boundary_policy" BALANCED medium low
+make_policy_fixture "$boundary_fixture" 42000 present present
+boundary_hot_policy="$(policy_json_for "$boundary_fixture" "$policy_defaults")"
+assert_policy_state "$boundary_hot_policy" HOT high high
+make_policy_fixture "$boundary_fixture" 46000 present present
+boundary_critical_policy="$(policy_json_for "$boundary_fixture" "$policy_defaults")"
+assert_policy_state "$boundary_critical_policy" CRITICAL maximum maximum
+
+hysteresis_fixture="$tmp/policy-hysteresis"
+make_policy_fixture "$hysteresis_fixture" 41000 present present
+hysteresis_policy="$(
+  NEBULA_SYSROOT="$hysteresis_fixture" \
+  NEBULA_DEFAULTS_JSON="$policy_defaults" \
+  NEBULA_POLICY_PREVIOUS_STATE=HOT \
+  NEBULA_POLICY_PREVIOUS_STATE_AGE_SECONDS=999 \
+  sh "$cli" cooling policy --json
+)"
+assert_policy_state "$hysteresis_policy" HOT high high
+python3 - "$hysteresis_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert "hysteresis_hold" in obj["reason"]
+PY
+
+dwell_fixture="$tmp/policy-dwell"
+make_policy_fixture "$dwell_fixture" 37000 present present
+dwell_policy="$(
+  NEBULA_SYSROOT="$dwell_fixture" \
+  NEBULA_DEFAULTS_JSON="$policy_defaults" \
+  NEBULA_POLICY_PREVIOUS_STATE=CRITICAL \
+  NEBULA_POLICY_PREVIOUS_STATE_AGE_SECONDS=10 \
+  sh "$cli" cooling policy --json
+)"
+assert_policy_state "$dwell_policy" CRITICAL maximum maximum
+python3 - "$dwell_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert "minimum_dwell_active" in obj["reason"]
+PY
+
+malformed_temp_fixture="$tmp/policy-malformed"
+make_policy_fixture "$malformed_temp_fixture" fast present present
+malformed_policy="$(policy_json_for "$malformed_temp_fixture" "$policy_defaults")"
+assert_policy_state "$malformed_policy" UNAVAILABLE stock stock
+python3 - "$malformed_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["thermal"]["valid_sensor_count"] == 0
+assert obj["thermal"]["rejected_sensor_count"] == 1
+assert any(item.startswith("rejected_thermal:") for item in obj["reason"])
+assert "no_valid_thermal" in obj["reason"]
+PY
+
+out_of_range_temp_fixture="$tmp/policy-out-of-range"
+make_policy_fixture "$out_of_range_temp_fixture" 250000 present present
+out_of_range_policy="$(policy_json_for "$out_of_range_temp_fixture" "$policy_defaults")"
+assert_policy_state "$out_of_range_policy" UNAVAILABLE stock stock
+python3 - "$out_of_range_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["thermal"]["valid_sensor_count"] == 0
+assert obj["thermal"]["rejected_sensor_count"] == 1
+PY
+
+no_sensor_fixture="$tmp/policy-no-sensor"
+rm -rf "$no_sensor_fixture"
+mkdir -p "$no_sensor_fixture/sys/kernel/fan" "$no_sensor_fixture/proc/driver/micropump"
+printf 0 > "$no_sensor_fixture/sys/kernel/fan/fan_enable"
+printf 0 > "$no_sensor_fixture/sys/kernel/fan/fan_speed_count"
+printf 2 > "$no_sensor_fixture/sys/kernel/fan/fan_speed_level"
+printf 1 > "$no_sensor_fixture/proc/driver/micropump/enable"
+printf 4 > "$no_sensor_fixture/proc/driver/micropump/freq"
+printf 80 > "$no_sensor_fixture/proc/driver/micropump/speed"
+no_sensor_policy="$(policy_json_for "$no_sensor_fixture" "$policy_defaults")"
+assert_policy_state "$no_sensor_policy" UNAVAILABLE stock stock
+python3 - "$no_sensor_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert "no_valid_thermal" in obj["reason"]
+PY
+
+fan_missing_fixture="$tmp/policy-fan-missing"
+make_policy_fixture "$fan_missing_fixture" 41000 missing present
+fan_missing_policy="$(policy_json_for "$fan_missing_fixture" "$policy_defaults")"
+assert_policy_state "$fan_missing_policy" BALANCED unavailable low
+
+pump_missing_fixture="$tmp/policy-pump-missing"
+make_policy_fixture "$pump_missing_fixture" 41000 present missing
+pump_missing_policy="$(policy_json_for "$pump_missing_fixture" "$policy_defaults")"
+assert_policy_state "$pump_missing_policy" BALANCED medium unavailable
+
+both_missing_fixture="$tmp/policy-both-missing"
+make_policy_fixture "$both_missing_fixture" 41000 missing missing
+both_missing_policy="$(policy_json_for "$both_missing_fixture" "$policy_defaults")"
+assert_policy_state "$both_missing_policy" BALANCED unavailable unavailable
+
+safe_policy_data="$tmp/policy-safe-data"
+mkdir -p "$safe_policy_data"
+touch "$safe_policy_data/safe_mode"
+safe_policy="$(
+  NEBULA_SYSROOT="$balanced_fixture" \
+  NEBULA_DEFAULTS_JSON="$policy_defaults" \
+  NEBULA_DATA_DIR="$safe_policy_data" \
+  sh "$cli" cooling policy --json
+)"
+assert_policy_state "$safe_policy" SAFE_MODE stock stock
+
+unconfigured_defaults="$tmp/policy-unconfigured.json"
+write_policy_defaults "$unconfigured_defaults" false
+unconfigured_policy="$(policy_json_for "$balanced_fixture" "$unconfigured_defaults")"
+assert_policy_state "$unconfigured_policy" UNAVAILABLE stock stock
+python3 - "$unconfigured_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["configured"] is False
+assert "CALIBRATION_REQUIRED" in obj["errors"]
+PY
+
+denied_policy="$(
+  NEBULA_SYSROOT="$balanced_fixture" \
+  NEBULA_DEFAULTS_JSON="$policy_defaults" \
+  NEBULA_TEST_DENY_PATHS="/sys/class/thermal/thermal_zone0/temp" \
+  sh "$cli" cooling policy --json
+)"
+assert_policy_state "$denied_policy" UNAVAILABLE stock stock
+python3 - "$denied_policy" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert "permission_denied:/sys/class/thermal/thermal_zone0/temp" in obj["errors"]
 PY
 
 missing_probe="$(NEBULA_SYSROOT="$tmp/missing" sh "$cli" redmagic probe --json)"
@@ -228,11 +464,15 @@ extra_arg="$(sh "$cli" redmagic probe --json /etc/passwd 2>/dev/null)"
 extra_code=$?
 pump_extra_arg="$(sh "$cli" redmagic pump probe --json /proc/driver/micropump/speed 2>/dev/null)"
 pump_extra_code=$?
+cooling_extra_arg="$(sh "$cli" cooling policy --json /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
+cooling_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
+[[ "$cooling_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'
@@ -252,12 +492,22 @@ if rg -n 'setprop|settings put|service (start|stop|restart)|am start|cmd activit
   exit 1
 fi
 
+if rg -n 'pump (enable|disable|speed|mode|auto)|fan (enable|level|speed)|cooling (apply|set)|applyPump|enablePump|setPump' "$repo_root/nebula-core-module/bin/nebula-core"; then
+  echo "nebula-core contains forbidden cooling mutation strings" >&2
+  exit 1
+fi
+
 if rg -n 'cat "?[$][{]?[A-Za-z0-9_]+|/etc/passwd|/proc/kmsg' "$repo_root/nebula-core-module/bin/nebula-core"; then
   echo "nebula-core appears to expose arbitrary path reads" >&2
   exit 1
 fi
 
+if rg -n 'balanced_c|hot_c|critical_c|temperature_min_c|temperature_max_c|46[.]0|42[.]0|38[.]0' "$repo_root/app/src/main/java"; then
+  echo "app contains duplicated cooling threshold source" >&2
+  exit 1
+fi
+
 rg -n 'NEBULA_CORE_PROTOCOL_VERSION = 1|NEBULA_CORE_PROTOCOL_VERSION=1' "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreProtocol.java" >/dev/null
-rg -n 'protocolMismatch|moduleVersionMismatch|Invalid module JSON|parseRedMagicProbe|redMagicPumpProbe' "$repo_root/app/src/main/java/io/droidspaces/nebula/core" >/dev/null
+rg -n 'protocolMismatch|moduleVersionMismatch|Invalid module JSON|parseRedMagicProbe|redMagicPumpProbe|coolingPolicy' "$repo_root/app/src/main/java/io/droidspaces/nebula/core" >/dev/null
 
 echo "Nebula control plane host tests passed."

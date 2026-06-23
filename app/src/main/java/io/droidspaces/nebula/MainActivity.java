@@ -478,7 +478,8 @@ public final class MainActivity extends Activity {
         rail.addView(statusCell("ADRENO 840", "Turnip 26.2", TEXT), weightedButtonParams());
         rail.addView(statusCell("NTSYNC", "kernel enabled", TEXT), weightedButtonParams());
         rail.addView(statusCell("SELINUX", "enforcing", TEXT), weightedButtonParams());
-        rail.addView(statusCell("POWERDECK", coolingPolicyLabel(redMagicProbe), HOT), weightedButtonParams());
+        rail.addView(statusCell("POWERDECK", coolingPolicyLabel(redMagicProbe),
+                coolingPolicyColor(redMagicProbe)), weightedButtonParams());
         return rail;
     }
 
@@ -580,11 +581,11 @@ public final class MainActivity extends Activity {
         top.addView(titleBox, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView title = text("PowerDeck Auto Cooling", 19, TEXT, Typeface.BOLD);
+        TextView title = text("Cooling Engine", 19, TEXT, Typeface.BOLD);
         title.setLetterSpacing(0.04f);
         titleBox.addView(title);
 
-        TextView subtitle = text("temperature policy: " + coolingPolicyReason(probe),
+        TextView subtitle = text("module policy preview: " + coolingPolicyReason(probe),
                 12, MUTED, Typeface.NORMAL);
         subtitle.setTypeface(Typeface.MONOSPACE);
         subtitle.setPadding(0, dp(4), 0, 0);
@@ -592,7 +593,7 @@ public final class MainActivity extends Activity {
 
         top.addView(chip(coolingPolicyLabel(probe), coolingPolicyColor(probe)));
 
-        card.addView(progressRow("thermal envelope", coolingLoadPercent(probe),
+        card.addView(progressRow("policy response", coolingLoadPercent(probe),
                 coolingPolicyColor(probe)));
 
         LinearLayout metrics = new LinearLayout(this);
@@ -604,7 +605,12 @@ public final class MainActivity extends Activity {
         metrics.addView(metricTile("Internal Fan", fanText(probe)), weightedButtonParams());
         metrics.addView(metricTile("Liquid Pump", pumpText(probe)), weightedButtonParams());
 
-        TextView guardrail = text("AUTO APPLY: DISABLED  //  snapshot + rollback required before writes",
+        TextView source = text(coolingSourceText(probe), 12, MUTED, Typeface.NORMAL);
+        source.setTypeface(Typeface.MONOSPACE);
+        source.setPadding(0, dp(12), 0, 0);
+        card.addView(source);
+
+        TextView guardrail = text("PREVIEW ONLY  //  fanApplied=false  pumpApplied=false  //  no writes",
                 12, YELLOW, Typeface.BOLD);
         guardrail.setTypeface(Typeface.MONOSPACE);
         guardrail.setPadding(0, dp(12), 0, 0);
@@ -613,61 +619,95 @@ public final class MainActivity extends Activity {
     }
 
     private String coolingPolicyLabel(RedMagicProbe probe) {
-        Double temp = probe.maxThermalC;
-        if (temp == null) return "Telemetry";
-        if (temp >= 46.0) return "Overdrive";
-        if (temp >= 42.0) return "Active";
-        if (temp >= 38.0) return "Balanced";
-        return "Silent";
+        if (probe == null || probe.coolingPolicy == null || !probe.coolingPolicy.available) {
+            return "Unavailable";
+        }
+        String state = probe.coolingPolicy.state == null ? "UNAVAILABLE" : probe.coolingPolicy.state;
+        if ("SAFE_MODE".equals(state)) return "Safe Mode";
+        if ("COOL".equals(state)) return "Cool";
+        if ("BALANCED".equals(state)) return "Balanced";
+        if ("HOT".equals(state)) return "Hot";
+        if ("CRITICAL".equals(state)) return "Critical";
+        return "Unavailable";
     }
 
     private int coolingPolicyColor(RedMagicProbe probe) {
-        Double temp = probe.maxThermalC;
-        if (temp == null) return BLUE;
-        if (temp >= 46.0) return HOT;
-        if (temp >= 42.0) return YELLOW;
-        if (temp >= 38.0) return CYAN;
-        return NEON;
+        if (probe == null || probe.coolingPolicy == null || !probe.coolingPolicy.available) {
+            return BLUE;
+        }
+        String state = probe.coolingPolicy.state == null ? "UNAVAILABLE" : probe.coolingPolicy.state;
+        if ("CRITICAL".equals(state)) return HOT;
+        if ("HOT".equals(state)) return YELLOW;
+        if ("BALANCED".equals(state)) return CYAN;
+        if ("COOL".equals(state)) return NEON;
+        if ("SAFE_MODE".equals(state)) return BLUE;
+        return BLUE;
     }
 
     private String coolingPolicyReason(RedMagicProbe probe) {
-        Double temp = probe.maxThermalC;
-        if (!probe.available || temp == null) {
-            return "waiting for module thermal telemetry";
+        if (probe == null || !probe.available || probe.coolingPolicy == null
+                || !probe.coolingPolicy.available) {
+            return "waiting for module policy telemetry";
         }
-        if (temp >= 46.0) return "fan+pump would request high response";
-        if (temp >= 42.0) return "fan+pump would request active response";
-        if (temp >= 38.0) return "fan+pump would hold balanced response";
-        return "cool enough for quiet response";
+        if (probe.coolingPolicy.errorSummary != null
+                && !probe.coolingPolicy.errorSummary.isEmpty()) {
+            return probe.coolingPolicy.errorSummary;
+        }
+        return probe.coolingPolicy.reasonSummary;
     }
 
     private int coolingLoadPercent(RedMagicProbe probe) {
-        Double temp = probe.maxThermalC;
-        if (temp == null) return 0;
-        int value = (int) Math.round(((temp - 30.0) / 24.0) * 100.0);
-        if (value < 0) return 0;
-        if (value > 100) return 100;
-        return value;
+        if (probe == null || probe.coolingPolicy == null || !probe.coolingPolicy.available) {
+            return 0;
+        }
+        String state = probe.coolingPolicy.state == null ? "UNAVAILABLE" : probe.coolingPolicy.state;
+        if ("CRITICAL".equals(state)) return 100;
+        if ("HOT".equals(state)) return 75;
+        if ("BALANCED".equals(state)) return 50;
+        if ("COOL".equals(state)) return 25;
+        if ("SAFE_MODE".equals(state)) return 15;
+        return 0;
     }
 
     private String thermalText(RedMagicProbe probe) {
-        if (probe.maxThermalC == null) return "unavailable";
-        return String.format(Locale.US, "%.1f C / %d zones", probe.maxThermalC,
-                probe.thermalReadingCount);
+        Double temp = probe.coolingPolicy == null ? null : probe.coolingPolicy.controllingTemperatureC;
+        if (temp == null) temp = probe.maxThermalC;
+        if (temp == null) return "unavailable";
+        int count = probe.coolingPolicy == null || !probe.coolingPolicy.available
+                ? probe.thermalReadingCount : probe.coolingPolicy.validSensorCount;
+        return String.format(Locale.US, "%.1f C / %d zones", temp, count);
     }
 
     private String fanText(RedMagicProbe probe) {
         String state = probe.fanEnabled == null ? "unknown" : (probe.fanEnabled ? "on" : "off");
         String rpm = probe.fanRpm == null ? "rpm ?" : probe.fanRpm + " rpm";
         String level = probe.fanLevel == null ? "level ?" : "level " + probe.fanLevel;
-        return state + " / " + rpm + " / " + level;
+        String intent = probe.coolingPolicy == null ? "unavailable" : probe.coolingPolicy.fanIntent;
+        return state + " / " + rpm + " / " + level + "\nintent " + intent;
     }
 
     private String pumpText(RedMagicProbe probe) {
         if (!probe.pumpPresent) return "not detected";
         String state = probe.pumpEnabled == null ? "unknown" : (probe.pumpEnabled ? "on" : "off");
         String speed = probe.pumpSpeed == null ? "speed ?" : "speed " + probe.pumpSpeed;
-        return state + " / " + speed;
+        String intent = probe.coolingPolicy == null ? "unavailable" : probe.coolingPolicy.pumpIntent;
+        String freq = probe.coolingPolicy == null || probe.coolingPolicy.pumpFreq == null
+                ? "freq ?" : "freq " + probe.coolingPolicy.pumpFreq;
+        return state + " / " + speed + " / " + freq + "\nintent " + intent;
+    }
+
+    private String coolingSourceText(RedMagicProbe probe) {
+        if (probe == null || probe.coolingPolicy == null || !probe.coolingPolicy.available) {
+            return "source=unavailable  confidence=module_policy_missing";
+        }
+        RedMagicProbe.CoolingPolicy policy = probe.coolingPolicy;
+        return "state=" + policy.state
+                + "  previewOnly=" + policy.previewOnly
+                + "  configured=" + policy.configured
+                + "  safeMode=" + policy.safeMode
+                + "\nsource=" + policy.thresholdSource
+                + "  sensor=" + policy.controllingSensorName
+                + "  rejectedSensors=" + policy.rejectedSensorCount;
     }
 
     private View metricTile(String label, String value) {
@@ -1046,6 +1086,10 @@ public final class MainActivity extends Activity {
             sb.append("  error=").append(coreStatus.visibleError()).append('\n');
         }
         sb.append("  redMagicProbe=").append(redMagicProbe.available).append('\n');
+        sb.append("  coolingPolicyState=").append(redMagicProbe.coolingPolicy.state).append('\n');
+        sb.append("  coolingPreviewOnly=").append(redMagicProbe.coolingPolicy.previewOnly).append('\n');
+        sb.append("  coolingFanIntent=").append(redMagicProbe.coolingPolicy.fanIntent).append('\n');
+        sb.append("  coolingPumpIntent=").append(redMagicProbe.coolingPolicy.pumpIntent).append('\n');
         sb.append('\n');
 
         sb.append("[Targets]\n");

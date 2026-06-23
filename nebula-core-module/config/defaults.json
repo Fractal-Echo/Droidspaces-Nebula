@@ -7,5 +7,15 @@
   "blocked_profiles": [
     "dock",
     "compatibility"
-  ]
+  ],
+  "cooling_policy": {
+    "configured": true,
+    "temperature_min_c": 0,
+    "temperature_max_c": 120,
+    "balanced_c": 38,
+    "hot_c": 42,
+    "critical_c": 46,
+    "hysteresis_c": 2,
+    "minimum_dwell_seconds": 30
+  }
 }

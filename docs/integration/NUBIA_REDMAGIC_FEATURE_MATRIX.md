@@ -26,6 +26,7 @@ Source restoration:
 | Watermark length | NubiaToolkit | `WatermarkLengthHook.hookWaterMarkWatcher` | Apache-2.0 | Increase Game Launcher watermark text limit. | Mutating UI behavior | LSPosed/root | LSPosed hook | RedMagic relevant, NX809J not live-confirmed | Disable hook | Low | Future hook lane | UNKNOWN |
 | Fan enable/level/PWM/RPM | Redmagic-Control-Center | `HardwareController.enableFan`, `setFanLevel`, `setFanPwm`, `readFanRpm` | Author permission, attribution required | Cooling fan control/status. | Mutating/read-only | Root | sysfs | NX809J candidate from Control Center and PowerDeck node map; not live-tested | Snapshot prior values, write previous enable/level/PWM | Medium | Module | REIMPLEMENT later; status only in pass 01 |
 | Micropump read-only telemetry | Redmagic-Control-Center | `HardwareController.readPumpEnabled`, `readPumpFreq`, `readPumpSpeed`; `DashboardSnapshot.readPumpEnabled/readPumpFreq/readPumpSpeed`; `DeviceCapabilityScanner.scan` | Author permission, attribution required | Liquid-cooling pump support, presence, enabled state, and vendor speed telemetry. | Read-only | Root likely | procfs | NX809J candidate from Control Center; live support must be reported from exact nodes only | None | Low | Module + app | PORT in pass 03 |
+| Auto cooling policy preview | Nebula reimplementation from Redmagic-Control-Center telemetry evidence | `nebula-core cooling policy --json`; `defaults.json` | Project source with RedMagic attribution | Combine thermal, internal fan, and liquid pump telemetry into read-only fan/pump intents. | Read-only preview | Root likely for telemetry reads | fixed CLI + sysfs/procfs reads | NX809J relevant when fan/pump/thermal nodes are readable | No rollback needed in pass 04 because no writes; future apply requires snapshot/rollback | Low in pass 04 | Module owns policy; app renders state | PORT in pass 04 |
 | Micropump control/profile writes | Redmagic-Control-Center | `HardwareController.enablePump`, `setPumpProfile`; `AutoPumpService.applyPumpRule`; `PumpDialogUi` | Author permission, attribution required | Liquid-cooling pump enable/profile control. | Mutating | Root | procfs writes/service/UI callbacks | NX809J candidate from Control Center and PowerDeck | Snapshot enable/freq/speed, restore previous values if ever enabled | Medium | Future module | REJECT_MUTATING for pass 03 |
 | RGB LEDs | Redmagic-Control-Center | `setFanLedEnabled`, `setLogoLedEffect`, `setShoulderLedEffect` | Author permission, attribution required | Fan/logo/shoulder lighting. | Mutating | Root | sysfs | NX809J candidate; not live-tested | Snapshot LED effect/cfg, restore/off | Low-medium | Module + app UI | REIMPLEMENT later; status only in pass 01 |
 | Shoulder triggers | Redmagic-Control-Center | `enableTriggers`, `disableTriggers`, `TriggerRootService` | Author permission, attribution required | Enable/handle shoulder trigger input. | Mutating | Root/accessibility | sysfs, input event, shell command | NX809J candidate via `nubia_tgk_aw_sar*` event names; not live-tested | Disable custom service, restore SAR mode, stock fallback | Medium-high | Module later | REIMPLEMENT later; disabled in pass 01 |
@@ -51,12 +52,14 @@ Selected for port/reimplementation now:
 - Nubia/RedMagic capability discovery cards.
 - RedMagic button audit card, disabled.
 - RedMagic liquid-cooling pump read-only probe in pass 03.
+- Read-only automatic cooling policy preview in pass 04.
 
 Deferred or rejected:
 
 - Any LSPosed hook activation.
 - Any fan/pump/LED/trigger/slider/haptic write.
 - Pump `freq` and `mode` value semantics until units/meaning are proven.
+- Any automatic fan/pump apply action; pass 04 exposes preview intents only.
 - GPP property auto-set at boot.
 - Lossless Scaling/Vulkan/frame-generation integration.
 - Generic performance tuning modules.

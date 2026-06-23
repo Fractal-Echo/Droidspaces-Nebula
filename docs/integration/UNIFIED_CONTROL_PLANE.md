@@ -42,6 +42,7 @@ Allowed fixed commands:
 | `logs tail --lines N` | Returns the last 1-500 module log lines as JSON. |
 | `redmagic probe --json` | Read-only aggregate RM11 Pro RedMagic telemetry. |
 | `redmagic pump probe --json` | Read-only liquid-cooling pump telemetry from fixed micropump nodes. |
+| `cooling policy --json` | Read-only fan + pump policy preview from fixed telemetry and module defaults. |
 
 Blocked pass 01 activations:
 
@@ -84,6 +85,7 @@ Pass 01 defaults:
 - No unrestricted shell console in the APK.
 - Mutating Nubia/RedMagic controls are represented as audited status only.
 - The RedMagic pump probe reads only fixed source-derived `/proc/driver/micropump` nodes and never exposes pump enable, disable, speed, mode, or profile setters.
+- The auto cooling policy is preview-only in pass 04: it returns fan/pump intents with `applied=false`, reads thresholds only from `nebula-core-module/config/defaults.json`, and performs no hardware writes.
 
 ## Source Integration
 
@@ -92,6 +94,8 @@ Nubia Toolkit remains an LSPosed hook lane. Pass 01 does not enable hooks.
 RedMagic Control Center source is permitted by user-supplied author approval evidence and remains attributed. Nebula does not merge the APK or copy its UI; it ports only bounded capability knowledge into documentation and non-mutating status surfaces.
 
 RedMagic PowerDeck is a local archived source reference with no recovered origin URL. Its dry-run/snapshot design is reimplemented conceptually in Nebula Core, not copied as a third-party payload.
+
+See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
 Online references checked for future work:
 

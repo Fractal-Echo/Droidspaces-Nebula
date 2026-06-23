@@ -97,6 +97,14 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
                 "nebula-core redmagic probe --json"));
 
         capabilities.add(new NebulaCapability(
+                "redmagic.cooling.policy",
+                "Cooling Engine policy",
+                coolingPolicyStatus(probe),
+                coolingPolicyDetail(probe),
+                false,
+                "nebula-core cooling policy --json"));
+
+        capabilities.add(new NebulaCapability(
                 "redmagic.gpp.allgame",
                 "GPP all-game property",
                 "reference_only",
@@ -137,5 +145,32 @@ public final class RedMagicPerformanceAdapter implements DeviceCapabilityProvide
             return "present_no_readable_telemetry";
         }
         return "unsupported_or_unavailable";
+    }
+
+    private String coolingPolicyStatus(RedMagicProbe probe) {
+        if (!probe.available || probe.coolingPolicy == null || !probe.coolingPolicy.available) {
+            return "read_only_unavailable";
+        }
+        if (!probe.coolingPolicy.configured) {
+            return "calibration_required";
+        }
+        if (probe.coolingPolicy.safeMode) {
+            return "safe_mode_preview";
+        }
+        String state = probe.coolingPolicy.state == null ? "unavailable" : probe.coolingPolicy.state;
+        return "preview_" + state.toLowerCase();
+    }
+
+    private String coolingPolicyDetail(RedMagicProbe probe) {
+        if (probe.coolingPolicy == null) {
+            return "cooling policy unavailable";
+        }
+        RedMagicProbe.CoolingPolicy policy = probe.coolingPolicy;
+        return "state=" + policy.state
+                + ", previewOnly=" + policy.previewOnly
+                + ", fanIntent=" + policy.fanIntent
+                + ", pumpIntent=" + policy.pumpIntent
+                + ", applied=" + (policy.fanApplied || policy.pumpApplied)
+                + ", reason=" + policy.reasonSummary;
     }
 }

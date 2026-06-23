@@ -28,6 +28,7 @@ No PowerDeck-only display or GPU paths are promoted here because pass 02 require
 | Display refresh/current display state | none in scoped implementation files | n/a | no confirmed path | unknown | rejected | unknown | no | unknown | `supported=false`, `NO_CONFIRMED_READ_ONLY_SOURCE` | REJECT for pass 02 |
 | Thermal zone 0-3 primary | Redmagic-Control-Center `HardwareController.readTemperatureC` | `e94d36e8204c228c6e8781157dea22946cf715e3` | `/sys/class/thermal/thermal_zone0/temp` through `/sys/class/thermal/thermal_zone3/temp` | integer C or millicelsius | read first line from allowlisted path | root may be needed | yes | medium; generic thermal paths used by source | omit missing zones; permission error if denied | PORT |
 | Thermal zone 0-3 virtual | Redmagic-Control-Center `HardwareController.readTemperatureC` | `e94d36e8204c228c6e8781157dea22946cf715e3` | `/sys/devices/virtual/thermal/thermal_zone0/temp` through `/sys/devices/virtual/thermal/thermal_zone3/temp` | integer C or millicelsius | read first line from allowlisted path | root may be needed | yes | medium; generic thermal paths used by source | omit missing zones; permission error if denied | PORT |
+| Auto cooling policy preview | Nebula module policy using accepted fan, pump, and thermal reads | current Hub | `nebula-core-module/config/defaults.json` plus fixed allowlisted telemetry paths | JSON state and intents | `nebula-core cooling policy --json` | root likely for telemetry reads | yes; preview-only, `applied=false` | high when accepted NX809J nodes are readable | `UNAVAILABLE`, `SAFE_MODE`, or channel-level `unavailable` intents | PORT in pass 04 |
 | RedMagic button state | Redmagic-Control-Center trigger files from pass 01 audit | `e94d36e8204c228c6e8781157dea22946cf715e3` | SAR/input/settings paths | mixed | rejected in pass 02 | root/accessibility | not enabled | candidate only | `supported=false`, `disabled_in_pass_02` | DEFER |
 
 Rejected candidates:
@@ -35,6 +36,7 @@ Rejected candidates:
 - RedMagic performance/game mode app-private preferences: not a current device performance state.
 - RedMagic pump write/profile/service/UI paths: proven source-relevant, but mutating and deferred.
 - RedMagic pump `freq` and `mode`: useful identity/presence evidence, but physical unit and mode semantics are not yet proven for a public JSON value.
+- Automatic fan/pump writes: policy preview is accepted, but all apply/toggle/profile writes remain deferred.
 - NubiaToolkit hook settings: describes hook configuration, not verified current performance mode.
 - Any display/refresh node not present in scoped implementation files.
 - Any path requiring writes, `setprop`, `settings put`, service mutation, input injection, or vendor-service mutation.

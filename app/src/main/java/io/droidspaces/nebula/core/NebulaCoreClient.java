@@ -23,6 +23,7 @@ public final class NebulaCoreClient {
             "profile set compatibility",
             "safe-mode get --json",
             "safe-mode enable",
+            "cooling policy --json",
             "redmagic probe --json",
             "redmagic pump probe --json"
     ));
@@ -82,6 +83,13 @@ public final class NebulaCoreClient {
         }
         return runFixed("logs", "tail", "--lines",
                 String.valueOf(NebulaCoreProtocol.sanitizeTailLines(lines)));
+    }
+
+    public CommandResult coolingPolicy() {
+        if (!isModulePathVisible()) {
+            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
+        }
+        return runFixed("cooling", "policy", "--json");
     }
 
     public CommandResult redMagicProbe() {

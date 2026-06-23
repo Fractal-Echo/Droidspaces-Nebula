@@ -21,6 +21,7 @@ public final class RedMagicProbe {
     public final String performanceSummary;
     public final String displaySummary;
     public final String thermalSummary;
+    public final CoolingPolicy coolingPolicy;
     public final String error;
 
     private RedMagicProbe(boolean available, boolean pumpSupported, boolean pumpPresent,
@@ -28,7 +29,7 @@ public final class RedMagicProbe {
             Integer pumpSpeed, Double maxThermalC, int thermalReadingCount,
             String deviceSummary, String fanSummary, String pumpSummary,
             String performanceSummary, String displaySummary, String thermalSummary,
-            String error) {
+            CoolingPolicy coolingPolicy, String error) {
         this.available = available;
         this.pumpSupported = pumpSupported;
         this.pumpPresent = pumpPresent;
@@ -45,13 +46,15 @@ public final class RedMagicProbe {
         this.performanceSummary = performanceSummary;
         this.displaySummary = displaySummary;
         this.thermalSummary = thermalSummary;
+        this.coolingPolicy = coolingPolicy;
         this.error = error;
     }
 
     public static RedMagicProbe unavailable(String reason) {
         return new RedMagicProbe(false, false, false, null, null, null, null,
                 null, null, 0, "unavailable", "unavailable", "unavailable",
-                "unavailable", "unavailable", "unavailable", reason);
+                "unavailable", "unavailable", "unavailable",
+                CoolingPolicy.unavailable(reason), reason);
     }
 
     public static RedMagicProbe fromJson(String json) {
@@ -63,6 +66,7 @@ public final class RedMagicProbe {
             JSONObject performance = root.optJSONObject("performance");
             JSONObject display = root.optJSONObject("display");
             JSONObject thermal = root.optJSONObject("thermal");
+            JSONObject coolingPolicy = root.optJSONObject("cooling_policy");
 
             String deviceSummary = "model=" + opt(device, "model")
                     + " product=" + opt(device, "product")
@@ -78,6 +82,7 @@ public final class RedMagicProbe {
             String thermalSummary = thermalSummary(thermal);
             Double maxThermalC = maxThermalC(thermal);
             int thermalReadingCount = thermalReadingCount(thermal);
+            CoolingPolicy parsedCoolingPolicy = CoolingPolicy.fromJson(coolingPolicy);
 
             return new RedMagicProbe(true, pump != null && pump.optBoolean("supported", false),
                     pump != null && pump.optBoolean("present", false),
@@ -85,7 +90,7 @@ public final class RedMagicProbe {
                     optIntegerOrNull(fan, "level"), optBooleanOrNull(pump, "enabled"),
                     optIntegerOrNull(pump, "speed"), maxThermalC, thermalReadingCount,
                     deviceSummary, fanSummary, pumpSummary, performanceSummary,
-                    displaySummary, thermalSummary, null);
+                    displaySummary, thermalSummary, parsedCoolingPolicy, null);
         } catch (JSONException error) {
             return unavailable("Invalid RedMagic probe JSON: " + error.getMessage());
         }
@@ -125,6 +130,19 @@ public final class RedMagicProbe {
         }
         try {
             return Integer.valueOf(String.valueOf(value));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static Double optDoubleOrNull(JSONObject object, String key) {
+        if (object == null || object.isNull(key) || !object.has(key)) return null;
+        Object value = object.opt(key);
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        try {
+            return Double.valueOf(String.valueOf(value));
         } catch (NumberFormatException ignored) {
             return null;
         }
@@ -191,5 +209,113 @@ public final class RedMagicProbe {
         builder.append(", sources=").append(sourceCount);
         builder.append(errors(pump));
         return builder.toString();
+    }
+
+    private static String joinedArray(JSONObject object, String key) {
+        if (object == null) return "";
+        JSONArray array = object.optJSONArray(key);
+        if (array == null || array.length() == 0) return "";
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < array.length(); i++) {
+            if (i > 0) builder.append("; ");
+            builder.append(array.optString(i, "unknown"));
+        }
+        return builder.toString();
+    }
+
+    public static final class CoolingPolicy {
+        public final boolean available;
+        public final boolean previewOnly;
+        public final boolean configured;
+        public final boolean safeMode;
+        public final String state;
+        public final String controllingSensorName;
+        public final String controllingSensorSource;
+        public final Double controllingTemperatureC;
+        public final Double maximumTemperatureC;
+        public final int validSensorCount;
+        public final int rejectedSensorCount;
+        public final String fanIntent;
+        public final boolean fanApplied;
+        public final String pumpIntent;
+        public final boolean pumpApplied;
+        public final Integer pumpFreq;
+        public final String thresholdSource;
+        public final Double hysteresisC;
+        public final int minimumDwellSeconds;
+        public final String reasonSummary;
+        public final String errorSummary;
+
+        private CoolingPolicy(boolean available, boolean previewOnly, boolean configured,
+                boolean safeMode, String state, String controllingSensorName,
+                String controllingSensorSource, Double controllingTemperatureC,
+                Double maximumTemperatureC, int validSensorCount, int rejectedSensorCount,
+                String fanIntent, boolean fanApplied, String pumpIntent, boolean pumpApplied,
+                Integer pumpFreq, String thresholdSource, Double hysteresisC,
+                int minimumDwellSeconds, String reasonSummary, String errorSummary) {
+            this.available = available;
+            this.previewOnly = previewOnly;
+            this.configured = configured;
+            this.safeMode = safeMode;
+            this.state = state;
+            this.controllingSensorName = controllingSensorName;
+            this.controllingSensorSource = controllingSensorSource;
+            this.controllingTemperatureC = controllingTemperatureC;
+            this.maximumTemperatureC = maximumTemperatureC;
+            this.validSensorCount = validSensorCount;
+            this.rejectedSensorCount = rejectedSensorCount;
+            this.fanIntent = fanIntent;
+            this.fanApplied = fanApplied;
+            this.pumpIntent = pumpIntent;
+            this.pumpApplied = pumpApplied;
+            this.pumpFreq = pumpFreq;
+            this.thresholdSource = thresholdSource;
+            this.hysteresisC = hysteresisC;
+            this.minimumDwellSeconds = minimumDwellSeconds;
+            this.reasonSummary = reasonSummary;
+            this.errorSummary = errorSummary;
+        }
+
+        static CoolingPolicy unavailable(String reason) {
+            return new CoolingPolicy(false, true, false, false, "UNAVAILABLE",
+                    null, null, null, null, 0, 0, "unavailable", false,
+                    "unavailable", false, null, "unavailable", null, 0,
+                    reason == null ? "unavailable" : reason, "");
+        }
+
+        static CoolingPolicy fromJson(JSONObject object) {
+            if (object == null) {
+                return unavailable("missing cooling_policy");
+            }
+            JSONObject sensor = object.optJSONObject("controlling_sensor");
+            JSONObject thermal = object.optJSONObject("thermal");
+            JSONObject fan = object.optJSONObject("fan");
+            JSONObject pump = object.optJSONObject("pump");
+            JSONObject pumpCurrent = pump == null ? null : pump.optJSONObject("current");
+            JSONObject policy = object.optJSONObject("policy");
+            String reason = joinedArray(object, "reason");
+            String errors = joinedArray(object, "errors");
+            return new CoolingPolicy(true,
+                    object.optBoolean("preview_only", true),
+                    object.optBoolean("configured", false),
+                    object.optBoolean("safe_mode", false),
+                    object.optString("state", "UNAVAILABLE"),
+                    opt(sensor, "name"),
+                    opt(sensor, "source"),
+                    optDoubleOrNull(sensor, "temperature_c"),
+                    optDoubleOrNull(thermal, "maximum_c"),
+                    thermal == null ? 0 : thermal.optInt("valid_sensor_count", 0),
+                    thermal == null ? 0 : thermal.optInt("rejected_sensor_count", 0),
+                    fan == null ? "unavailable" : fan.optString("intent", "unavailable"),
+                    fan != null && fan.optBoolean("applied", false),
+                    pump == null ? "unavailable" : pump.optString("intent", "unavailable"),
+                    pump != null && pump.optBoolean("applied", false),
+                    optIntegerOrNull(pumpCurrent, "freq"),
+                    policy == null ? "unavailable" : policy.optString("threshold_source", "unavailable"),
+                    optDoubleOrNull(policy, "hysteresis_c"),
+                    policy == null ? 0 : policy.optInt("minimum_dwell_seconds", 0),
+                    reason.isEmpty() ? "none" : reason,
+                    errors);
+        }
     }
 }
