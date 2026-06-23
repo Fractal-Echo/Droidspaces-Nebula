@@ -102,6 +102,14 @@ public final class NebulaCoreClient {
         return runFixed("redmagic", "pump", "probe", "--json");
     }
 
+    public String executionModeLabel() {
+        return "app_uid:/system/bin/su";
+    }
+
+    public String moduleDispatchLabel() {
+        return "fixed_active_or_pending_nebula_core_cli";
+    }
+
     private CommandResult runFixed(String... args) {
         String logical = joinArgs(args);
         if (!isAllowlisted(logical)) {

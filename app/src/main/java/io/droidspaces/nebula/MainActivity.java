@@ -581,7 +581,9 @@ public final class MainActivity extends Activity {
                 + "\nprofile=" + status.profile.wireName
                 + "\ndaemonRunning=" + status.daemonRunning
                 + "\nserviceStatus=" + status.serviceStatus
-                + "\ngitCommit=" + status.gitCommit;
+                + "\ngitCommit=" + status.gitCommit
+                + "\nrootExecution=" + coreClient.executionModeLabel()
+                + "\nmoduleDispatch=" + coreClient.moduleDispatchLabel();
     }
 
     private View buildAutoCoolingCard(RedMagicProbe probe) {
@@ -1244,6 +1246,9 @@ public final class MainActivity extends Activity {
         sb.append("  profile=").append(coreStatus.profile.wireName).append('\n');
         sb.append("  daemonRunning=").append(coreStatus.daemonRunning).append('\n');
         sb.append("  serviceStatus=").append(coreStatus.serviceStatus).append('\n');
+        sb.append("  rootExecution=").append(coreClient.executionModeLabel()).append('\n');
+        sb.append("  moduleDispatch=").append(coreClient.moduleDispatchLabel()).append('\n');
+        sb.append("  shellSuDiagnostic=host_only_not_authoritative\n");
         if (coreStatus.hasVisibleError()) {
             sb.append("  error=").append(coreStatus.visibleError()).append('\n');
         }

@@ -8,6 +8,22 @@ log_dir="${1:-/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-2
 mkdir -p "$log_dir"
 cd "$repo_root" || exit 2
 
+module_cli=/data/adb/modules/nebula_core/bin/nebula-core
+
+app_su() {
+  local serial="$1"
+  local command="$2"
+  "$adb" -s "$serial" shell run-as io.droidspaces.nebula /system/bin/su -c "$command"
+}
+
+shell_su_diagnostic() {
+  local serial="$1"
+  local output="$2"
+  "$adb" -s "$serial" shell su -c \
+    "id; getenforce; settings get global adb_enabled; settings get global adb_wifi_enabled; $module_cli status --json; $module_cli adb-wifi status --json; tail -n 40 /data/adb/nebula/logs/nebula-core.log" \
+    > "$output" 2>&1 || true
+}
+
 {
   printf 'start_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'head=%s\n' "$(git rev-parse --short=12 HEAD 2>/dev/null || printf unknown)"
@@ -23,9 +39,12 @@ serial="$(./scripts/resolve-rm11-adb-serial.sh)"
 printf 'pre_serial=%s\n' "$serial" | tee -a "$log_dir/reboot-start.txt"
 "$adb" -s "$serial" get-state | tee "$log_dir/pre-adb-state.txt"
 "$adb" -s "$serial" shell getprop sys.boot_completed | tee "$log_dir/pre-boot-completed.txt"
-"$adb" -s "$serial" shell su -c \
-  'settings get global adb_enabled; settings get global adb_wifi_enabled; /data/adb/modules/nebula_core/bin/nebula-core adb-wifi status --json' \
-  | tee "$log_dir/pre-adb-wifi-status.txt"
+"$adb" -s "$serial" shell \
+  'settings get global adb_enabled; settings get global adb_wifi_enabled' \
+  | tee "$log_dir/pre-adb-wifi-settings.txt"
+app_su "$serial" "$module_cli adb-wifi status --json" \
+  | tee "$log_dir/pre-adb-wifi-status-app-su.json"
+shell_su_diagnostic "$serial" "$log_dir/pre-shell-su-diagnostic.txt"
 
 "$adb" -s "$serial" reboot
 printf 'reboot_sent_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "$log_dir/reboot-start.txt"
@@ -62,24 +81,23 @@ printf 'post_serial=%s\n' "$resolved"
 "$adb" -s "$resolved" get-state | tee "$log_dir/post-adb-state.txt"
 "$adb" -s "$resolved" shell getprop sys.boot_completed | tee "$log_dir/post-boot-completed.txt"
 "$adb" -s "$resolved" shell getprop ro.product.model | tee "$log_dir/post-model.txt"
+"$adb" -s "$resolved" shell \
+  'settings get global adb_enabled; settings get global adb_wifi_enabled' \
+  | tee "$log_dir/post-adb-wifi-settings.txt"
+shell_su_diagnostic "$resolved" "$log_dir/post-shell-su-diagnostic.txt"
 
-"$adb" -s "$resolved" shell su -c \
-  'id; getenforce; settings get global adb_enabled; settings get global adb_wifi_enabled; /data/adb/modules/nebula_core/bin/nebula-core status --json; /data/adb/modules/nebula_core/bin/nebula-core adb-wifi status --json; /data/adb/modules/nebula_core/bin/nebula-core legacy modules --json; /data/adb/modules/nebula_core/bin/nebula-core cooling policy --json; tail -n 40 /data/adb/nebula/logs/nebula-core.log' \
-  | tee "$log_dir/post-core-probes.jsonl"
-
-"$adb" -s "$resolved" shell run-as io.droidspaces.nebula /system/bin/su -c \
-  '/data/adb/modules/nebula_core/bin/nebula-core status --json' \
+app_su "$resolved" "$module_cli status --json" \
   | tee "$log_dir/post-core-status-app-su.json"
-"$adb" -s "$resolved" shell run-as io.droidspaces.nebula /system/bin/su -c \
-  '/data/adb/modules/nebula_core/bin/nebula-core adb-wifi status --json' \
+app_su "$resolved" "$module_cli adb-wifi status --json" \
   | tee "$log_dir/post-adb-wifi-status-app-su.json"
-"$adb" -s "$resolved" shell run-as io.droidspaces.nebula /system/bin/su -c \
-  '/data/adb/modules/nebula_core/bin/nebula-core cooling policy --json' \
+app_su "$resolved" "$module_cli legacy modules --json" \
+  | tee "$log_dir/post-legacy-modules-app-su.json"
+app_su "$resolved" "$module_cli cooling policy --json" \
   | tee "$log_dir/post-cooling-policy-app-su.json"
 
 "$adb" -s "$resolved" shell su -c \
   'ls -ld /data/adb/modules/nebula_core /data/adb/modules_update/nebula_core /data/adb/modules/droidspaces /data/adb/modules/rm11-droidspace-bridge-fd 2>/dev/null; ls -l /data/adb/modules/droidspaces/disable /data/adb/modules/rm11-droidspace-bridge-fd/disable /data/adb/modules/nebula_core/disable 2>/dev/null' \
-  | tee "$log_dir/post-module-paths.txt"
+  > "$log_dir/post-module-paths-shell-su-diagnostic.txt" 2>&1 || true
 
 "$adb" -s "$resolved" shell am force-stop io.droidspaces.nebula || true
 "$adb" -s "$resolved" shell logcat -c || true
