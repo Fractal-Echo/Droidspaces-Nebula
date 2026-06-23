@@ -130,6 +130,8 @@ required = {
     "redmagic.probe",
     "redmagic.pump.probe",
     "cooling.policy",
+    "snapshot.cooling",
+    "legacy.modules",
 }
 missing = sorted(required - ids)
 if missing:
@@ -227,6 +229,91 @@ assert pump["flow_rate_unit"] is None
 assert pump["mode"] is None
 assert pump["confidence"] == "confirmed"
 assert pump["errors"] == []
+PY
+
+modules_root="$tmp/modules"
+mkdir -p "$modules_root/droidspaces" "$modules_root/rm11-droidspace-bridge-fd"
+{
+  printf 'id=droidspaces\n'
+  printf 'name=Droidspaces: Daemon & Init\n'
+  printf 'version=v6.3.0\n'
+  printf 'versionCode=6300\n'
+  printf 'description=Daemon: Running (PID 1559) | Containers: 1 started, 0 failed\n'
+} > "$modules_root/droidspaces/module.prop"
+{
+  printf 'id=rm11-droidspace-bridge-fd\n'
+  printf 'name=RM11 Droidspaces Bridge FD Policy\n'
+  printf 'version=2026.06.19\n'
+  printf 'versionCode=20260619\n'
+  printf 'description=Persists bridge fd-use SELinux rule and /dev/shm setup\n'
+} > "$modules_root/rm11-droidspace-bridge-fd/module.prop"
+legacy_probe="$(
+  NEBULA_MODULES_ROOT="$modules_root" \
+  sh "$cli" legacy modules --json
+)"
+python3 - "$legacy_probe" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "legacy modules"
+assert obj["migration_enabled"] is False
+modules = {item["id"]: item for item in obj["modules"]}
+assert modules["droidspaces"]["protected"] is True
+assert modules["droidspaces"]["installed"] is True
+assert modules["droidspaces"]["version"] == "v6.3.0"
+assert modules["rm11-droidspace-bridge-fd"]["protected"] is True
+assert modules["rm11-droidspace-bridge-fd"]["installed"] is True
+assert modules["rm11-droidspace-bridge-fd"]["nebula_import"] == "staged_audit_only"
+assert "do_not_disable_both" in obj["guardrails"]
+PY
+
+snapshot_create="$(
+  NEBULA_SYSROOT="$fixture" \
+  sh "$cli" snapshot cooling create --json
+)"
+python3 - "$snapshot_create" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "snapshot cooling create"
+assert obj["ok"] is True
+snap = obj["snapshot"]
+assert snap["scope"] == "cooling"
+assert snap["fan"]["enabled"] is True
+assert snap["fan"]["rpm"] == 4200
+assert snap["fan"]["level"] == 4
+assert snap["pump"]["enabled"] is True
+assert snap["pump"]["speed"] == 80
+assert snap["pump"]["freq"] == 4
+assert snap["apply_supported"] is False
+assert snap["rollback_supported"] is True
+PY
+
+snapshot_get="$(sh "$cli" snapshot cooling get --json)"
+python3 - "$snapshot_get" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "snapshot cooling get"
+assert obj["present"] is True
+assert obj["snapshot"]["scope"] == "cooling"
+PY
+
+rollback_dry_run="$(
+  NEBULA_SYSROOT="$fixture" \
+  sh "$cli" snapshot cooling rollback --dry-run --json
+)"
+python3 - "$rollback_dry_run" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "snapshot cooling rollback"
+assert obj["ok"] is True
+assert obj["dry_run"] is True
+assert obj["applied"] is False
+assert obj["writes_enabled"] is False
+assert obj["snapshot"]["scope"] == "cooling"
+assert obj["current"]["scope"] == "cooling"
 PY
 
 cool_fixture="$tmp/policy-cool"
@@ -466,13 +553,21 @@ pump_extra_arg="$(sh "$cli" redmagic pump probe --json /proc/driver/micropump/sp
 pump_extra_code=$?
 cooling_extra_arg="$(sh "$cli" cooling policy --json /sys/class/thermal/thermal_zone0/temp 2>/dev/null)"
 cooling_extra_code=$?
+legacy_extra_arg="$(sh "$cli" legacy modules --json droidspaces 2>/dev/null)"
+legacy_extra_code=$?
+snapshot_extra_arg="$(sh "$cli" snapshot cooling rollback --dry-run --json apply 2>/dev/null)"
+snapshot_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
 [[ "$cooling_extra_code" -ne 0 ]]
+[[ "$legacy_extra_code" -ne 0 ]]
+[[ "$snapshot_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$legacy_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$snapshot_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'
@@ -492,7 +587,7 @@ if rg -n 'setprop|settings put|service (start|stop|restart)|am start|cmd activit
   exit 1
 fi
 
-if rg -n 'pump (enable|disable|speed|mode|auto)|fan (enable|level|speed)|cooling (apply|set)|applyPump|enablePump|setPump' "$repo_root/nebula-core-module/bin/nebula-core"; then
+if rg -n 'pump (enable|disable|speed|mode|auto)|fan (enable|level|speed)|cooling (apply|set)|applyPump|enablePump|setPump|applied":true' "$repo_root/nebula-core-module/bin/nebula-core"; then
   echo "nebula-core contains forbidden cooling mutation strings" >&2
   exit 1
 fi

@@ -8,16 +8,21 @@ LOG_DIR="$DATA_DIR/logs"
 STATE_DIR="$DATA_DIR/state"
 LOG_FILE="$LOG_DIR/nebula-core.log"
 PROFILE_FILE="$STATE_DIR/profile"
+SNAPSHOT_DIR="$STATE_DIR/snapshots"
+COOLING_SNAPSHOT_FILE="$SNAPSHOT_DIR/cooling.json"
 SAFE_MODE_FILE="$DATA_DIR/safe_mode"
 SCRIPT_DIR=${0%/*}
 MODDIR=${NEBULA_MODULE_DIR:-${SCRIPT_DIR%/*}}
 MODULE_PROP=${NEBULA_MODULE_PROP:-$MODDIR/module.prop}
 DEFAULTS_JSON=${NEBULA_DEFAULTS_JSON:-$MODDIR/config/defaults.json}
+MODULES_ROOT=${NEBULA_MODULES_ROOT:-/data/adb/modules}
 REDMAGIC_SOURCE_COMMIT=e94d36e8204c228c6e8781157dea22946cf715e3
 REDMAGIC_SOURCE_FAN="Redmagic-Control-Center HardwareController.kt:25-28,48-77@$REDMAGIC_SOURCE_COMMIT"
 REDMAGIC_SOURCE_PUMP="Redmagic-Control-Center HardwareController.kt:30-32,80-98; DashboardSnapshot.kt:16-18; DeviceCapabilityScanner.kt:43-45@$REDMAGIC_SOURCE_COMMIT"
 REDMAGIC_SOURCE_THERMAL="Redmagic-Control-Center HardwareController.kt:275-288@$REDMAGIC_SOURCE_COMMIT"
 REDMAGIC_SOURCE_IDENTITY="Redmagic-Control-Center DeviceCapabilityScanner.kt:33-36@$REDMAGIC_SOURCE_COMMIT"
+LEGACY_DROIDSPACES_SOURCE="Droidspaces: Daemon & Init /data/adb/modules/droidspaces service.sh,post-fs-data.sh,sepolicy.rule captured 2026-06-22"
+LEGACY_BRIDGE_SOURCE="RM11 Droidspaces Bridge FD Policy /data/adb/modules/rm11-droidspace-bridge-fd service.sh,sepolicy.rule captured 2026-06-22"
 
 ensure_dirs() {
   mkdir -p "$LOG_DIR" "$STATE_DIR"
@@ -218,7 +223,9 @@ capabilities_json() {
   printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"},'
   printf '{"id":"redmagic.probe","title":"RM11 Pro read-only RedMagic probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_FAN")"
   printf '{"id":"redmagic.pump.probe","title":"RM11 Pro read-only liquid-cooling pump probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_PUMP")"
-  printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"}'
+  printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"},'
+  printf '{"id":"snapshot.cooling","title":"Cooling snapshot and rollback dry-run","status":"available_state_only","mutating":false,"source":"nebula-core state"},'
+  printf '{"id":"legacy.modules","title":"Protected legacy Droidspaces module status","status":"available_read_only","mutating":false,"source":"protected module audit"}'
   printf ']}\n'
 }
 
@@ -752,6 +759,186 @@ cooling_policy_json() {
   printf '}\n'
 }
 
+module_prop_from_dir() {
+  dir=$1
+  key=$2
+  prop="$dir/module.prop"
+  if [ -f "$prop" ]; then
+    sed -n "s/^$key=//p" "$prop" | head -n 1
+  fi
+}
+
+legacy_module_entry() {
+  id=$1
+  title=$2
+  source=$3
+  staged=$4
+  dir="$MODULES_ROOT/$id"
+  installed=0
+  disabled=0
+  remove_marker=0
+  version=unknown
+  version_code=0
+  description=
+  if [ -d "$dir" ]; then
+    installed=1
+    version=$(module_prop_from_dir "$dir" version)
+    version_code=$(module_prop_from_dir "$dir" versionCode)
+    description=$(module_prop_from_dir "$dir" description)
+    [ -f "$dir/disable" ] && disabled=1
+    [ -f "$dir/remove" ] && remove_marker=1
+  fi
+  [ -n "$version" ] || version=unknown
+  case "$version_code" in
+    ''|*[!0-9]*) version_code=0 ;;
+  esac
+  if [ -z "$description" ]; then description=unknown; fi
+  printf '{"id":%s,"title":%s,"protected":true,"installed":%s,"disabled":%s,"remove_marker":%s,"version":%s,"version_code":%s,"description":%s,"nebula_import":%s,"source":%s}' \
+    "$(json_string "$id")" \
+    "$(json_string "$title")" \
+    "$(json_bool "$installed")" \
+    "$(json_bool "$disabled")" \
+    "$(json_bool "$remove_marker")" \
+    "$(json_string "$version")" \
+    "$version_code" \
+    "$(json_string "$description")" \
+    "$(json_string "$staged")" \
+    "$(json_string "$source")"
+}
+
+legacy_modules_json() {
+  printf '{"protocol_version":%s,"command":"legacy modules","migration_enabled":false,"modules":[' "$PROTOCOL_VERSION"
+  legacy_module_entry droidspaces "Droidspaces: Daemon & Init" "$LEGACY_DROIDSPACES_SOURCE" "staged_audit_only"
+  printf ','
+  legacy_module_entry rm11-droidspace-bridge-fd "RM11 Droidspaces Bridge FD Policy" "$LEGACY_BRIDGE_SOURCE" "staged_audit_only"
+  printf '],"guardrails":["do_not_disable_both","do_not_delete_until_reboot_verified","nebula_core_does_not_start_targets_by_default"]}\n'
+}
+
+cooling_snapshot_payload() {
+  snap_errors=
+  snap_fan_present=0
+  snap_pump_present=0
+  snap_fan_enabled=
+  snap_fan_rpm=
+  snap_fan_level=
+  snap_pump_enabled=
+  snap_pump_speed=
+  snap_pump_freq=
+
+  for snap_path in /sys/kernel/fan/fan_enable /sys/kernel/fan/fan_speed_level /sys/kernel/fan/fan_speed_count; do
+    path_present "$snap_path" && snap_fan_present=1
+  done
+  if [ "$snap_fan_present" = "1" ]; then
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      case "$value" in
+        0) snap_fan_enabled=false ;;
+        1) snap_fan_enabled=true ;;
+        *) snap_errors=$(list_append_json_string "$snap_errors" "invalid_fan_enabled:/sys/kernel/fan/fan_enable") ;;
+      esac
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/sys/kernel/fan/fan_enable")
+    fi
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_count)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value"; then
+      snap_fan_rpm=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/sys/kernel/fan/fan_speed_count")
+    fi
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_level)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value"; then
+      snap_fan_level=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/sys/kernel/fan/fan_speed_level")
+    fi
+  else
+    snap_errors=$(list_append_json_string "$snap_errors" "missing:/sys/kernel/fan")
+  fi
+
+  for snap_path in /proc/driver/micropump/enable /proc/driver/micropump/freq /proc/driver/micropump/speed; do
+    path_present "$snap_path" && snap_pump_present=1
+  done
+  if [ "$snap_pump_present" = "1" ]; then
+    value=$(read_allowlisted_file /proc/driver/micropump/enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      case "$value" in
+        0) snap_pump_enabled=false ;;
+        1) snap_pump_enabled=true ;;
+        *) snap_errors=$(list_append_json_string "$snap_errors" "invalid_pump_enabled:/proc/driver/micropump/enable") ;;
+      esac
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/proc/driver/micropump/enable")
+    fi
+    value=$(read_allowlisted_file /proc/driver/micropump/speed)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value" && [ "$value" -le 100 ] 2>/dev/null; then
+      snap_pump_speed=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/proc/driver/micropump/speed")
+    fi
+    value=$(read_allowlisted_file /proc/driver/micropump/freq)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value" && [ "$value" -le 100 ] 2>/dev/null; then
+      snap_pump_freq=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/proc/driver/micropump/freq")
+    fi
+  else
+    snap_errors=$(list_append_json_string "$snap_errors" "missing:/proc/driver/micropump")
+  fi
+
+  if [ -z "$snap_fan_enabled" ]; then snap_fan_enabled_json=null; else snap_fan_enabled_json=$snap_fan_enabled; fi
+  if [ -z "$snap_pump_enabled" ]; then snap_pump_enabled_json=null; else snap_pump_enabled_json=$snap_pump_enabled; fi
+  created=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)
+  printf '{"scope":"cooling","created_utc":%s,"fan":{"present":%s,"enabled":%s,"rpm":%s,"level":%s},"pump":{"present":%s,"enabled":%s,"speed":%s,"freq":%s},"rollback_supported":true,"apply_supported":false,"errors":[%s]}' \
+    "$(json_string "$created")" \
+    "$(json_bool "$snap_fan_present")" \
+    "$snap_fan_enabled_json" \
+    "$(json_int_or_null "$snap_fan_rpm")" \
+    "$(json_int_or_null "$snap_fan_level")" \
+    "$(json_bool "$snap_pump_present")" \
+    "$snap_pump_enabled_json" \
+    "$(json_int_or_null "$snap_pump_speed")" \
+    "$(json_int_or_null "$snap_pump_freq")" \
+    "$snap_errors"
+}
+
+snapshot_cooling_create_json() {
+  ensure_dirs
+  mkdir -p "$SNAPSHOT_DIR"
+  payload=$(cooling_snapshot_payload)
+  printf '%s\n' "$payload" > "$COOLING_SNAPSHOT_FILE.tmp"
+  mv "$COOLING_SNAPSHOT_FILE.tmp" "$COOLING_SNAPSHOT_FILE"
+  printf '{"protocol_version":%s,"command":"snapshot cooling create","ok":true,"snapshot":%s}\n' "$PROTOCOL_VERSION" "$payload"
+}
+
+snapshot_cooling_get_json() {
+  ensure_dirs
+  if [ -s "$COOLING_SNAPSHOT_FILE" ]; then
+    printf '{"protocol_version":%s,"command":"snapshot cooling get","present":true,"snapshot":' "$PROTOCOL_VERSION"
+    sed -n '1p' "$COOLING_SNAPSHOT_FILE"
+    printf '}\n'
+  else
+    printf '{"protocol_version":%s,"command":"snapshot cooling get","present":false,"snapshot":null}\n' "$PROTOCOL_VERSION"
+  fi
+}
+
+snapshot_cooling_rollback_dry_run_json() {
+  ensure_dirs
+  if [ ! -s "$COOLING_SNAPSHOT_FILE" ]; then
+    printf '{"protocol_version":%s,"command":"snapshot cooling rollback","ok":false,"dry_run":true,"applied":false,"error":"NO_SNAPSHOT"}\n' "$PROTOCOL_VERSION"
+    return 66
+  fi
+  current=$(cooling_snapshot_payload)
+  printf '{"protocol_version":%s,"command":"snapshot cooling rollback","ok":true,"dry_run":true,"applied":false,"writes_enabled":false,"snapshot":' "$PROTOCOL_VERSION"
+  sed -n '1p' "$COOLING_SNAPSHOT_FILE"
+  printf ',"current":%s,"rollback_plan":{"fan":"restore_snapshot_values_if_apply_enabled_later","pump":"restore_snapshot_values_if_apply_enabled_later"}}\n' "$current"
+}
+
 pump_json_payload() {
   pump_errors=
   pump_sources=
@@ -1077,6 +1264,26 @@ main() {
       if [ "${2:-}" = "tail" ] && [ "${3:-}" = "--lines" ]; then
         log_command "logs_tail"
         logs_tail_json "${4:-50}"
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    legacy)
+      if [ "${2:-}" = "modules" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        legacy_modules_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    snapshot)
+      if [ "${2:-}" = "cooling" ] && [ "${3:-}" = "create" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        snapshot_cooling_create_json
+      elif [ "${2:-}" = "cooling" ] && [ "${3:-}" = "get" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        snapshot_cooling_get_json
+      elif [ "${2:-}" = "cooling" ] && [ "${3:-}" = "rollback" ] && [ "${4:-}" = "--dry-run" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        snapshot_cooling_rollback_dry_run_json
       else
         usage_json
         return 2

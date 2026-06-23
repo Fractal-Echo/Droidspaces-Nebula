@@ -1,0 +1,36 @@
+{
+  "migration_enabled": false,
+  "protected_modules": [
+    {
+      "id": "droidspaces",
+      "name": "Droidspaces: Daemon & Init",
+      "status": "protected_external_module",
+      "nebula_import": "staged_audit_only",
+      "functions": [
+        "post-fs-data dmesg logger",
+        "daemon mode marker handling",
+        "native /vendor/bin/droidspaces detection",
+        "droidspacesd_exec relabel before daemon launch",
+        "rootfs image vold_data_file relabel",
+        "boot_completed wait",
+        "network readiness wait",
+        "run_at_boot container scan",
+        "module.prop status update"
+      ],
+      "disable_rule": "disable only after Nebula Core replacement survives reboot verification"
+    },
+    {
+      "id": "rm11-droidspace-bridge-fd",
+      "name": "RM11 Droidspaces Bridge FD Policy",
+      "status": "protected_external_module",
+      "nebula_import": "staged_audit_only",
+      "functions": [
+        "allow untrusted_app droidspacesd fd use",
+        "KernelSU sepolicy check/patch for bridge fd rule",
+        "container rootfs /dev/shm creation",
+        "container rootfs /dev/shm chmod 1777"
+      ],
+      "disable_rule": "disable only after Nebula Core replacement survives reboot verification"
+    }
+  ]
+}
