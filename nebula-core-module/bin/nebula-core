@@ -361,14 +361,48 @@ adb_wifi_effective_value() {
   wifi_value=$1
   switch_value=$2
   port_value=${3:-}
-  if [ -n "$port_value" ] && [ "$port_value" -gt 0 ] 2>/dev/null; then
+  if adb_wifi_port_active "$port_value"; then
     printf '%s' 1
     return
   fi
-  case "$switch_value" in
-    1|0) printf '%s' "$switch_value" ;;
-    *) printf '%s' "$wifi_value" ;;
+  if [ "$wifi_value" = "1" ] || [ "$switch_value" = "1" ]; then
+    printf '%s' 0
+    return
+  fi
+  case "$wifi_value$switch_value" in
+    *0*) printf '%s' 0 ;;
+    *) printf '%s' unknown ;;
   esac
+}
+
+adb_wifi_port_active() {
+  port_value=${1:-}
+  [ -n "$port_value" ] && [ "$port_value" -gt 0 ] 2>/dev/null
+}
+
+adb_wifi_requested_value() {
+  adb_value=$1
+  wifi_value=$2
+  switch_value=$3
+  if [ "$adb_value" = "1" ] && { [ "$wifi_value" = "1" ] || [ "$switch_value" = "1" ]; }; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+adb_wifi_activation_state() {
+  effective_value=$1
+  requested_value=$2
+  if [ "$effective_value" = "1" ]; then
+    printf '%s' live
+  elif [ "$requested_value" = "1" ]; then
+    printf '%s' manual_toggle_required
+  elif [ "$effective_value" = "0" ]; then
+    printf '%s' disabled
+  else
+    printf '%s' unknown
+  fi
 }
 
 adb_wifi_current_bssid() {
@@ -480,6 +514,12 @@ adb_wifi_status_payload() {
     errors=$(list_append_json_string "$errors" "unreadable:current_wifi_bssid")
   fi
   effective_value=$(adb_wifi_effective_value "$wifi_value" "$switch_value" "$port_value")
+  requested_value=$(adb_wifi_requested_value "$adb_value" "$wifi_value" "$switch_value")
+  manual_required=0
+  if [ "$requested_value" = "1" ] && [ "$effective_value" != "1" ]; then
+    manual_required=1
+    errors=$(list_append_json_string "$errors" "manual_toggle_required:wireless_port_inactive")
+  fi
 
   printf '"adb_debugging":%s,' "$(adb_wifi_bool_json "$adb_value")"
   printf '"wireless_debugging":%s,' "$(adb_wifi_bool_json "$effective_value")"
@@ -491,6 +531,9 @@ adb_wifi_status_payload() {
     printf '"wireless_port":null,'
   fi
   printf '"manager_bssid_available":%s,' "$(json_bool "$([ -n "$bssid_value" ] && printf 1 || printf 0)")"
+  printf '"settings_requested":%s,' "$(json_bool "$requested_value")"
+  printf '"manual_toggle_required":%s,' "$(json_bool "$manual_required")"
+  printf '"activation_state":"%s",' "$(adb_wifi_activation_state "$effective_value" "$requested_value")"
   printf '"ui_switch_source":"Android Settings.Global enable_wireless_switch",'
   printf '"auto_enable":%s,' "$(json_bool "$(adb_wifi_auto_value)")"
   printf '"source":"Android Settings.Global adb_enabled,adb_wifi_enabled,enable_wireless_switch; android.debug.IAdbManager allowWirelessDebugging/getAdbWirelessPort",'
@@ -508,40 +551,50 @@ adb_wifi_enable_json() {
   ensure_dirs
   adb_wifi_state_snapshot
   errors=
-  ok=1
+  settings_ok=1
+  manager_ok=1
   if ! adb_wifi_write_adb_enabled; then
-    ok=0
+    settings_ok=0
     errors=$(list_append_json_string "$errors" "write_failed:settings_global_adb_enabled")
   fi
   if ! adb_wifi_write_wireless_enabled; then
-    ok=0
+    settings_ok=0
     errors=$(list_append_json_string "$errors" "write_failed:settings_global_adb_wifi_enabled")
   fi
   if ! adb_wifi_write_ui_switch; then
-    ok=0
+    settings_ok=0
     errors=$(list_append_json_string "$errors" "write_failed:settings_global_enable_wireless_switch")
   fi
   bssid_value=$(adb_wifi_current_bssid 2>/dev/null || true)
   if adb_wifi_valid_bssid "$bssid_value"; then
     if ! adb_wifi_manager_allow "$bssid_value"; then
-      ok=0
+      manager_ok=0
       errors=$(list_append_json_string "$errors" "write_failed:adb_manager_allow_wireless_debugging")
     fi
   else
-    ok=0
+    manager_ok=0
     errors=$(list_append_json_string "$errors" "unavailable:current_wifi_bssid")
   fi
-  if [ "$ok" = "1" ]; then
+  requested=0
+  if [ "$settings_ok" = "1" ]; then
+    requested=1
     touch "$ADB_WIFI_AUTO_FILE" 2>/dev/null || {
-      ok=0
+      requested=0
       errors=$(list_append_json_string "$errors" "write_failed:adb_wifi_auto_enable")
     }
   fi
-  printf '{"protocol_version":%s,"command":"adb-wifi enable","ok":%s,"applied":%s,' \
-    "$PROTOCOL_VERSION" "$(json_bool "$ok")" "$(json_bool "$ok")"
+  port_value=$(adb_wifi_read_wireless_port 2>/dev/null || true)
+  live=0
+  if adb_wifi_port_active "$port_value"; then
+    live=1
+  elif [ "$settings_ok" = "1" ]; then
+    errors=$(list_append_json_string "$errors" "manual_toggle_required:wireless_port_inactive")
+  fi
+  printf '{"protocol_version":%s,"command":"adb-wifi enable","ok":%s,"applied":%s,"requested":%s,"manager_request_ok":%s,' \
+    "$PROTOCOL_VERSION" "$(json_bool "$live")" "$(json_bool "$live")" "$(json_bool "$requested")" "$(json_bool "$manager_ok")"
   adb_wifi_status_payload
   printf '}\n'
-  [ "$ok" = "1" ]
+  [ "$live" = "1" ]
 }
 
 adb_wifi_auto_disable_json() {

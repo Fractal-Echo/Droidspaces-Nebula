@@ -161,10 +161,49 @@ assert obj["settings_wireless_debugging"] is False
 assert obj["ui_wireless_switch"] is False
 assert obj["wireless_port"] == 0
 assert obj["manager_bssid_available"] is True
+assert obj["settings_requested"] is False
+assert obj["manual_toggle_required"] is False
+assert obj["activation_state"] == "disabled"
 assert obj["auto_enable"] is False
 assert obj["errors"] == []
 PY
 
+set +e
+adb_wifi_enable="$(
+  NEBULA_SETTINGS_DIR="$settings_dir" \
+  sh "$cli" adb-wifi enable --json
+)"
+adb_wifi_enable_code=$?
+set -e
+[[ "$adb_wifi_enable_code" -ne 0 ]]
+python3 - "$adb_wifi_enable" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "adb-wifi enable"
+assert obj["ok"] is False
+assert obj["applied"] is False
+assert obj["requested"] is True
+assert obj["manager_request_ok"] is True
+assert obj["adb_debugging"] is True
+assert obj["wireless_debugging"] is False
+assert obj["settings_wireless_debugging"] is True
+assert obj["ui_wireless_switch"] is True
+assert obj["manager_bssid_available"] is True
+assert obj["settings_requested"] is True
+assert obj["manual_toggle_required"] is True
+assert obj["activation_state"] == "manual_toggle_required"
+assert obj["auto_enable"] is True
+assert "manual_toggle_required:wireless_port_inactive" in obj["errors"]
+PY
+[[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
+[[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
+[[ "$(cat "$settings_dir/global_enable_wireless_switch")" == "1" ]]
+[[ "$(cat "$settings_dir/manager_allow_bssid")" == "20:3a:0c:78:9a:c8" ]]
+[[ -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
+[[ -s "$NEBULA_DATA_DIR/state/adb_wifi.state" ]]
+
+printf 33195 > "$settings_dir/adb_wireless_port"
 adb_wifi_enable="$(
   NEBULA_SETTINGS_DIR="$settings_dir" \
   sh "$cli" adb-wifi enable --json
@@ -176,20 +215,20 @@ assert obj["protocol_version"] == 1
 assert obj["command"] == "adb-wifi enable"
 assert obj["ok"] is True
 assert obj["applied"] is True
+assert obj["requested"] is True
+assert obj["manager_request_ok"] is True
 assert obj["adb_debugging"] is True
 assert obj["wireless_debugging"] is True
 assert obj["settings_wireless_debugging"] is True
 assert obj["ui_wireless_switch"] is True
+assert obj["settings_requested"] is True
+assert obj["manual_toggle_required"] is False
+assert obj["activation_state"] == "live"
+assert obj["wireless_port"] == 33195
 assert obj["manager_bssid_available"] is True
 assert obj["auto_enable"] is True
 assert obj["errors"] == []
 PY
-[[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
-[[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
-[[ "$(cat "$settings_dir/global_enable_wireless_switch")" == "1" ]]
-[[ "$(cat "$settings_dir/manager_allow_bssid")" == "20:3a:0c:78:9a:c8" ]]
-[[ -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
-[[ -s "$NEBULA_DATA_DIR/state/adb_wifi.state" ]]
 
 adb_wifi_auto_disable="$(
   NEBULA_SETTINGS_DIR="$settings_dir" \
@@ -207,6 +246,9 @@ assert obj["wireless_debugging"] is True
 assert obj["settings_wireless_debugging"] is True
 assert obj["ui_wireless_switch"] is True
 assert obj["manager_bssid_available"] is True
+assert obj["settings_requested"] is True
+assert obj["manual_toggle_required"] is False
+assert obj["activation_state"] == "live"
 assert obj["auto_enable"] is False
 PY
 [[ ! -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]

@@ -22,6 +22,15 @@ valid_bssid() {
   esac
 }
 
+wireless_port() {
+  parcel="$(service call adb 10 2>/dev/null | tr -d '\r')"
+  value="$(printf '%s\n' "$parcel" | sed -n 's/.*00000000 \([0-9A-Fa-f][0-9A-Fa-f]*\).*/\1/p' | head -n 1)"
+  if [ -n "$value" ]; then
+    printf '%d' "0x$value" 2>/dev/null && return 0
+  fi
+  return 2
+}
+
 if [ -f "$DATA_DIR/state/adb_wifi_auto_enable" ]; then
   (
     attempt=1
@@ -31,11 +40,22 @@ if [ -f "$DATA_DIR/state/adb_wifi_auto_enable" ]; then
            settings put global adb_wifi_enabled 1 >/dev/null 2>&1 && \
            settings put global enable_wireless_switch 1 >/dev/null 2>&1; then
           bssid="$(current_bssid)"
+          manager=unavailable
           if valid_bssid "$bssid" && service call adb 4 i32 1 s16 "$bssid" >/dev/null 2>&1; then
-            printf '%s adb wifi early auto-enable applied attempt=%s manager=allowWirelessDebugging\n' \
+            manager=allowWirelessDebugging
+          fi
+          port="$(wireless_port 2>/dev/null || printf 0)"
+          if [ -n "$port" ] && [ "$port" -gt 0 ] 2>/dev/null; then
+            state=live
+            printf '%s adb wifi early auto-enable requested attempt=%s manager=%s state=%s port=%s\n' \
               "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" \
-              "$attempt" >> "$DATA_DIR/logs/nebula-core.log"
+              "$attempt" "$manager" "$state" "$port" >> "$DATA_DIR/logs/nebula-core.log"
             exit 0
+          else
+            state=manual_toggle_required
+            printf '%s adb wifi early auto-enable requested attempt=%s manager=%s state=%s port=%s\n' \
+              "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" \
+              "$attempt" "$manager" "$state" "$port" >> "$DATA_DIR/logs/nebula-core.log"
           fi
         fi
       fi

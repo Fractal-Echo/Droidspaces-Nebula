@@ -193,6 +193,7 @@ public final class MainActivity extends Activity {
     private final RedMagicButtonAdapter redMagicButtonAdapter = new RedMagicButtonAdapter();
     private NebulaCoreStatus coreStatus = NebulaCoreStatus.absent("Not refreshed");
     private RedMagicProbe redMagicProbe = RedMagicProbe.unavailable("Not refreshed");
+    private JSONObject adbWifiModuleStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -322,6 +323,7 @@ public final class MainActivity extends Activity {
     private void refresh() {
         coreStatus = coreClient.loadStatus();
         redMagicProbe = loadRedMagicProbe(coreStatus);
+        adbWifiModuleStatus = loadAdbWifiModuleStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
@@ -835,6 +837,13 @@ public final class MainActivity extends Activity {
     }
 
     private String adbWifiStatus() {
+        JSONObject module = adbWifiModuleStatusObject();
+        if (module != null) {
+            String state = module.optString("activation_state", "");
+            if ("live".equals(state)) return "Live";
+            if ("manual_toggle_required".equals(state)) return "Manual";
+            if ("disabled".equals(state)) return "Disabled";
+        }
         int value = adbWifiEffectiveSetting();
         if (value == 1) return "Enabled";
         if (value == 0) return "Disabled";
@@ -842,6 +851,13 @@ public final class MainActivity extends Activity {
     }
 
     private int adbWifiColor() {
+        JSONObject module = adbWifiModuleStatusObject();
+        if (module != null) {
+            String state = module.optString("activation_state", "");
+            if ("live".equals(state)) return GREEN;
+            if ("manual_toggle_required".equals(state)) return YELLOW;
+            if ("disabled".equals(state)) return MUTED;
+        }
         int value = adbWifiEffectiveSetting();
         if (value == 1) return GREEN;
         if (value == 0) return YELLOW;
@@ -866,33 +882,49 @@ public final class MainActivity extends Activity {
                 + "\nadbDebugging=" + settingLabel(adb)
                 + "\n" + adbWifiModuleDetail()
                 + "\ncontrol=Nebula Core opt-in"
-                + "\nmutation=fixed_adb_wifi_settings_only";
+                + "\nmutation=fixed_adb_wifi_request_only";
     }
 
     private String adbWifiModuleDetail() {
+        JSONObject object = adbWifiModuleStatusObject();
+        if (object == null) {
+            return "moduleAuto=unknown";
+        }
+        if (!object.has("auto_enable") || object.isNull("auto_enable")) {
+            return "moduleAuto=unknown";
+        }
+        String auto = object.optBoolean("auto_enable", false) ? "enabled" : "disabled";
+        String uiSwitch = jsonBoolLabel(object, "ui_wireless_switch");
+        String settingsWireless = jsonBoolLabel(object, "settings_wireless_debugging");
+        String requested = jsonBoolLabel(object, "settings_requested");
+        String manualRequired = jsonBoolLabel(object, "manual_toggle_required");
+        String port = object.isNull("wireless_port")
+                ? "unknown" : String.valueOf(object.optInt("wireless_port", 0));
+        return "moduleAuto=" + auto
+                + "\nmoduleState=" + object.optString("activation_state", "unknown")
+                + "\nmoduleUiSwitch=" + uiSwitch
+                + "\nmoduleSettingsWireless=" + settingsWireless
+                + "\nmoduleRequested=" + requested
+                + "\nmoduleManualRequired=" + manualRequired
+                + "\nmoduleWirelessPort=" + port;
+    }
+
+    private JSONObject adbWifiModuleStatusObject() {
+        return adbWifiModuleStatus;
+    }
+
+    private JSONObject loadAdbWifiModuleStatus() {
         if (!coreStatus.installed || coreStatus.hasVisibleError()) {
-            return "moduleAuto=unavailable";
+            return null;
         }
         CommandResult result = coreClient.adbWifiStatus();
         if (!result.ok()) {
-            return "moduleAuto=unknown";
+            return null;
         }
         try {
-            JSONObject object = new JSONObject(result.stdout);
-            if (!object.has("auto_enable") || object.isNull("auto_enable")) {
-                return "moduleAuto=unknown";
-            }
-            String auto = object.optBoolean("auto_enable", false) ? "enabled" : "disabled";
-            String uiSwitch = jsonBoolLabel(object, "ui_wireless_switch");
-            String settingsWireless = jsonBoolLabel(object, "settings_wireless_debugging");
-            String port = object.isNull("wireless_port")
-                    ? "unknown" : String.valueOf(object.optInt("wireless_port", 0));
-            return "moduleAuto=" + auto
-                    + "\nmoduleUiSwitch=" + uiSwitch
-                    + "\nmoduleSettingsWireless=" + settingsWireless
-                    + "\nmoduleWirelessPort=" + port;
+            return new JSONObject(result.stdout);
         } catch (JSONException error) {
-            return "moduleAuto=invalid_json";
+            return null;
         }
     }
 
@@ -905,8 +937,25 @@ public final class MainActivity extends Activity {
 
     private void enableAdbWifiWithNebula() {
         CommandResult result = coreClient.adbWifiEnable();
-        toast(result.ok() ? "ADB Wi-Fi enabled" : commandMessage("ADB Wi-Fi enable", result));
+        if (result.ok()) {
+            toast("ADB Wi-Fi live");
+        } else {
+            String manual = adbWifiManualRequiredMessage(result.stdout);
+            toast(manual != null ? manual : commandMessage("ADB Wi-Fi enable", result));
+        }
         refresh();
+    }
+
+    private String adbWifiManualRequiredMessage(String stdout) {
+        try {
+            JSONObject object = new JSONObject(stdout);
+            if (object.optBoolean("manual_toggle_required", false)) {
+                return "ADB Wi-Fi requested; toggle Wireless debugging once";
+            }
+        } catch (JSONException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private void disableAdbWifiAutoEnable() {
