@@ -377,7 +377,15 @@ adb_wifi_effective_value() {
 
 adb_wifi_port_active() {
   port_value=${1:-}
-  [ -n "$port_value" ] && [ "$port_value" -gt 0 ] 2>/dev/null
+  [ -n "$port_value" ] && [ "$port_value" -gt 0 ] 2>/dev/null && [ "$port_value" -le 65535 ] 2>/dev/null
+}
+
+adb_wifi_port_valid_or_zero() {
+  port_value=${1:-}
+  case "$port_value" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$port_value" -ge 0 ] 2>/dev/null && [ "$port_value" -le 65535 ] 2>/dev/null
 }
 
 adb_wifi_requested_value() {
@@ -444,15 +452,23 @@ adb_wifi_manager_allow() {
 adb_wifi_read_wireless_port() {
   if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
     if [ -f "$NEBULA_SETTINGS_DIR/adb_wireless_port" ]; then
-      head -n 1 "$NEBULA_SETTINGS_DIR/adb_wireless_port" | tr -d '\r'
-      return 0
+      value=$(head -n 1 "$NEBULA_SETTINGS_DIR/adb_wireless_port" | tr -d '\r')
+      if adb_wifi_port_valid_or_zero "$value"; then
+        printf '%s' "$value"
+        return 0
+      fi
+      return 2
     fi
     return 2
   fi
   parcel=$(service call adb 10 2>/dev/null | tr -d '\r')
   value=$(printf '%s\n' "$parcel" | sed -n 's/.*00000000 \([0-9A-Fa-f][0-9A-Fa-f]*\).*/\1/p' | head -n 1)
   if [ -n "$value" ]; then
-    printf '%d' "0x$value" 2>/dev/null && return 0
+    port=$(printf '%d' "0x$value" 2>/dev/null || true)
+    if adb_wifi_port_valid_or_zero "$port"; then
+      printf '%s' "$port"
+      return 0
+    fi
   fi
   return 2
 }

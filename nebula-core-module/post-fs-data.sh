@@ -26,7 +26,11 @@ wireless_port() {
   parcel="$(service call adb 10 2>/dev/null | tr -d '\r')"
   value="$(printf '%s\n' "$parcel" | sed -n 's/.*00000000 \([0-9A-Fa-f][0-9A-Fa-f]*\).*/\1/p' | head -n 1)"
   if [ -n "$value" ]; then
-    printf '%d' "0x$value" 2>/dev/null && return 0
+    port="$(printf '%d' "0x$value" 2>/dev/null || true)"
+    if [ -n "$port" ] && [ "$port" -ge 0 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null; then
+      printf '%s' "$port"
+      return 0
+    fi
   fi
   return 2
 }

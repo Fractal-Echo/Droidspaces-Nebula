@@ -203,6 +203,25 @@ PY
 [[ -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
 [[ -s "$NEBULA_DATA_DIR/state/adb_wifi.state" ]]
 
+printf 4294967295 > "$settings_dir/adb_wireless_port"
+adb_wifi_invalid_port="$(
+  NEBULA_SETTINGS_DIR="$settings_dir" \
+  sh "$cli" adb-wifi status --json
+)"
+python3 - "$adb_wifi_invalid_port" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "adb-wifi status"
+assert obj["wireless_debugging"] is False
+assert obj["wireless_port"] is None
+assert obj["settings_requested"] is True
+assert obj["manual_toggle_required"] is True
+assert obj["activation_state"] == "manual_toggle_required"
+assert "unreadable:adb_manager_wireless_port" in obj["errors"]
+assert "manual_toggle_required:wireless_port_inactive" in obj["errors"]
+PY
+
 printf 33195 > "$settings_dir/adb_wireless_port"
 adb_wifi_enable="$(
   NEBULA_SETTINGS_DIR="$settings_dir" \
