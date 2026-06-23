@@ -67,6 +67,16 @@ printf 'post_serial=%s\n' "$resolved"
   'id; getenforce; settings get global adb_enabled; settings get global adb_wifi_enabled; /data/adb/modules/nebula_core/bin/nebula-core status --json; /data/adb/modules/nebula_core/bin/nebula-core adb-wifi status --json; /data/adb/modules/nebula_core/bin/nebula-core legacy modules --json; /data/adb/modules/nebula_core/bin/nebula-core cooling policy --json; tail -n 40 /data/adb/nebula/logs/nebula-core.log' \
   | tee "$log_dir/post-core-probes.jsonl"
 
+"$adb" -s "$resolved" shell run-as io.droidspaces.nebula /system/bin/su -c \
+  '/data/adb/modules/nebula_core/bin/nebula-core status --json' \
+  | tee "$log_dir/post-core-status-app-su.json"
+"$adb" -s "$resolved" shell run-as io.droidspaces.nebula /system/bin/su -c \
+  '/data/adb/modules/nebula_core/bin/nebula-core adb-wifi status --json' \
+  | tee "$log_dir/post-adb-wifi-status-app-su.json"
+"$adb" -s "$resolved" shell run-as io.droidspaces.nebula /system/bin/su -c \
+  '/data/adb/modules/nebula_core/bin/nebula-core cooling policy --json' \
+  | tee "$log_dir/post-cooling-policy-app-su.json"
+
 "$adb" -s "$resolved" shell su -c \
   'ls -ld /data/adb/modules/nebula_core /data/adb/modules_update/nebula_core /data/adb/modules/droidspaces /data/adb/modules/rm11-droidspace-bridge-fd 2>/dev/null; ls -l /data/adb/modules/droidspaces/disable /data/adb/modules/rm11-droidspace-bridge-fd/disable /data/adb/modules/nebula_core/disable 2>/dev/null' \
   | tee "$log_dir/post-module-paths.txt"
