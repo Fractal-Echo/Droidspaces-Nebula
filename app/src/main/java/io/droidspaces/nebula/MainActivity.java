@@ -207,6 +207,7 @@ public final class MainActivity extends Activity {
         }
     }
 
+    @SuppressWarnings("deprecation")
     private View buildContent() {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
@@ -214,7 +215,18 @@ public final class MainActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(14), dp(18), dp(14), dp(24));
+        final int horizontalPadding = dp(14);
+        final int topPadding = dp(18);
+        final int bottomPadding = dp(24);
+        root.setPadding(horizontalPadding, topPadding, horizontalPadding, bottomPadding);
+        scroll.setOnApplyWindowInsetsListener((view, insets) -> {
+            root.setPadding(
+                    horizontalPadding,
+                    topPadding + insets.getSystemWindowInsetTop(),
+                    horizontalPadding,
+                    bottomPadding + insets.getSystemWindowInsetBottom());
+            return insets;
+        });
         scroll.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));

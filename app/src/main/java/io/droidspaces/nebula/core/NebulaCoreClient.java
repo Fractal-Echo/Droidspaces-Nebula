@@ -1,7 +1,6 @@
 package io.droidspaces.nebula.core;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -11,7 +10,18 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public final class NebulaCoreClient {
-    private static final String MODULE_CLI = "/data/adb/modules/nebula_core/bin/nebula-core";
+    private static final String ACTIVE_MODULE_CLI =
+            "/data/adb/modules/nebula_core/bin/nebula-core";
+    private static final String PENDING_MODULE_CLI =
+            "/data/adb/modules_update/nebula_core/bin/nebula-core";
+    private static final String MODULE_CLI_DISPATCH =
+            "NEBULA_CORE_CLI=''; "
+                    + "if [ -x " + ACTIVE_MODULE_CLI + " ]; then NEBULA_CORE_CLI="
+                    + ACTIVE_MODULE_CLI + "; "
+                    + "elif [ -x " + PENDING_MODULE_CLI + " ]; then NEBULA_CORE_CLI="
+                    + PENDING_MODULE_CLI + "; "
+                    + "else echo 'Nebula Core module path is not visible' >&2; exit 127; fi; "
+                    + "exec \"$NEBULA_CORE_CLI\"";
     private static final long TIMEOUT_MS = 2500L;
     private static final Set<String> STATIC_COMMANDS = new HashSet<>(Arrays.asList(
             "status --json",
@@ -29,9 +39,6 @@ public final class NebulaCoreClient {
     ));
 
     public NebulaCoreStatus loadStatus() {
-        if (!isModulePathVisible()) {
-            return NebulaCoreStatus.absent("Nebula Core module path is not visible; app is read-only.");
-        }
         CommandResult result = runFixed("status", "--json");
         if (!result.ok()) {
             return NebulaCoreStatus.absent(commandError("status", result));
@@ -40,16 +47,10 @@ public final class NebulaCoreClient {
     }
 
     public CommandResult capabilities() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("capabilities", "--json");
     }
 
     public CommandResult profileGet() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("profile", "get", "--json");
     }
 
@@ -57,58 +58,32 @@ public final class NebulaCoreClient {
         if (!NebulaCoreProtocol.isAllowedProfile(profile)) {
             return new CommandResult(2, "", "profile not allowlisted", false);
         }
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("profile", "set", profile.wireName);
     }
 
     public CommandResult safeModeGet() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("safe-mode", "get", "--json");
     }
 
     public CommandResult safeModeEnable() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("safe-mode", "enable");
     }
 
     public CommandResult logsTail(int lines) {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("logs", "tail", "--lines",
                 String.valueOf(NebulaCoreProtocol.sanitizeTailLines(lines)));
     }
 
     public CommandResult coolingPolicy() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("cooling", "policy", "--json");
     }
 
     public CommandResult redMagicProbe() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("redmagic", "probe", "--json");
     }
 
     public CommandResult redMagicPumpProbe() {
-        if (!isModulePathVisible()) {
-            return new CommandResult(127, "", "Nebula Core module path is not visible", false);
-        }
         return runFixed("redmagic", "pump", "probe", "--json");
-    }
-
-    private boolean isModulePathVisible() {
-        File file = new File(MODULE_CLI);
-        return file.isFile() && file.canRead();
     }
 
     private CommandResult runFixed(String... args) {
@@ -116,7 +91,7 @@ public final class NebulaCoreClient {
         if (!isAllowlisted(logical)) {
             return new CommandResult(2, "", "command not allowlisted", false);
         }
-        return runRoot(MODULE_CLI + " " + logical);
+        return runRoot(MODULE_CLI_DISPATCH + " " + logical);
     }
 
     private boolean isAllowlisted(String logical) {
