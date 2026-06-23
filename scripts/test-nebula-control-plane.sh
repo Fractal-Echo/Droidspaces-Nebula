@@ -132,11 +132,71 @@ required = {
     "cooling.policy",
     "snapshot.cooling",
     "legacy.modules",
+    "adb.wifi",
 }
 missing = sorted(required - ids)
 if missing:
     raise SystemExit(f"missing capabilities: {missing}")
 PY
+
+settings_dir="$tmp/settings"
+mkdir -p "$settings_dir"
+printf 0 > "$settings_dir/global_adb_enabled"
+printf 0 > "$settings_dir/global_adb_wifi_enabled"
+adb_wifi_status="$(
+  NEBULA_SETTINGS_DIR="$settings_dir" \
+  sh "$cli" adb-wifi status --json
+)"
+python3 - "$adb_wifi_status" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "adb-wifi status"
+assert obj["adb_debugging"] is False
+assert obj["wireless_debugging"] is False
+assert obj["auto_enable"] is False
+assert obj["errors"] == []
+PY
+
+adb_wifi_enable="$(
+  NEBULA_SETTINGS_DIR="$settings_dir" \
+  sh "$cli" adb-wifi enable --json
+)"
+python3 - "$adb_wifi_enable" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "adb-wifi enable"
+assert obj["ok"] is True
+assert obj["applied"] is True
+assert obj["adb_debugging"] is True
+assert obj["wireless_debugging"] is True
+assert obj["auto_enable"] is True
+assert obj["errors"] == []
+PY
+[[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
+[[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
+[[ -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
+[[ -s "$NEBULA_DATA_DIR/state/adb_wifi.state" ]]
+
+adb_wifi_auto_disable="$(
+  NEBULA_SETTINGS_DIR="$settings_dir" \
+  sh "$cli" adb-wifi auto-disable --json
+)"
+python3 - "$adb_wifi_auto_disable" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "adb-wifi auto-disable"
+assert obj["ok"] is True
+assert obj["current_session_changed"] is False
+assert obj["adb_debugging"] is True
+assert obj["wireless_debugging"] is True
+assert obj["auto_enable"] is False
+PY
+[[ ! -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
+[[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
+[[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
 
 fixture="$tmp/fixture"
 props="$tmp/props"
@@ -557,17 +617,21 @@ legacy_extra_arg="$(sh "$cli" legacy modules --json droidspaces 2>/dev/null)"
 legacy_extra_code=$?
 snapshot_extra_arg="$(sh "$cli" snapshot cooling rollback --dry-run --json apply 2>/dev/null)"
 snapshot_extra_code=$?
+adb_wifi_extra_arg="$(sh "$cli" adb-wifi enable --json /tmp/path 2>/dev/null)"
+adb_wifi_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
 [[ "$cooling_extra_code" -ne 0 ]]
 [[ "$legacy_extra_code" -ne 0 ]]
 [[ "$snapshot_extra_code" -ne 0 ]]
+[[ "$adb_wifi_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$legacy_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$snapshot_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$adb_wifi_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'
@@ -582,8 +646,13 @@ if rg -n 'WayLandIE|Wayland|Gamescope|Xwayland|DRM|compositor|linux|am start|mon
   exit 1
 fi
 
-if rg -n 'setprop|settings put|service (start|stop|restart)|am start|cmd activity|input tap' "$repo_root/nebula-core-module/bin/nebula-core"; then
+if rg -n 'setprop|service (start|stop|restart)|am start|cmd activity|input tap' "$repo_root/nebula-core-module/bin/nebula-core"; then
   echo "nebula-core contains forbidden mutation command strings" >&2
+  exit 1
+fi
+
+if rg -n 'settings put' "$repo_root/nebula-core-module/bin/nebula-core" | rg -v 'settings put global (adb_enabled|adb_wifi_enabled) 1'; then
+  echo "nebula-core contains forbidden non-ADB settings mutation strings" >&2
   exit 1
 fi
 

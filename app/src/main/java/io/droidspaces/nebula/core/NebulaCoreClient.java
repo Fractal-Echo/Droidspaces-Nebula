@@ -34,6 +34,9 @@ public final class NebulaCoreClient {
             "profile set compatibility",
             "safe-mode get --json",
             "safe-mode enable",
+            "adb-wifi status --json",
+            "adb-wifi enable --json",
+            "adb-wifi auto-disable --json",
             "cooling policy --json",
             "redmagic probe --json",
             "redmagic pump probe --json"
@@ -68,6 +71,18 @@ public final class NebulaCoreClient {
 
     public CommandResult safeModeEnable() {
         return runFixed("safe-mode", "enable");
+    }
+
+    public CommandResult adbWifiStatus() {
+        return runFixed("adb-wifi", "status", "--json");
+    }
+
+    public CommandResult adbWifiEnable() {
+        return runFixed("adb-wifi", "enable", "--json");
+    }
+
+    public CommandResult adbWifiAutoDisable() {
+        return runFixed("adb-wifi", "auto-disable", "--json");
     }
 
     public CommandResult logsTail(int lines) {

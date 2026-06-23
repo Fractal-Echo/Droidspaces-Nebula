@@ -802,13 +802,29 @@ public final class MainActivity extends Activity {
 
         top.addView(chip(adbWifiStatus(), adbWifiColor()));
 
-        Button open = smallButton("Open settings", CYAN);
+        boolean coreAvailable = coreStatus.installed && !coreStatus.hasVisibleError();
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+
+        Button enable = smallButton("Enable", NEON);
+        enable.setEnabled(coreAvailable);
+        enable.setOnClickListener(v -> enableAdbWifiWithNebula());
+        buttons.addView(enable, weightedButtonParams());
+
+        Button autoOff = smallButton("Auto off", PANEL_ALT);
+        autoOff.setEnabled(coreAvailable);
+        autoOff.setOnClickListener(v -> disableAdbWifiAutoEnable());
+        buttons.addView(autoOff, weightedButtonParams());
+
+        Button open = smallButton("Settings", CYAN);
         open.setOnClickListener(v -> openWirelessDebuggingSettings());
+        buttons.addView(open, weightedButtonParams());
+
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         buttonParams.topMargin = dp(12);
-        card.addView(open, buttonParams);
+        card.addView(buttons, buttonParams);
 
         return card;
     }
@@ -832,8 +848,28 @@ public final class MainActivity extends Activity {
         int adb = globalSettingInt("adb_enabled", -1);
         return "wirelessDebugging=" + settingLabel(wireless)
                 + "\nadbDebugging=" + settingLabel(adb)
-                + "\ncontrol=Android developer options"
-                + "\nmutation=false";
+                + "\ncontrol=Nebula Core opt-in"
+                + "\nmutation=adb_wifi_enable_only";
+    }
+
+    private void enableAdbWifiWithNebula() {
+        CommandResult result = coreClient.adbWifiEnable();
+        toast(result.ok() ? "ADB Wi-Fi enabled" : commandMessage("ADB Wi-Fi enable", result));
+        refresh();
+    }
+
+    private void disableAdbWifiAutoEnable() {
+        CommandResult result = coreClient.adbWifiAutoDisable();
+        toast(result.ok() ? "ADB Wi-Fi auto disabled" : commandMessage("ADB Wi-Fi auto disable", result));
+        refresh();
+    }
+
+    private String commandMessage(String action, CommandResult result) {
+        if (result.timedOut) return action + " timed out";
+        String message = result.stderr.isEmpty() ? result.stdout : result.stderr;
+        if (message.isEmpty()) message = "exit " + result.exitCode;
+        if (message.length() > 80) message = message.substring(0, 80);
+        return action + " failed: " + message;
     }
 
     private int globalSettingInt(String key, int fallback) {
@@ -1210,7 +1246,7 @@ public final class MainActivity extends Activity {
         sb.append("[ADB Wi-Fi]\n");
         sb.append("  status=").append(adbWifiStatus()).append('\n');
         sb.append("  ").append(adbWifiDetail().replace("\n", "\n  ")).append('\n');
-        sb.append("  mutating=false\n\n");
+        sb.append("  mutating=opt-in\n\n");
 
         appendCapabilities(sb, "Performance", redMagicPerformanceAdapter.discover(this, redMagicProbe));
         appendCapabilities(sb, "RedMagic Button", redMagicButtonAdapter.discover(this));
