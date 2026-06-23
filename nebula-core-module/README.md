@@ -35,6 +35,8 @@ ADB Wi-Fi recovery is opt-in. `adb-wifi enable --json` writes only
 values, and creates `/data/adb/nebula/state/adb_wifi_auto_enable`. On later
 boots, the service re-applies only those two settings when that flag is present.
 `adb-wifi auto-disable --json` removes the boot flag without turning off the
-current debugging session.
+current debugging session. If Android already reports `adb_wifi_enabled=1` at
+boot, the service also preserves that existing developer-option choice by
+re-applying only those same two ADB settings.
 
 Pass 05 stages protected legacy Droidspaces module migration evidence. The staged SELinux policy under `sepolicy.d/` is not active module policy yet; keep the old `droidspaces` and `rm11-droidspace-bridge-fd` modules enabled until one-at-a-time migration and reboot verification pass.
