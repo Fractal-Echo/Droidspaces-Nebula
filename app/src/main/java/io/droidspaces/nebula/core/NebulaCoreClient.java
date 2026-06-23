@@ -10,6 +10,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public final class NebulaCoreClient {
+    private static final String ROOT_SHELL = "/system/bin/su";
     private static final String ACTIVE_MODULE_CLI =
             "/data/adb/modules/nebula_core/bin/nebula-core";
     private static final String PENDING_MODULE_CLI =
@@ -113,7 +114,7 @@ public final class NebulaCoreClient {
     private CommandResult runRoot(String fixedCommand) {
         Process process = null;
         try {
-            process = new ProcessBuilder("su", "-c", fixedCommand).start();
+            process = new ProcessBuilder(ROOT_SHELL, "-c", fixedCommand).start();
             StreamReader stdout = new StreamReader(process.getInputStream());
             StreamReader stderr = new StreamReader(process.getErrorStream());
             Thread outThread = new Thread(stdout, "nebula-core-stdout");
