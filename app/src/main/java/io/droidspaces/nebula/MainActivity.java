@@ -35,6 +35,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import io.droidspaces.nebula.core.NebulaCapability;
 import io.droidspaces.nebula.core.NebulaCoreClient;
 import io.droidspaces.nebula.core.NebulaCoreProtocol;
@@ -848,8 +851,29 @@ public final class MainActivity extends Activity {
         int adb = globalSettingInt("adb_enabled", -1);
         return "wirelessDebugging=" + settingLabel(wireless)
                 + "\nadbDebugging=" + settingLabel(adb)
+                + "\n" + adbWifiModuleDetail()
                 + "\ncontrol=Nebula Core opt-in"
                 + "\nmutation=adb_wifi_enable_only";
+    }
+
+    private String adbWifiModuleDetail() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return "moduleAuto=unavailable";
+        }
+        CommandResult result = coreClient.adbWifiStatus();
+        if (!result.ok()) {
+            return "moduleAuto=unknown";
+        }
+        try {
+            JSONObject object = new JSONObject(result.stdout);
+            if (!object.has("auto_enable") || object.isNull("auto_enable")) {
+                return "moduleAuto=unknown";
+            }
+            return "moduleAuto=" + (object.optBoolean("auto_enable", false)
+                    ? "enabled" : "disabled");
+        } catch (JSONException error) {
+            return "moduleAuto=invalid_json";
+        }
     }
 
     private void enableAdbWifiWithNebula() {
