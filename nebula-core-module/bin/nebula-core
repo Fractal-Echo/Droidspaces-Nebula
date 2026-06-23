@@ -57,8 +57,15 @@ module_version_code() {
 }
 
 git_commit() {
-  value=${NEBULA_GIT_COMMIT:-unknown}
-  printf '%s' "$value"
+  value=${NEBULA_GIT_COMMIT:-}
+  if [ -z "$value" ] && [ -f "$MODDIR/config/git-commit.txt" ]; then
+    value=$(sed -n '1p' "$MODDIR/config/git-commit.txt")
+  fi
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' unknown
+  fi
 }
 
 json_escape() {
