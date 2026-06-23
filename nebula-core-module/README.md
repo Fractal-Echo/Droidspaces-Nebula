@@ -33,13 +33,15 @@ Safe mode is represented by `/data/adb/nebula/safe_mode`. The module action togg
 ADB Wi-Fi recovery is opt-in. `adb-wifi enable --json` writes only
 `Settings.Global adb_enabled=1`, `adb_wifi_enabled=1`, and the observed
 RedMagic/Nubia UI switch candidate `enable_wireless_switch=1`, snapshots the
-prior values, and creates `/data/adb/nebula/state/adb_wifi_auto_enable`. On
-later boots, an early bounded `post-fs-data` worker and the later service
-re-apply only those three fixed ADB Wi-Fi settings when that flag is present.
-`adb-wifi auto-disable --json` removes the boot flag without turning off the
-current debugging session. If Android already reports the UI switch candidate
-or `adb_wifi_enabled=1` at service time, the service also preserves that
-existing developer-option choice by re-applying only those same ADB Wi-Fi
-settings.
+prior values, calls Android's fixed `IAdbManager.allowWirelessDebugging`
+transaction for the current validated Wi-Fi BSSID, and creates
+`/data/adb/nebula/state/adb_wifi_auto_enable`. On later boots, an early bounded
+`post-fs-data` worker and the later service re-apply only those three fixed ADB
+Wi-Fi settings and the same fixed ADB manager transaction when that flag is
+present. `adb-wifi auto-disable --json` removes the boot flag without turning
+off the current debugging session. If Android already reports the UI switch
+candidate or `adb_wifi_enabled=1` at service time, the service also preserves
+that existing developer-option choice by re-applying only those same ADB Wi-Fi
+settings and the fixed ADB manager transaction.
 
 Pass 05 stages protected legacy Droidspaces module migration evidence. The staged SELinux policy under `sepolicy.d/` is not active module policy yet; keep the old `droidspaces` and `rm11-droidspace-bridge-fd` modules enabled until one-at-a-time migration and reboot verification pass.

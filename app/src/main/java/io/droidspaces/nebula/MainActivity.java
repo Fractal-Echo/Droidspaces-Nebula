@@ -885,9 +885,12 @@ public final class MainActivity extends Activity {
             String auto = object.optBoolean("auto_enable", false) ? "enabled" : "disabled";
             String uiSwitch = jsonBoolLabel(object, "ui_wireless_switch");
             String settingsWireless = jsonBoolLabel(object, "settings_wireless_debugging");
+            String port = object.isNull("wireless_port")
+                    ? "unknown" : String.valueOf(object.optInt("wireless_port", 0));
             return "moduleAuto=" + auto
                     + "\nmoduleUiSwitch=" + uiSwitch
-                    + "\nmoduleSettingsWireless=" + settingsWireless;
+                    + "\nmoduleSettingsWireless=" + settingsWireless
+                    + "\nmoduleWirelessPort=" + port;
         } catch (JSONException error) {
             return "moduleAuto=invalid_json";
         }

@@ -144,6 +144,8 @@ mkdir -p "$settings_dir"
 printf 0 > "$settings_dir/global_adb_enabled"
 printf 0 > "$settings_dir/global_adb_wifi_enabled"
 printf 0 > "$settings_dir/global_enable_wireless_switch"
+printf 0 > "$settings_dir/adb_wireless_port"
+printf '20:3a:0c:78:9a:c8\n' > "$settings_dir/current_bssid"
 adb_wifi_status="$(
   NEBULA_SETTINGS_DIR="$settings_dir" \
   sh "$cli" adb-wifi status --json
@@ -157,6 +159,8 @@ assert obj["adb_debugging"] is False
 assert obj["wireless_debugging"] is False
 assert obj["settings_wireless_debugging"] is False
 assert obj["ui_wireless_switch"] is False
+assert obj["wireless_port"] == 0
+assert obj["manager_bssid_available"] is True
 assert obj["auto_enable"] is False
 assert obj["errors"] == []
 PY
@@ -176,12 +180,14 @@ assert obj["adb_debugging"] is True
 assert obj["wireless_debugging"] is True
 assert obj["settings_wireless_debugging"] is True
 assert obj["ui_wireless_switch"] is True
+assert obj["manager_bssid_available"] is True
 assert obj["auto_enable"] is True
 assert obj["errors"] == []
 PY
 [[ "$(cat "$settings_dir/global_adb_enabled")" == "1" ]]
 [[ "$(cat "$settings_dir/global_adb_wifi_enabled")" == "1" ]]
 [[ "$(cat "$settings_dir/global_enable_wireless_switch")" == "1" ]]
+[[ "$(cat "$settings_dir/manager_allow_bssid")" == "20:3a:0c:78:9a:c8" ]]
 [[ -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
 [[ -s "$NEBULA_DATA_DIR/state/adb_wifi.state" ]]
 
@@ -200,6 +206,7 @@ assert obj["adb_debugging"] is True
 assert obj["wireless_debugging"] is True
 assert obj["settings_wireless_debugging"] is True
 assert obj["ui_wireless_switch"] is True
+assert obj["manager_bssid_available"] is True
 assert obj["auto_enable"] is False
 PY
 [[ ! -f "$NEBULA_DATA_DIR/state/adb_wifi_auto_enable" ]]
@@ -662,6 +669,11 @@ fi
 
 if rg -n 'settings put' "$repo_root/nebula-core-module/bin/nebula-core" | rg -v 'settings put global (adb_enabled|adb_wifi_enabled|enable_wireless_switch) 1'; then
   echo "nebula-core contains forbidden non-ADB settings mutation strings" >&2
+  exit 1
+fi
+
+if rg -n 'service call' "$repo_root/nebula-core-module" | rg -v 'service call adb (4|10)'; then
+  echo "nebula-core module contains forbidden non-ADB-manager Binder calls" >&2
   exit 1
 fi
 

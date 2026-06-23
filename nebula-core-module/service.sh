@@ -1,6 +1,22 @@
 #!/system/bin/sh
 DATA_DIR=/data/adb/nebula
 
+current_bssid() {
+  cmd wifi status 2>/dev/null \
+    | sed -n 's/.*BSSID: \([0-9A-Fa-f:][0-9A-Fa-f:]*\),.*/\1/p' \
+    | head -n 1 \
+    | tr -d '\r'
+}
+
+valid_bssid() {
+  case "$1" in
+    [0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f])
+      [ "$1" != "02:00:00:00:00:00" ]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
 while [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
   sleep 2
 done
@@ -22,7 +38,12 @@ if [ -n "$adb_wifi_reason" ]; then
   if settings put global adb_enabled 1 >/dev/null 2>&1 && \
      settings put global adb_wifi_enabled 1 >/dev/null 2>&1 && \
      settings put global enable_wireless_switch 1 >/dev/null 2>&1; then
-    printf '%s adb wifi auto-enable applied reason=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$adb_wifi_reason" >> "$DATA_DIR/logs/nebula-core.log"
+    bssid="$(current_bssid)"
+    if valid_bssid "$bssid" && service call adb 4 i32 1 s16 "$bssid" >/dev/null 2>&1; then
+      printf '%s adb wifi auto-enable applied reason=%s manager=allowWirelessDebugging\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$adb_wifi_reason" >> "$DATA_DIR/logs/nebula-core.log"
+    else
+      printf '%s adb wifi auto-enable applied reason=%s manager=bssid_unavailable\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$adb_wifi_reason" >> "$DATA_DIR/logs/nebula-core.log"
+    fi
   else
     printf '%s adb wifi auto-enable failed reason=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$adb_wifi_reason" >> "$DATA_DIR/logs/nebula-core.log"
   fi

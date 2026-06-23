@@ -360,10 +360,67 @@ adb_wifi_bool_json() {
 adb_wifi_effective_value() {
   wifi_value=$1
   switch_value=$2
+  port_value=${3:-}
+  if [ -n "$port_value" ] && [ "$port_value" -gt 0 ] 2>/dev/null; then
+    printf '%s' 1
+    return
+  fi
   case "$switch_value" in
     1|0) printf '%s' "$switch_value" ;;
     *) printf '%s' "$wifi_value" ;;
   esac
+}
+
+adb_wifi_current_bssid() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/current_bssid" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/current_bssid" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  cmd wifi status 2>/dev/null \
+    | sed -n 's/.*BSSID: \([0-9A-Fa-f:][0-9A-Fa-f:]*\),.*/\1/p' \
+    | head -n 1 \
+    | tr -d '\r'
+}
+
+adb_wifi_valid_bssid() {
+  case "$1" in
+    [0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f])
+      [ "$1" != "02:00:00:00:00:00" ]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+adb_wifi_manager_allow() {
+  bssid=$1
+  if ! adb_wifi_valid_bssid "$bssid"; then
+    return 2
+  fi
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
+    printf '%s\n' "$bssid" > "$NEBULA_SETTINGS_DIR/manager_allow_bssid"
+    return $?
+  fi
+  service call adb 4 i32 1 s16 "$bssid" >/dev/null 2>&1
+}
+
+adb_wifi_read_wireless_port() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/adb_wireless_port" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/adb_wireless_port" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  parcel=$(service call adb 10 2>/dev/null | tr -d '\r')
+  value=$(printf '%s\n' "$parcel" | sed -n 's/.*00000000 \([0-9A-Fa-f][0-9A-Fa-f]*\).*/\1/p' | head -n 1)
+  if [ -n "$value" ]; then
+    printf '%d' "0x$value" 2>/dev/null && return 0
+  fi
+  return 2
 }
 
 adb_wifi_auto_value() {
@@ -380,10 +437,12 @@ adb_wifi_state_snapshot() {
     adb_value=$(adb_wifi_read_adb_enabled 2>/dev/null || printf unknown)
     wifi_value=$(adb_wifi_read_wireless_enabled 2>/dev/null || printf unknown)
     switch_value=$(adb_wifi_read_ui_switch 2>/dev/null || printf unknown)
+    bssid_value=$(adb_wifi_current_bssid 2>/dev/null || printf unknown)
     {
       printf 'adb_enabled=%s\n' "$adb_value"
       printf 'adb_wifi_enabled=%s\n' "$wifi_value"
       printf 'enable_wireless_switch=%s\n' "$switch_value"
+      printf 'current_bssid=%s\n' "$bssid_value"
     } > "$ADB_WIFI_STATE_FILE"
   fi
 }
@@ -408,15 +467,33 @@ adb_wifi_status_payload() {
     switch_value=
     errors=$(list_append_json_string "$errors" "unreadable:settings_global_enable_wireless_switch")
   fi
-  effective_value=$(adb_wifi_effective_value "$wifi_value" "$switch_value")
+  port_value=$(adb_wifi_read_wireless_port)
+  port_rc=$?
+  if [ "$port_rc" != "0" ]; then
+    port_value=
+    errors=$(list_append_json_string "$errors" "unreadable:adb_manager_wireless_port")
+  fi
+  bssid_value=$(adb_wifi_current_bssid)
+  bssid_rc=$?
+  if [ "$bssid_rc" != "0" ] || ! adb_wifi_valid_bssid "$bssid_value"; then
+    bssid_value=
+    errors=$(list_append_json_string "$errors" "unreadable:current_wifi_bssid")
+  fi
+  effective_value=$(adb_wifi_effective_value "$wifi_value" "$switch_value" "$port_value")
 
   printf '"adb_debugging":%s,' "$(adb_wifi_bool_json "$adb_value")"
   printf '"wireless_debugging":%s,' "$(adb_wifi_bool_json "$effective_value")"
   printf '"settings_wireless_debugging":%s,' "$(adb_wifi_bool_json "$wifi_value")"
   printf '"ui_wireless_switch":%s,' "$(adb_wifi_bool_json "$switch_value")"
+  if [ -n "$port_value" ] && [ "$port_value" -ge 0 ] 2>/dev/null; then
+    printf '"wireless_port":%s,' "$port_value"
+  else
+    printf '"wireless_port":null,'
+  fi
+  printf '"manager_bssid_available":%s,' "$(json_bool "$([ -n "$bssid_value" ] && printf 1 || printf 0)")"
   printf '"ui_switch_source":"Android Settings.Global enable_wireless_switch",'
   printf '"auto_enable":%s,' "$(json_bool "$(adb_wifi_auto_value)")"
-  printf '"source":"Android Settings.Global adb_enabled,adb_wifi_enabled,enable_wireless_switch",'
+  printf '"source":"Android Settings.Global adb_enabled,adb_wifi_enabled,enable_wireless_switch; android.debug.IAdbManager allowWirelessDebugging/getAdbWirelessPort",'
   printf '"errors":[%s]' "$errors"
 }
 
@@ -443,6 +520,16 @@ adb_wifi_enable_json() {
   if ! adb_wifi_write_ui_switch; then
     ok=0
     errors=$(list_append_json_string "$errors" "write_failed:settings_global_enable_wireless_switch")
+  fi
+  bssid_value=$(adb_wifi_current_bssid 2>/dev/null || true)
+  if adb_wifi_valid_bssid "$bssid_value"; then
+    if ! adb_wifi_manager_allow "$bssid_value"; then
+      ok=0
+      errors=$(list_append_json_string "$errors" "write_failed:adb_manager_allow_wireless_debugging")
+    fi
+  else
+    ok=0
+    errors=$(list_append_json_string "$errors" "unavailable:current_wifi_bssid")
   fi
   if [ "$ok" = "1" ]; then
     touch "$ADB_WIFI_AUTO_FILE" 2>/dev/null || {
