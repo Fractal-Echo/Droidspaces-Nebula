@@ -340,6 +340,7 @@ public final class MainActivity extends Activity {
         deviceToolsContainer.removeAllViews();
         deviceToolsContainer.addView(buildCapabilityCard(
                 "Audited Nubia capability status", nubiaDeviceAdapter.discover(this)));
+        deviceToolsContainer.addView(buildAdbWifiCard());
 
         performanceContainer.removeAllViews();
         performanceContainer.addView(buildCapabilityCard(
@@ -780,6 +781,95 @@ public final class MainActivity extends Activity {
         return card;
     }
 
+    private View buildAdbWifiCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("ADB Wi-Fi", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(adbWifiDetail(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(adbWifiStatus(), adbWifiColor()));
+
+        Button open = smallButton("Open settings", CYAN);
+        open.setOnClickListener(v -> openWirelessDebuggingSettings());
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        buttonParams.topMargin = dp(12);
+        card.addView(open, buttonParams);
+
+        return card;
+    }
+
+    private String adbWifiStatus() {
+        int value = globalSettingInt("adb_wifi_enabled", -1);
+        if (value == 1) return "Enabled";
+        if (value == 0) return "Disabled";
+        return "Android";
+    }
+
+    private int adbWifiColor() {
+        int value = globalSettingInt("adb_wifi_enabled", -1);
+        if (value == 1) return GREEN;
+        if (value == 0) return YELLOW;
+        return BLUE;
+    }
+
+    private String adbWifiDetail() {
+        int wireless = globalSettingInt("adb_wifi_enabled", -1);
+        int adb = globalSettingInt("adb_enabled", -1);
+        return "wirelessDebugging=" + settingLabel(wireless)
+                + "\nadbDebugging=" + settingLabel(adb)
+                + "\ncontrol=Android developer options"
+                + "\nmutation=false";
+    }
+
+    private int globalSettingInt(String key, int fallback) {
+        try {
+            return Settings.Global.getInt(getContentResolver(), key);
+        } catch (Settings.SettingNotFoundException | SecurityException ignored) {
+            return fallback;
+        }
+    }
+
+    private String settingLabel(int value) {
+        if (value == 1) return "enabled";
+        if (value == 0) return "disabled";
+        return "unknown";
+    }
+
+    private void openWirelessDebuggingSettings() {
+        Intent wireless = new Intent("android.settings.WIRELESS_DEBUGGING_SETTINGS");
+        if (tryStartSettings(wireless)) {
+            return;
+        }
+        Intent developer = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
+        if (!tryStartSettings(developer)) {
+            toast("Developer options unavailable");
+        }
+    }
+
+    private boolean tryStartSettings(Intent intent) {
+        try {
+            startActivity(intent);
+            return true;
+        } catch (ActivityNotFoundException error) {
+            return false;
+        }
+    }
+
     private View buildCapabilityRow(NebulaCapability capability) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
@@ -1117,6 +1207,11 @@ public final class MainActivity extends Activity {
         sb.append('\n');
 
         appendCapabilities(sb, "Device Tools", nubiaDeviceAdapter.discover(this));
+        sb.append("[ADB Wi-Fi]\n");
+        sb.append("  status=").append(adbWifiStatus()).append('\n');
+        sb.append("  ").append(adbWifiDetail().replace("\n", "\n  ")).append('\n');
+        sb.append("  mutating=false\n\n");
+
         appendCapabilities(sb, "Performance", redMagicPerformanceAdapter.discover(this, redMagicProbe));
         appendCapabilities(sb, "RedMagic Button", redMagicButtonAdapter.discover(this));
 
