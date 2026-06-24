@@ -127,7 +127,7 @@ Initial lane model:
 
 | Lane | Purpose | Current ownership | Risk gate |
 | --- | --- | --- | --- |
-| Phone/App Mode | Run through the known WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Keep using known-good sidecar evidence; current blocker is GLX visual/fbconfig exposure. |
+| Phone/App Mode | Run through the known WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Keep using known-good sidecar evidence; current blocker is GLX visual/fbconfig exposure. Sidecar-13 force-composition is exposed only as a promotion candidate until a bounded Wine GUI smoke promotes it. |
 | Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven reference, operator-gated; external-display-only; explicit stop/revoke; no boot auto-launch. |
 | Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Snapshot config before any repair; fixed commands only; no raw helper-script execution. |
 | Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
@@ -136,12 +136,25 @@ Initial lane model:
 The target experience is one app and one core module coordinating these lanes,
 not one rendering path forced onto every user.
 
+Runtime constraints:
+
+- The RM11 Pro stock RedMagic ROM plus OnePlus Wild kernel lane is
+  operator-reported as a 39-bit kernel VA environment. Nebula surfaces this in
+  display-lane status and must avoid assuming 45-bit userspace/runtime behavior
+  until a bounded runtime probe proves it.
+- Sidecar-13's `--force-composition` result is a concrete Phone/App lead, not a
+  Dock Lease result. It should be promoted by minimal Wine GUI smoke before
+  Steam or larger Proton targets.
+
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
 See `LEGACY_MODULE_MIGRATION.md` for the protected module audit and migration guardrails.
 
 See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be
 promoted only in a separate operator-gated pass.
+
+See `REVERSA_FINDINGS_ASSESSMENT.md` for the contradiction assessment that keeps
+Sidecar-11 canonical while surfacing Sidecar-13 as a promotion candidate.
 
 Online references checked for future work:
 

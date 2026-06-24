@@ -1285,6 +1285,23 @@ public final class MainActivity extends Activity {
         if (lane.has("active_blocker")) {
             builder.append("\nblocker=").append(lane.optString("active_blocker"));
         }
+        if (lane.has("unpromoted_lead")) {
+            builder.append("\nlead=").append(lane.optString("unpromoted_lead"));
+            builder.append("  status=").append(lane.optString("lead_status", "unknown"));
+        }
+        if (lane.has("trick")) {
+            builder.append("\ntrick=").append(lane.optString("trick"));
+        }
+        if (lane.has("next_reversa_action")) {
+            builder.append("\nnext=").append(lane.optString("next_reversa_action"));
+        }
+        if (lane.has("kernel_va_bits_constraint")) {
+            builder.append("\nkernelVaBitsConstraint=")
+                    .append(lane.optInt("kernel_va_bits_constraint", -1));
+        }
+        if (lane.has("runtime_constraint")) {
+            builder.append("\nruntimeConstraint=").append(lane.optString("runtime_constraint"));
+        }
         if (lane.has("evidence_captured")) {
             builder.append("\nevidenceCaptured=").append(lane.optBoolean("evidence_captured", false));
             builder.append("  externalOnly=").append(lane.optBoolean("external_display_only", false));
@@ -1715,6 +1732,17 @@ public final class MainActivity extends Activity {
                     sb.append("    mutating=").append(lane.optBoolean("mutating", false)).append('\n');
                     if (lane.has("active_blocker")) {
                         sb.append("    blocker=").append(lane.optString("active_blocker")).append('\n');
+                    }
+                    if (lane.has("unpromoted_lead")) {
+                        sb.append("    lead=").append(lane.optString("unpromoted_lead")).append('\n');
+                        sb.append("    leadStatus=").append(lane.optString("lead_status", "unknown")).append('\n');
+                    }
+                    if (lane.has("next_reversa_action")) {
+                        sb.append("    next=").append(lane.optString("next_reversa_action")).append('\n');
+                    }
+                    if (lane.has("kernel_va_bits_constraint")) {
+                        sb.append("    kernelVaBitsConstraint=")
+                                .append(lane.optInt("kernel_va_bits_constraint", -1)).append('\n');
                     }
                     if (lane.has("evidence_captured")) {
                         sb.append("    evidenceCaptured=").append(lane.optBoolean("evidence_captured", false)).append('\n');

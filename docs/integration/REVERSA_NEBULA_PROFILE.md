@@ -67,10 +67,22 @@ Required distinctions:
 Output decisions:
 
 - `READY_FOR_FIX`
+- `PROMOTION_CANDIDATE`
 - `REFERENCE_ONLY`
 - `OPERATOR_GATED`
 - `NOT_WIRED`
 - `REJECT`
+
+Promotion candidate rule:
+
+- A later sidecar may be surfaced as `PROMOTION_CANDIDATE` only when it has
+  artifact evidence and a bounded next test. It must not replace the canonical
+  blocker until that promotion pass succeeds.
+
+Runtime constraint rule:
+
+- Record operator-provided kernel/runtime constraints, such as the RM11 Pro
+  OnePlus Wild 39-bit VA limit, as constraints until independently probed.
 
 ### `reversa-nebula-module-auditor`
 

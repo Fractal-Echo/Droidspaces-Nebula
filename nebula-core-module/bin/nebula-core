@@ -34,6 +34,8 @@ WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie
 WAYLANDIE_SOURCE_COMMIT=1526655a2470
 WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
 DISPLAY_PHONE_SOURCE="Sidecar-11 WayLandIE/Gamescope/Xwayland evidence: RGB GLX visual/fbconfig blocker"
+DISPLAY_PHONE_PROMOTION_SOURCE="Sidecar-13 XWAYLAND_GLX_RENDER_PASS_FORCE_COMPOSITION: --force-composition, ARGB8888, ready-without-sync-fd"
+DISPLAY_PHONE_RUNTIME_CONSTRAINT="operator-reported NX809J stock RedMagic ROM with OnePlus Wild kernel: 39-bit kernel VA limit; avoid 45-bit runtime assumptions until probed"
 ANLAND_REPAIR_SOURCE="Droidspaces-OSS tools/fix-anland-display.sh@6db8940190ea; anland display_producer timeout fix@5d69f36dd5a0"
 DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
 ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
@@ -1072,7 +1074,16 @@ display_phone_preflight_payload() {
   printf '"mutating":false,'
   printf '"launch_command_available":false,'
   printf '"active_blocker":"RGB_GLX_VISUAL_FBCONFIG_EXPOSURE",'
+  printf '"canonical_blocker":"RGB_GLX_VISUAL_FBCONFIG_EXPOSURE",'
   printf '"current_endpoint":"Xwayland launches",'
+  printf '"unpromoted_lead":"FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_FD",'
+  printf '"lead_status":"promotion_candidate",'
+  printf '"trick":"gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf",'
+  printf '"next_reversa_action":"minimal_wine_gui_smoke_before_steam",'
+  printf '"steam_allowed":false,'
+  printf '"kernel_va_bits_constraint":39,'
+  printf '"runtime_constraint":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_CONSTRAINT")"
+  printf '"promotion_source":%s,' "$(json_string "$DISPLAY_PHONE_PROMOTION_SOURCE")"
   printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
   printf '"checks":{"waylandie_ready":%s,"package_installed":%s,"imagefs_present":%s,"proton_present":%s,"wine_present":%s},' \
     "$(json_bool "$wl_ready")" \

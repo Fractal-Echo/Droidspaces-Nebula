@@ -338,6 +338,13 @@ assert lanes["phone_app_bridge"]["status"] == "ready_for_glx_fix"
 assert lanes["phone_app_bridge"]["mutating"] is False
 assert lanes["phone_app_bridge"]["launch_command_available"] is False
 assert lanes["phone_app_bridge"]["active_blocker"] == "RGB_GLX_VISUAL_FBCONFIG_EXPOSURE"
+assert lanes["phone_app_bridge"]["canonical_blocker"] == "RGB_GLX_VISUAL_FBCONFIG_EXPOSURE"
+assert lanes["phone_app_bridge"]["unpromoted_lead"] == "FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_FD"
+assert lanes["phone_app_bridge"]["lead_status"] == "promotion_candidate"
+assert lanes["phone_app_bridge"]["trick"] == "gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf"
+assert lanes["phone_app_bridge"]["next_reversa_action"] == "minimal_wine_gui_smoke_before_steam"
+assert lanes["phone_app_bridge"]["steam_allowed"] is False
+assert lanes["phone_app_bridge"]["kernel_va_bits_constraint"] == 39
 assert lanes["anland_surface"]["status"] == "preflight_ready"
 assert lanes["anland_surface"]["repair_command_available"] is False
 assert lanes["anland_surface"]["checks"]["display_daemon_socket"] is True
@@ -366,6 +373,10 @@ assert obj["id"] == "phone_app_bridge"
 assert obj["available"] is True
 assert obj["mutating"] is False
 assert obj["launch_command_available"] is False
+assert obj["unpromoted_lead"] == "FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_FD"
+assert obj["lead_status"] == "promotion_candidate"
+assert obj["steam_allowed"] is False
+assert obj["kernel_va_bits_constraint"] == 39
 PY
 
 anland_preflight="$(
