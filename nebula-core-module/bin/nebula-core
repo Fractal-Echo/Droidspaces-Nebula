@@ -33,11 +33,21 @@ NUBIA_GAME_LAUNCHER_PACKAGE=cn.nubia.gamelauncher
 WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie
 WAYLANDIE_SOURCE_COMMIT=1526655a2470
 WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
+DISPLAY_PHONE_SOURCE="Sidecar-11 WayLandIE/Gamescope/Xwayland evidence: RGB GLX visual/fbconfig blocker"
+ANLAND_REPAIR_SOURCE="Droidspaces-OSS tools/fix-anland-display.sh@6db8940190ea; anland display_producer timeout fix@5d69f36dd5a0"
+DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
+ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
+ANLAND_CONTAINER=ubuntu
+ANLAND_CONFIG=/data/local/Droidspaces/Containers/ubuntu/container.config
+ANLAND_ENV=/data/local/Droidspaces/Containers/ubuntu/anland.env
+ANLAND_SOCKET_HOST=/data/local/tmp/display_daemon.sock
+ANLAND_SOCKET_GUEST=/run/display.sock
+ANLAND_RENDER_NODE=/dev/dri/renderD128
 
 ensure_dirs() {
-  mkdir -p "$LOG_DIR" "$STATE_DIR"
+  mkdir -p "$LOG_DIR" "$STATE_DIR" 2>/dev/null || return 0
   if [ ! -s "$PROFILE_FILE" ]; then
-    printf '%s\n' safe > "$PROFILE_FILE"
+    printf '%s\n' safe > "$PROFILE_FILE" 2>/dev/null || true
   fi
 }
 
@@ -214,7 +224,9 @@ service_status() {
 
 log_command() {
   ensure_dirs
-  printf '%s command=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$1" >> "$LOG_FILE"
+  if [ -d "$LOG_DIR" ]; then
+    printf '%s command=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$1" >> "$LOG_FILE" 2>/dev/null || true
+  fi
 }
 
 status_json() {
@@ -251,6 +263,10 @@ capabilities_json() {
   printf '{"id":"nubia.toolkit.status","title":"Nubia Toolkit compatibility status","status":"ported_status_only","mutating":false,"source":"%s"},' "$(json_escape "$NUBIA_TOOLKIT_SOURCE")"
   printf '{"id":"runtime.waylandie.status","title":"WayLandIE runtime readiness","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
+  printf '{"id":"display.lanes","title":"Display lane selector status","status":"available_read_only","mutating":false,"source":"nebula-core lane registry"},'
+  printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DISPLAY_PHONE_SOURCE")"
+  printf '{"id":"display.lane.anland.preflight","title":"Anland surface lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_REPAIR_SOURCE")"
+  printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"proven_reference_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DRM_LEASE_SOURCE")"
   printf '{"id":"adb.wifi","title":"ADB Wi-Fi guardrail","status":"available_opt_in","mutating":true,"source":"Android Settings.Global adb_wifi_enabled,enable_wireless_switch"}'
   printf ']}\n'
 }
@@ -997,6 +1013,187 @@ EOF
     "$(json_string "$WAYLANDIE_SOURCE")" \
     "$errors"
   [ "$rc" -eq 0 ]
+}
+
+fixed_device_path() {
+  path=$1
+  root=${NEBULA_TEST_DEVICE_ROOT:-}
+  if [ -n "$root" ]; then
+    printf '%s%s' "$root" "$path"
+  else
+    printf '%s' "$path"
+  fi
+}
+
+fixed_path_exists() {
+  path=$(fixed_device_path "$1")
+  [ -e "$path" ]
+}
+
+fixed_path_executable() {
+  path=$(fixed_device_path "$1")
+  [ -x "$path" ]
+}
+
+fixed_path_socket() {
+  path=$(fixed_device_path "$1")
+  [ -S "$path" ]
+}
+
+fixed_file_contains() {
+  path=$(fixed_device_path "$1")
+  pattern=$2
+  [ -f "$path" ] && grep -F "$pattern" "$path" >/dev/null 2>&1
+}
+
+display_bool_source() {
+  bool_value=$1
+  true_label=$2
+  false_label=$3
+  if [ "$bool_value" = "1" ]; then
+    printf '%s' "$true_label"
+  else
+    printf '%s' "$false_label"
+  fi
+}
+
+display_phone_preflight_payload() {
+  waylandie_collect
+  phone_status=missing
+  if [ "$wl_ready" = "1" ]; then
+    phone_status=ready_for_glx_fix
+  elif [ "$wl_installed" = "1" ]; then
+    phone_status=partial
+  fi
+  printf '"id":"phone_app_bridge",'
+  printf '"title":"Phone / App Mode",'
+  printf '"status":%s,' "$(json_string "$phone_status")"
+  printf '"available":%s,' "$(json_bool "$wl_ready")"
+  printf '"mutating":false,'
+  printf '"launch_command_available":false,'
+  printf '"active_blocker":"RGB_GLX_VISUAL_FBCONFIG_EXPOSURE",'
+  printf '"current_endpoint":"Xwayland launches",'
+  printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
+  printf '"checks":{"waylandie_ready":%s,"package_installed":%s,"imagefs_present":%s,"proton_present":%s,"wine_present":%s},' \
+    "$(json_bool "$wl_ready")" \
+    "$(json_bool "$wl_installed")" \
+    "$(json_bool "$wl_imagefs_present")" \
+    "$(json_bool "$wl_proton_present")" \
+    "$(json_bool "$wl_wine_present")"
+  printf '"errors":[%s]' "$wl_errors"
+}
+
+display_phone_preflight_json() {
+  printf '{"protocol_version":%s,"command":"display lane phone preflight",' "$PROTOCOL_VERSION"
+  display_phone_preflight_payload
+  printf '}\n'
+}
+
+display_anland_preflight_payload() {
+  anland_errors=
+  anland_bin=0
+  anland_config=0
+  anland_env=0
+  anland_socket=0
+  anland_render=0
+  anland_config_env=0
+  anland_config_bind=0
+  anland_env_socket=0
+  anland_env_kgsl=0
+
+  fixed_path_executable "$ANLAND_DROIDSPACES_BIN" && anland_bin=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:droidspaces_binary")
+  fixed_path_exists "$ANLAND_CONFIG" && anland_config=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:container_config")
+  fixed_path_exists "$ANLAND_ENV" && anland_env=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:anland_env")
+  fixed_path_socket "$ANLAND_SOCKET_HOST" && anland_socket=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:display_daemon_socket")
+  fixed_path_exists "$ANLAND_RENDER_NODE" && anland_render=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:render_node")
+  fixed_file_contains "$ANLAND_CONFIG" "env_file=$ANLAND_ENV" && anland_config_env=1 || true
+  fixed_file_contains "$ANLAND_CONFIG" "$ANLAND_SOCKET_HOST:$ANLAND_SOCKET_GUEST" && anland_config_bind=1 || true
+  fixed_file_contains "$ANLAND_ENV" "ANLAND_SOCKET=$ANLAND_SOCKET_GUEST" && anland_env_socket=1 || true
+  fixed_file_contains "$ANLAND_ENV" "MESA_LOADER_DRIVER_OVERRIDE=kgsl" && anland_env_kgsl=1 || true
+
+  anland_ready=0
+  anland_status=missing
+  if [ "$anland_bin" = "1" ] && [ "$anland_config" = "1" ] && [ "$anland_socket" = "1" ] && [ "$anland_render" = "1" ]; then
+    anland_status=preflight_ready
+    anland_ready=1
+  elif [ "$anland_bin" = "1" ] || [ "$anland_config" = "1" ] || [ "$anland_env" = "1" ]; then
+    anland_status=partial
+  fi
+
+  printf '"id":"anland_surface",'
+  printf '"title":"Anland Surface Mode",'
+  printf '"status":%s,' "$(json_string "$anland_status")"
+  printf '"available":%s,' "$(json_bool "$anland_ready")"
+  printf '"mutating":false,'
+  printf '"repair_command_available":false,'
+  printf '"source":%s,' "$(json_string "$ANLAND_REPAIR_SOURCE")"
+  printf '"checks":{"droidspaces_binary":%s,"container_config":%s,"anland_env":%s,"display_daemon_socket":%s,"render_node":%s,"config_env_file":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s},' \
+    "$(json_bool "$anland_bin")" \
+    "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_env")" \
+    "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_render")" \
+    "$(json_bool "$anland_config_env")" \
+    "$(json_bool "$anland_config_bind")" \
+    "$(json_bool "$anland_env_socket")" \
+    "$(json_bool "$anland_env_kgsl")"
+  printf '"fixed_paths":{"droidspaces_binary":%s,"container_config":%s,"anland_env":%s,"display_socket_host":%s,"display_socket_guest":%s,"render_node":%s},' \
+    "$(json_string "$ANLAND_DROIDSPACES_BIN")" \
+    "$(json_string "$ANLAND_CONFIG")" \
+    "$(json_string "$ANLAND_ENV")" \
+    "$(json_string "$ANLAND_SOCKET_HOST")" \
+    "$(json_string "$ANLAND_SOCKET_GUEST")" \
+    "$(json_string "$ANLAND_RENDER_NODE")"
+  printf '"errors":[%s]' "$anland_errors"
+}
+
+display_anland_preflight_json() {
+  printf '{"protocol_version":%s,"command":"display lane anland preflight",' "$PROTOCOL_VERSION"
+  display_anland_preflight_payload
+  printf '}\n'
+}
+
+display_dock_preflight_payload() {
+  dock_safe=$(safe_mode_value)
+  dock_status=proven_reference_not_wired
+  if [ "$dock_safe" = "1" ]; then
+    dock_status=safe_mode_blocks_start
+  fi
+  printf '"id":"dock_drm_lease_external",'
+  printf '"title":"Dock Lease Mode",'
+  printf '"status":%s,' "$(json_string "$dock_status")"
+  printf '"available":false,'
+  printf '"mutating":false,'
+  printf '"start_command_available":false,'
+  printf '"evidence_captured":true,'
+  printf '"operator_gated":true,'
+  printf '"safe_mode":%s,' "$(json_bool "$dock_safe")"
+  printf '"external_display_only":true,'
+  printf '"internal_panel_allowed":false,'
+  printf '"whole_card_takeover":false,'
+  printf '"dynamic_discovery_required":true,'
+  printf '"reported_objects":{"connector":89,"crtc":285,"planes":[137,145],"rejected_encoder":86,"composer_fd_observed":11,"hardcoded_forbidden":true},'
+  printf '"method":["composer_fd_duplicate","CREATE_LEASE_external_only","SCM_RIGHTS_fd_handoff","wlroots_drm_backend_lease_fd","explicit_stop_revoke"],'
+  printf '"source":%s,' "$(json_string "$DRM_LEASE_SOURCE")"
+  printf '"errors":[]'
+}
+
+display_dock_preflight_json() {
+  printf '{"protocol_version":%s,"command":"display lane dock preflight",' "$PROTOCOL_VERSION"
+  display_dock_preflight_payload
+  printf '}\n'
+}
+
+display_lanes_json() {
+  printf '{"protocol_version":%s,"command":"display lanes","selector":"multi_lane","lanes":[' "$PROTOCOL_VERSION"
+  printf '{'
+  display_phone_preflight_payload
+  printf '},{'
+  display_dock_preflight_payload
+  printf '},{'
+  display_anland_preflight_payload
+  printf '},{"id":"compatibility","title":"Compatibility Mode","status":"not_wired","available":false,"mutating":false,"source":"Nebula compatibility fallback design","errors":["NOT_WIRED_BY_DESIGN"]},{"id":"recovery_safe","title":"Recovery / Safe Mode","status":"always_available","available":true,"mutating":false,"source":"Nebula Core safe mode","errors":[]}'
+  printf '],"selection_rules":["prefer_phone_app_for_internal_display","prefer_dock_lease_for_external_monitor_when_wired","use_anland_surface_as_compatibility_fallback","safe_mode_blocks_mutating_lane_start","no_lane_silently_replaces_another"]}\n'
 }
 
 is_test_denied_path() {
@@ -2033,6 +2230,24 @@ main() {
     cooling)
       if [ "${2:-}" = "policy" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
         cooling_policy_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    display)
+      if [ "${2:-}" = "lanes" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "display_lanes"
+        display_lanes_json
+      elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "phone" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        log_command "display_lane_phone_preflight"
+        display_phone_preflight_json
+      elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "anland" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        log_command "display_lane_anland_preflight"
+        display_anland_preflight_json
+      elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "dock" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        log_command "display_lane_dock_preflight"
+        display_dock_preflight_json
       else
         usage_json
         return 2

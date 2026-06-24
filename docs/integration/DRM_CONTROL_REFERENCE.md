@@ -89,7 +89,7 @@ Expected side effects:
 
 ## Nebula Integration Target
 
-Future Dock mode should port the pattern as a separate crash-gated lane:
+Future Dock mode should port the pattern as a separate operator-gated lane:
 
 - Nebula Core fixed commands only.
 - External-display-only preflight before any lease attempt.
@@ -119,7 +119,7 @@ IDs, plane IDs, and fd numbers from the app.
 
 ## Risk Gates
 
-Do not promote this into an active Nebula command until these are true:
+Do not promote this into an active start command until these are true:
 
 - Exact source/code from the working broker is reviewed and licensed for use.
 - The object discovery code proves `DP-1` or another external connector is

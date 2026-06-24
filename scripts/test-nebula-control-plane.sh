@@ -4,7 +4,14 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cli="$repo_root/nebula-core-module/bin/nebula-core"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+socket_pids=()
+cleanup() {
+  for pid in "${socket_pids[@]:-}"; do
+    kill "$pid" 2>/dev/null || true
+  done
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
 
 export NEBULA_DATA_DIR="$tmp/data"
 export NEBULA_MODULE_DIR="$repo_root/nebula-core-module"
@@ -135,6 +142,10 @@ required = {
     "nubia.toolkit.status",
     "runtime.waylandie.status",
     "runtime.waylandie.proton-smoke",
+    "display.lanes",
+    "display.lane.phone.preflight",
+    "display.lane.anland.preflight",
+    "display.lane.dock.preflight",
     "adb.wifi",
 }
 missing = sorted(required - ids)
@@ -264,6 +275,135 @@ assert obj["ok"] is True
 assert obj["method"] == "root_assisted_proot"
 assert obj["exit_code"] == 0
 assert obj["errors"] == []
+PY
+
+device_root="$tmp/device-root"
+mkdir -p "$device_root/data/local/Droidspaces/bin" \
+  "$device_root/data/local/Droidspaces/Containers/ubuntu" \
+  "$device_root/data/local/tmp" \
+  "$device_root/dev/dri"
+: > "$device_root/dev/dri/renderD128"
+cat > "$device_root/data/local/Droidspaces/bin/droidspaces" <<'SH'
+#!/system/bin/sh
+exit 0
+SH
+chmod 755 "$device_root/data/local/Droidspaces/bin/droidspaces"
+cat > "$device_root/data/local/Droidspaces/Containers/ubuntu/container.config" <<'EOF'
+enable_termux_x11=0
+enable_hw_access=1
+enable_gpu_mode=1
+env_file=/data/local/Droidspaces/Containers/ubuntu/anland.env
+bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock
+EOF
+cat > "$device_root/data/local/Droidspaces/Containers/ubuntu/anland.env" <<'EOF'
+ANLAND=1
+ANLAND_SOCKET=/run/display.sock
+ANLAND_DRM_DEVICE=/dev/dri/renderD128
+WAYLAND_DISPLAY=wayland-0
+MESA_LOADER_DRIVER_OVERRIDE=kgsl
+GALLIUM_DRIVER=kgsl
+FD_FORCE_KGSL=1
+EOF
+python3 - "$device_root/data/local/tmp/display_daemon.sock" <<'PY' &
+import os, socket, sys, time
+path = sys.argv[1]
+try:
+    os.unlink(path)
+except FileNotFoundError:
+    pass
+s = socket.socket(socket.AF_UNIX)
+s.bind(path)
+s.listen(1)
+time.sleep(120)
+PY
+socket_pids+=("$!")
+sleep 0.2
+
+display_lanes="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  sh "$cli" display lanes --json
+)"
+python3 - "$display_lanes" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display lanes"
+assert obj["selector"] == "multi_lane"
+lanes = {item["id"]: item for item in obj["lanes"]}
+assert lanes["phone_app_bridge"]["status"] == "ready_for_glx_fix"
+assert lanes["phone_app_bridge"]["mutating"] is False
+assert lanes["phone_app_bridge"]["launch_command_available"] is False
+assert lanes["phone_app_bridge"]["active_blocker"] == "RGB_GLX_VISUAL_FBCONFIG_EXPOSURE"
+assert lanes["anland_surface"]["status"] == "preflight_ready"
+assert lanes["anland_surface"]["repair_command_available"] is False
+assert lanes["anland_surface"]["checks"]["display_daemon_socket"] is True
+assert lanes["dock_drm_lease_external"]["status"] == "proven_reference_not_wired"
+assert lanes["dock_drm_lease_external"]["evidence_captured"] is True
+assert lanes["dock_drm_lease_external"]["operator_gated"] is True
+assert lanes["dock_drm_lease_external"]["external_display_only"] is True
+assert lanes["dock_drm_lease_external"]["start_command_available"] is False
+assert lanes["dock_drm_lease_external"]["reported_objects"]["hardcoded_forbidden"] is True
+assert "no_lane_silently_replaces_another" in obj["selection_rules"]
+PY
+
+phone_preflight="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  sh "$cli" display lane phone preflight --json
+)"
+python3 - "$phone_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display lane phone preflight"
+assert obj["id"] == "phone_app_bridge"
+assert obj["available"] is True
+assert obj["mutating"] is False
+assert obj["launch_command_available"] is False
+PY
+
+anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display lane anland preflight"
+assert obj["id"] == "anland_surface"
+assert obj["available"] is True
+assert obj["mutating"] is False
+assert obj["repair_command_available"] is False
+assert obj["checks"]["droidspaces_binary"] is True
+assert obj["checks"]["display_daemon_socket"] is True
+assert obj["checks"]["env_kgsl"] is True
+PY
+
+dock_preflight="$(sh "$cli" display lane dock preflight --json)"
+python3 - "$dock_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display lane dock preflight"
+assert obj["id"] == "dock_drm_lease_external"
+assert obj["status"] == "proven_reference_not_wired"
+assert obj["available"] is False
+assert obj["mutating"] is False
+assert obj["start_command_available"] is False
+assert obj["evidence_captured"] is True
+assert obj["operator_gated"] is True
+assert obj["external_display_only"] is True
+assert obj["internal_panel_allowed"] is False
+assert obj["whole_card_takeover"] is False
+assert obj["reported_objects"]["connector"] == 89
+assert obj["reported_objects"]["hardcoded_forbidden"] is True
 PY
 
 settings_dir="$tmp/settings"
@@ -828,6 +968,14 @@ runtime_status_extra_arg="$(sh "$cli" runtime waylandie status --json /tmp/path 
 runtime_status_extra_code=$?
 runtime_smoke_extra_arg="$(sh "$cli" runtime waylandie proton-smoke --json /tmp/path 2>/dev/null)"
 runtime_smoke_extra_code=$?
+display_lanes_extra_arg="$(sh "$cli" display lanes --json /tmp/path 2>/dev/null)"
+display_lanes_extra_code=$?
+display_phone_extra_arg="$(sh "$cli" display lane phone preflight --json /tmp/path 2>/dev/null)"
+display_phone_extra_code=$?
+display_anland_extra_arg="$(sh "$cli" display lane anland preflight --json /tmp/path 2>/dev/null)"
+display_anland_extra_code=$?
+display_dock_extra_arg="$(sh "$cli" display lane dock preflight --json /tmp/path 2>/dev/null)"
+display_dock_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
@@ -838,6 +986,10 @@ set -e
 [[ "$nubia_extra_code" -ne 0 ]]
 [[ "$runtime_status_extra_code" -ne 0 ]]
 [[ "$runtime_smoke_extra_code" -ne 0 ]]
+[[ "$display_lanes_extra_code" -ne 0 ]]
+[[ "$display_phone_extra_code" -ne 0 ]]
+[[ "$display_anland_extra_code" -ne 0 ]]
+[[ "$display_dock_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
@@ -847,6 +999,10 @@ set -e
 [[ "$(json_field "$nubia_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$runtime_status_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$runtime_smoke_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$display_lanes_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$display_phone_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$display_anland_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$display_dock_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'
@@ -856,42 +1012,42 @@ if not isinstance(obj.get("lines"), list):
     raise SystemExit("logs.lines is not a list")
 PY
 
-if rg -n 'WayLandIE|Wayland|Gamescope|Xwayland|DRM|compositor|linux|am start|monkey' "$repo_root/nebula-core-module/service.sh"; then
+if grep -RInE 'WayLandIE|Wayland|Gamescope|Xwayland|DRM|compositor|linux|am start|monkey' "$repo_root/nebula-core-module/service.sh"; then
   echo "service.sh contains forbidden backend launch strings" >&2
   exit 1
 fi
 
-if rg -n 'setprop|service (start|stop|restart)|am start|cmd activity|input tap' "$repo_root/nebula-core-module/bin/nebula-core"; then
+if grep -RInE 'setprop|service (start|stop|restart)|am start|cmd activity|input tap' "$repo_root/nebula-core-module/bin/nebula-core"; then
   echo "nebula-core contains forbidden mutation command strings" >&2
   exit 1
 fi
 
-if rg -n 'settings put' "$repo_root/nebula-core-module/bin/nebula-core" | rg -v 'settings put global (adb_enabled|adb_wifi_enabled|enable_wireless_switch) 1'; then
+if grep -RInE 'settings put' "$repo_root/nebula-core-module/bin/nebula-core" | grep -Ev 'settings put global (adb_enabled|adb_wifi_enabled|enable_wireless_switch) 1'; then
   echo "nebula-core contains forbidden non-ADB settings mutation strings" >&2
   exit 1
 fi
 
-if rg -n 'service call' "$repo_root/nebula-core-module" | rg -v 'service call adb (4|10)'; then
+if grep -RInE 'service call' "$repo_root/nebula-core-module" | grep -Ev 'service call adb (4|10)'; then
   echo "nebula-core module contains forbidden non-ADB-manager Binder calls" >&2
   exit 1
 fi
 
-if rg -n 'pump (enable|disable|speed|mode|auto)|fan (enable|level|speed)|cooling (apply|set)|applyPump|enablePump|setPump|applied":true' "$repo_root/nebula-core-module/bin/nebula-core"; then
+if grep -RInE 'pump (enable|disable|speed|mode|auto)|fan (enable|level|speed)|cooling (apply|set)|applyPump|enablePump|setPump|applied":true' "$repo_root/nebula-core-module/bin/nebula-core"; then
   echo "nebula-core contains forbidden cooling mutation strings" >&2
   exit 1
 fi
 
-if rg -n 'cat "?[$][{]?[A-Za-z0-9_]+|/etc/passwd|/proc/kmsg' "$repo_root/nebula-core-module/bin/nebula-core"; then
+if grep -RInE 'cat "?[$][{]?[A-Za-z0-9_]+|/etc/passwd|/proc/kmsg' "$repo_root/nebula-core-module/bin/nebula-core"; then
   echo "nebula-core appears to expose arbitrary path reads" >&2
   exit 1
 fi
 
-if rg -n 'balanced_c|hot_c|critical_c|temperature_min_c|temperature_max_c|46[.]0|42[.]0|38[.]0' "$repo_root/app/src/main/java"; then
+if grep -RInE 'balanced_c|hot_c|critical_c|temperature_min_c|temperature_max_c|46[.]0|42[.]0|38[.]0' "$repo_root/app/src/main/java"; then
   echo "app contains duplicated cooling threshold source" >&2
   exit 1
 fi
 
-rg -n 'NEBULA_CORE_PROTOCOL_VERSION = 1|NEBULA_CORE_PROTOCOL_VERSION=1' "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreProtocol.java" >/dev/null
-rg -n 'protocolMismatch|moduleVersionMismatch|Invalid module JSON|parseRedMagicProbe|redMagicPumpProbe|coolingPolicy' "$repo_root/app/src/main/java/io/droidspaces/nebula/core" >/dev/null
+grep -RInE 'NEBULA_CORE_PROTOCOL_VERSION = 1|NEBULA_CORE_PROTOCOL_VERSION=1' "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreProtocol.java" >/dev/null
+grep -RInE 'protocolMismatch|moduleVersionMismatch|Invalid module JSON|parseRedMagicProbe|redMagicPumpProbe|coolingPolicy' "$repo_root/app/src/main/java/io/droidspaces/nebula/core" >/dev/null
 
 echo "Nebula control plane host tests passed."

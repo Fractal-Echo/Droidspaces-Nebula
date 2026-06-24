@@ -52,6 +52,9 @@ done
 forbidden_paths="$(
   find . \
     -path ./.git -prune -o \
+    -path ./.gradle -prune -o \
+    -path ./build -prune -o \
+    -path ./app/build -prune -o \
     -path ./.github -type f -print -o \
     -type f \( \
       -name '*.img' -o \
@@ -79,7 +82,12 @@ if [[ -n "$forbidden_paths" ]]; then
   exit 1
 fi
 
-if find . -path ./.git -prune -o -type d \( \
+if find . \
+    -path ./.git -prune -o \
+    -path ./.gradle -prune -o \
+    -path ./build -prune -o \
+    -path ./app/build -prune -o \
+    -type d \( \
     -name nebula-assets -o \
     -name Backups -o \
     -name EDL -o \

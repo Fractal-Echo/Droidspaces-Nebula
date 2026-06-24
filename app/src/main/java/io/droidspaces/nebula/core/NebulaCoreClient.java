@@ -44,7 +44,11 @@ public final class NebulaCoreClient {
             "redmagic pump probe --json",
             "nubia toolkit status --json",
             "runtime waylandie status --json",
-            "runtime waylandie proton-smoke --json"
+            "runtime waylandie proton-smoke --json",
+            "display lanes --json",
+            "display lane phone preflight --json",
+            "display lane anland preflight --json",
+            "display lane dock preflight --json"
     ));
 
     public NebulaCoreStatus loadStatus() {
@@ -117,6 +121,22 @@ public final class NebulaCoreClient {
 
     public CommandResult waylandieProtonSmoke() {
         return runFixed("runtime", "waylandie", "proton-smoke", "--json");
+    }
+
+    public CommandResult displayLanes() {
+        return runFixed("display", "lanes", "--json");
+    }
+
+    public CommandResult displayLanePhonePreflight() {
+        return runFixed("display", "lane", "phone", "preflight", "--json");
+    }
+
+    public CommandResult displayLaneAnlandPreflight() {
+        return runFixed("display", "lane", "anland", "preflight", "--json");
+    }
+
+    public CommandResult displayLaneDockPreflight() {
+        return runFixed("display", "lane", "dock", "preflight", "--json");
     }
 
     public String executionModeLabel() {

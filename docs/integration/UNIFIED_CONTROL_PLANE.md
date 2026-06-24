@@ -50,6 +50,10 @@ Allowed fixed commands:
 | `nubia toolkit status --json` | Reports audited Nubia Toolkit/Vector readiness without enabling hooks. |
 | `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, and linker readiness. |
 | `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
+| `display lanes --json` | Read-only multi-lane selector status for Phone/App, Dock Lease, Anland, Compatibility, and Recovery lanes. |
+| `display lane phone preflight --json` | Read-only WayLandIE/Gamescope/Xwayland lane preflight and active blocker status. |
+| `display lane anland preflight --json` | Read-only fixed-path Anland/Droidspaces/socket/render-node preflight. |
+| `display lane dock preflight --json` | Read-only Dock lease evidence and operator-gated start requirements. |
 
 Blocked pass 01 activations:
 
@@ -84,7 +88,9 @@ Pass 01 defaults:
 
 - Safe profile first.
 - Safe mode available and explicit.
-- Dock Mode blocked.
+- Dock profile activation blocked until the broker/receiver start path exists.
+- Dock Lease Mode is a proven external-display reference lane, surfaced read-only
+  until Nebula has fixed start/stop/revoke commands.
 - Compatibility Mode blocked.
 - No phone/device action during build or tests.
 - No boot-time target start.
@@ -97,10 +103,10 @@ Pass 01 defaults:
 - Pass 05 legacy module migration is staged only. Nebula Core does not disable, delete, replace, or launch the protected Droidspaces modules.
 - Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane. Nebula Core reports its module state, but hook scoping and mutating Nubia Toolkit behavior remain deferred.
 - The WayLandIE Proton smoke command accepts no arbitrary path, package, or shell input and is blocked by Nebula safe mode.
-- The DRM Control package and Bob Dilian evidence are treated as confirmed
-  future Dock references for external-display-only composer-fd DRM leasing,
-  `SCM_RIGHTS` handoff, wlroots receiver startup, and explicit revoke/stop. It
-  is not executed from this control-plane patch.
+- The DRM Control package and Bob Dilian evidence are treated as confirmed Dock
+  references for external-display-only composer-fd DRM leasing, `SCM_RIGHTS`
+  handoff, wlroots receiver startup, and explicit revoke/stop. This patch
+  exposes read-only preflight/status only; it does not execute leases.
 
 ## Source Integration
 
@@ -122,7 +128,7 @@ Initial lane model:
 | Lane | Purpose | Current ownership | Risk gate |
 | --- | --- | --- | --- |
 | Phone/App Mode | Run through the known WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Keep using known-good sidecar evidence; current blocker is GLX visual/fbconfig exposure. |
-| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Crash-gated; external-display-only; explicit stop/revoke; no boot auto-launch. |
+| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven reference, operator-gated; external-display-only; explicit stop/revoke; no boot auto-launch. |
 | Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Snapshot config before any repair; fixed commands only; no raw helper-script execution. |
 | Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
 | Recovery/Safe Mode | Preserve rollback, ADB visibility, module safe mode, and phone usability. | Nebula Core and protected old modules until replacement is proven. | Always available; blocks target launches and risky display mutation. |
@@ -135,7 +141,7 @@ See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and s
 See `LEGACY_MODULE_MIGRATION.md` for the protected module audit and migration guardrails.
 
 See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be
-promoted only in a separate crash-gated pass.
+promoted only in a separate operator-gated pass.
 
 Online references checked for future work:
 

@@ -27,6 +27,10 @@ Pass 01 exposes only a fixed JSON command protocol:
 - `nubia toolkit status --json`
 - `runtime waylandie status --json`
 - `runtime waylandie proton-smoke --json`
+- `display lanes --json`
+- `display lane phone preflight --json`
+- `display lane anland preflight --json`
+- `display lane dock preflight --json`
 
 `profile set dock` and `profile set compatibility` return `BLOCKED_NOT_READY`.
 The service creates `/data/adb/nebula/logs` and `/data/adb/nebula/state` after boot completion and does not start any target.
@@ -63,3 +67,14 @@ Toolkit APK for status display.
 `runtime waylandie proton-smoke --json` is safe-mode guarded and runs only the
 fixed root-assisted proot Proton smoke command. It accepts no path, package, or
 shell argument and is never launched during boot.
+
+`display lanes --json` reports the multi-lane display selector state. The lane
+preflight commands are read-only:
+
+- Phone/App Mode reports the known WayLandIE/Gamescope/Xwayland state and the
+  current GLX visual/fbconfig blocker.
+- Anland Surface Mode checks only fixed Droidspaces/Anland paths, env state,
+  display socket presence, and render-node visibility.
+- Dock Lease Mode reports the proven external-display DRM lease reference and
+  required operator-gated start conditions. It does not probe composer fds,
+  create leases, run wlroots, or mutate display state.

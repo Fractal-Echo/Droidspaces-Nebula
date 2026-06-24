@@ -35,6 +35,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -178,6 +179,7 @@ public final class MainActivity extends Activity {
                     new ArrayList<>()));
 
     private LinearLayout laneContainer;
+    private LinearLayout displayLaneContainer;
     private LinearLayout targetProfileContainer;
     private LinearLayout coreContainer;
     private LinearLayout autoCoolingContainer;
@@ -197,6 +199,7 @@ public final class MainActivity extends Activity {
     private JSONObject adbWifiModuleStatus;
     private JSONObject nubiaToolkitStatus;
     private JSONObject waylandieRuntimeStatus;
+    private JSONObject displayLanesStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -279,6 +282,12 @@ public final class MainActivity extends Activity {
         autoCoolingContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(autoCoolingContainer);
 
+        root.addView(sectionTitle("Display Lanes"));
+
+        displayLaneContainer = new LinearLayout(this);
+        displayLaneContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(displayLaneContainer);
+
         root.addView(sectionTitle("Targets"));
 
         targetProfileContainer = new LinearLayout(this);
@@ -329,6 +338,7 @@ public final class MainActivity extends Activity {
         adbWifiModuleStatus = loadAdbWifiModuleStatus();
         nubiaToolkitStatus = loadNubiaToolkitStatus();
         waylandieRuntimeStatus = loadWaylandieRuntimeStatus();
+        displayLanesStatus = loadDisplayLanesStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
@@ -341,6 +351,9 @@ public final class MainActivity extends Activity {
 
         autoCoolingContainer.removeAllViews();
         autoCoolingContainer.addView(buildAutoCoolingCard(redMagicProbe));
+
+        displayLaneContainer.removeAllViews();
+        displayLaneContainer.addView(buildDisplayLanesCard());
 
         targetProfileContainer.removeAllViews();
         for (TargetProfile profile : targetProfiles) {
@@ -1137,6 +1150,178 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private JSONObject loadDisplayLanesStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.displayLanes();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
+    private View buildDisplayLanesCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("Nebula Display Lanes", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(displayLaneSummary(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(displayLaneTopLabel(), displayLaneTopColor()));
+
+        JSONArray lanes = displayLanesStatus == null ? null : displayLanesStatus.optJSONArray("lanes");
+        if (lanes == null || lanes.length() == 0) {
+            TextView unavailable = text("moduleStatus=unavailable", 12, MUTED, Typeface.NORMAL);
+            unavailable.setTypeface(Typeface.MONOSPACE);
+            unavailable.setPadding(0, dp(12), 0, 0);
+            card.addView(unavailable);
+            return card;
+        }
+
+        for (int i = 0; i < lanes.length(); i++) {
+            JSONObject lane = lanes.optJSONObject(i);
+            if (lane != null) {
+                card.addView(buildDisplayLaneRow(lane));
+            }
+        }
+        return card;
+    }
+
+    private String displayLaneSummary() {
+        if (displayLanesStatus == null) {
+            return "selector=module_unavailable\nmode=read_only";
+        }
+        return "selector=" + displayLanesStatus.optString("selector", "unknown")
+                + "\nmode=read_only"
+                + "\nprofile=" + coreStatus.profile.wireName
+                + "\nsafeMode=" + coreStatus.safeMode;
+    }
+
+    private String displayLaneTopLabel() {
+        if (displayLanesStatus == null) return "Unknown";
+        return "Multi-lane";
+    }
+
+    private int displayLaneTopColor() {
+        return displayLanesStatus == null ? BLUE : CYAN;
+    }
+
+    private View buildDisplayLaneRow(JSONObject lane) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(4));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(top);
+
+        String title = lane.optString("title", lane.optString("id", "Lane"));
+        String status = lane.optString("status", "unknown");
+        TextView label = text(title, 15, TEXT, Typeface.BOLD);
+        top.addView(label, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        top.addView(chip(displayStatusLabel(status), displayLaneColor(status)));
+
+        TextView detail = text(displayLaneDetail(lane), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(6), 0, 0);
+        row.addView(detail);
+        return row;
+    }
+
+    private String displayStatusLabel(String status) {
+        if (status == null || status.isEmpty()) return "Unknown";
+        if ("ready_for_glx_fix".equals(status)) return "Ready";
+        if ("preflight_ready".equals(status)) return "Preflight";
+        if ("proven_reference_not_wired".equals(status)) return "Proven";
+        if ("safe_mode_blocks_start".equals(status)) return "Safe";
+        if ("always_available".equals(status)) return "Ready";
+        if ("not_wired".equals(status)) return "Pending";
+        return status.length() > 14 ? status.substring(0, 14) : status;
+    }
+
+    private int displayLaneColor(String status) {
+        if (status == null) return BLUE;
+        if (status.contains("ready") || status.contains("always_available")) return GREEN;
+        if (status.contains("proven")) return CYAN;
+        if (status.contains("safe")) return BLUE;
+        if (status.contains("partial") || status.contains("not_wired")) return YELLOW;
+        if (status.contains("missing")) return RED;
+        return BLUE;
+    }
+
+    private String displayLaneDetail(JSONObject lane) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("id=").append(lane.optString("id", "unknown"));
+        builder.append("\navailable=").append(lane.optBoolean("available", false));
+        builder.append("  mutating=").append(lane.optBoolean("mutating", false));
+        if (lane.has("start_command_available")) {
+            builder.append("\nstartCommand=").append(lane.optBoolean("start_command_available", false));
+        }
+        if (lane.has("launch_command_available")) {
+            builder.append("\nlaunchCommand=").append(lane.optBoolean("launch_command_available", false));
+        }
+        if (lane.has("repair_command_available")) {
+            builder.append("\nrepairCommand=").append(lane.optBoolean("repair_command_available", false));
+        }
+        if (lane.has("active_blocker")) {
+            builder.append("\nblocker=").append(lane.optString("active_blocker"));
+        }
+        if (lane.has("evidence_captured")) {
+            builder.append("\nevidenceCaptured=").append(lane.optBoolean("evidence_captured", false));
+            builder.append("  externalOnly=").append(lane.optBoolean("external_display_only", false));
+        }
+        JSONObject reported = lane.optJSONObject("reported_objects");
+        if (reported != null) {
+            builder.append("\nreportedObjects=connector ")
+                    .append(reported.optInt("connector", -1))
+                    .append(" crtc ")
+                    .append(reported.optInt("crtc", -1))
+                    .append(" planes ")
+                    .append(reported.optJSONArray("planes"));
+        }
+        JSONObject checks = lane.optJSONObject("checks");
+        if (checks != null) {
+            builder.append("\nchecks=").append(checkSummary(checks));
+        }
+        JSONArray errors = lane.optJSONArray("errors");
+        if (errors != null && errors.length() > 0) {
+            builder.append("\nerrors=").append(errors);
+        }
+        builder.append("\nsource=").append(lane.optString("source", "unknown"));
+        return builder.toString();
+    }
+
+    private String checkSummary(JSONObject checks) {
+        StringBuilder builder = new StringBuilder();
+        JSONArray names = checks.names();
+        if (names == null) return "{}";
+        for (int i = 0; i < names.length(); i++) {
+            String name = names.optString(i);
+            if (i > 0) builder.append(", ");
+            builder.append(name).append('=').append(checks.optBoolean(name, false));
+        }
+        return builder.toString();
+    }
+
     private boolean waylandieRuntimeReady() {
         JSONObject object = waylandieRuntimeStatusObject();
         return object != null && object.optBoolean("ready", false);
@@ -1512,6 +1697,33 @@ public final class MainActivity extends Activity {
         sb.append("  coolingFanIntent=").append(redMagicProbe.coolingPolicy.fanIntent).append('\n');
         sb.append("  coolingPumpIntent=").append(redMagicProbe.coolingPolicy.pumpIntent).append('\n');
         sb.append('\n');
+
+        sb.append("[Display Lanes]\n");
+        if (displayLanesStatus == null) {
+            sb.append("  status=unavailable\n\n");
+        } else {
+            sb.append("  selector=").append(displayLanesStatus.optString("selector", "unknown")).append('\n');
+            JSONArray lanes = displayLanesStatus.optJSONArray("lanes");
+            if (lanes != null) {
+                for (int i = 0; i < lanes.length(); i++) {
+                    JSONObject lane = lanes.optJSONObject(i);
+                    if (lane == null) continue;
+                    sb.append("  ").append(lane.optString("title", lane.optString("id", "Lane")))
+                            .append(": ").append(lane.optString("status", "unknown")).append('\n');
+                    sb.append("    id=").append(lane.optString("id", "unknown")).append('\n');
+                    sb.append("    available=").append(lane.optBoolean("available", false)).append('\n');
+                    sb.append("    mutating=").append(lane.optBoolean("mutating", false)).append('\n');
+                    if (lane.has("active_blocker")) {
+                        sb.append("    blocker=").append(lane.optString("active_blocker")).append('\n');
+                    }
+                    if (lane.has("evidence_captured")) {
+                        sb.append("    evidenceCaptured=").append(lane.optBoolean("evidence_captured", false)).append('\n');
+                    }
+                    sb.append("    source=").append(lane.optString("source", "unknown")).append('\n');
+                }
+            }
+            sb.append('\n');
+        }
 
         sb.append("[Targets]\n");
         for (TargetProfile profile : targetProfiles) {
