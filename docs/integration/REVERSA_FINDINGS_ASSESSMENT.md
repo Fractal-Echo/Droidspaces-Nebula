@@ -67,17 +67,38 @@ the Phone/App WayLandIE lane.
 
 Result: first-class runtime constraint.
 
-Operator-reported environment:
+Live-confirmed environment:
 
 - device: RM11 Pro / NX809J;
 - ROM: stock RedMagic ROM;
 - kernel: OnePlus Wild kernel;
-- kernel VA limitation: 39 bits.
+- kernel VA limitation: `CONFIG_ARM64_VA_BITS=39`;
+- page size: `CONFIG_ARM64_4K_PAGES=y`;
+- physical address width: `CONFIG_ARM64_PA_BITS=48`;
+- compat support: enabled.
 
 Decision: Nebula must avoid assuming 45-bit userspace/runtime compatibility
 until a bounded runtime probe proves it. This especially matters for Wine,
 Proton, Box/FEX-style runtimes, GPU stacks, and any prebuilt binary expecting a
 larger VA layout.
+
+### 5. Wine GUI runtime blocker
+
+Result: actionable runtime blocker, separate from force-composition display.
+
+Sidecar-13 proves X11 GLX presentation through Gamescope force-composition for
+software GLX content. The later Wine/Proton notepad attempts do not promote the
+Wine GUI lane: Xwayland starts and `winex11.drv` loads, then the ARM64EC Wine
+runtime fails during `winex11.drv` process attach with SEH `invalid frame` and
+`c0000005` evidence. Bridge real-buffer commits remain zero for those Wine GUI
+attempts.
+
+Decision: the next Wine path is not another blind display rerun. It is a bounded
+ARM64EC Wine runtime investigation for 39-bit VA behavior, PE unwind/exception
+metadata, and `winex11.drv` attach.
+
+See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the sidecar-by-sidecar evidence chain
+and rejected interpretations.
 
 ## Patch Decision
 
@@ -86,6 +107,8 @@ Implemented read-only metadata only:
 - Phone/App display lane JSON now reports Sidecar-13 as an unpromoted
   `promotion_candidate`.
 - The same JSON reports `kernel_va_bits_constraint=39`.
+- The same JSON reports the current Wine GUI runtime blocker:
+  `ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA`.
 - The app display-lane card and doctor report render the lead and constraint.
 
 No launch command, mutating command, arbitrary path, DRM ioctl, compositor start,
@@ -97,6 +120,7 @@ Run a bounded promotion pass for the Phone/App lane:
 
 1. Reuse the exact Sidecar-13 force-composition harness.
 2. Run minimal Wine GUI smoke first.
-3. Confirm the 39-bit kernel constraint does not break the selected runtime.
+3. Patch or swap the ARM64EC Wine runtime path so `winex11.drv` attach survives
+   under 39-bit VA.
 4. Promote only if artifact evidence matches the Sidecar-13 result and rollback
    remains clean.

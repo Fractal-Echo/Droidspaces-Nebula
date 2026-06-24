@@ -139,12 +139,16 @@ not one rendering path forced onto every user.
 Runtime constraints:
 
 - The RM11 Pro stock RedMagic ROM plus OnePlus Wild kernel lane is
-  operator-reported as a 39-bit kernel VA environment. Nebula surfaces this in
-  display-lane status and must avoid assuming 45-bit userspace/runtime behavior
-  until a bounded runtime probe proves it.
+  live-confirmed as a 39-bit kernel VA environment through `/proc/config.gz`.
+  Nebula surfaces this in display-lane status and must avoid assuming 45-bit
+  userspace/runtime behavior.
 - Sidecar-13's `--force-composition` result is a concrete Phone/App lead, not a
   Dock Lease result. It should be promoted by minimal Wine GUI smoke before
   Steam or larger Proton targets.
+- Existing Wine GUI attempts identify the current runtime blocker as ARM64EC
+  Wine `winex11.drv` process-attach failure with SEH invalid-frame/c0000005
+  evidence under 39-bit VA. Treat this as a Wine runtime blocker, not a
+  Gamescope force-composition regression.
 
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
@@ -155,6 +159,9 @@ promoted only in a separate operator-gated pass.
 
 See `REVERSA_FINDINGS_ASSESSMENT.md` for the contradiction assessment that keeps
 Sidecar-11 canonical while surfacing Sidecar-13 as a promotion candidate.
+
+See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the preserved sidecar chain and the
+ARM64EC/39-bit Wine GUI blocker audit.
 
 Online references checked for future work:
 

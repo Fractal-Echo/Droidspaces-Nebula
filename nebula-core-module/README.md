@@ -74,7 +74,9 @@ preflight commands are read-only:
 - Phone/App Mode reports the known WayLandIE/Gamescope/Xwayland state and the
   current GLX visual/fbconfig blocker. It also exposes the Sidecar-13
   `--force-composition` result as an unpromoted promotion candidate and reports
-  the operator-provided 39-bit kernel VA constraint for runtime selection.
+  the live-confirmed 39-bit kernel VA constraint for runtime selection. Wine GUI
+  remains blocked by ARM64EC `winex11.drv` SEH invalid-frame/c0000005 evidence
+  until a runtime patch is proven.
 - Anland Surface Mode checks only fixed Droidspaces/Anland paths, env state,
   display socket presence, and render-node visibility.
 - Dock Lease Mode reports the proven external-display DRM lease reference and

@@ -35,7 +35,8 @@ WAYLANDIE_SOURCE_COMMIT=1526655a2470
 WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
 DISPLAY_PHONE_SOURCE="Sidecar-11 WayLandIE/Gamescope/Xwayland evidence: RGB GLX visual/fbconfig blocker"
 DISPLAY_PHONE_PROMOTION_SOURCE="Sidecar-13 XWAYLAND_GLX_RENDER_PASS_FORCE_COMPOSITION: --force-composition, ARGB8888, ready-without-sync-fd"
-DISPLAY_PHONE_RUNTIME_CONSTRAINT="operator-reported NX809J stock RedMagic ROM with OnePlus Wild kernel: 39-bit kernel VA limit; avoid 45-bit runtime assumptions until probed"
+DISPLAY_PHONE_RUNTIME_CONSTRAINT="live-confirmed NX809J stock RedMagic ROM with OnePlus Wild kernel: CONFIG_ARM64_VA_BITS=39, 4K pages, PA_BITS=48, compat enabled; avoid 45-bit runtime assumptions"
+DISPLAY_PHONE_RUNTIME_BLOCKER="ARM64EC Wine GUI blocked after force-composition: winex11.drv loads then fails during process attach with SEH invalid-frame/c0000005 under 39-bit VA"
 ANLAND_REPAIR_SOURCE="Droidspaces-OSS tools/fix-anland-display.sh@6db8940190ea; anland display_producer timeout fix@5d69f36dd5a0"
 DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
 ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
@@ -1082,6 +1083,9 @@ display_phone_preflight_payload() {
   printf '"next_reversa_action":"minimal_wine_gui_smoke_before_steam",'
   printf '"steam_allowed":false,'
   printf '"kernel_va_bits_constraint":39,'
+  printf '"kernel_va_bits_evidence":"live_proc_config_gz",'
+  printf '"runtime_blocker":"ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA",'
+  printf '"runtime_blocker_detail":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_BLOCKER")"
   printf '"runtime_constraint":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_CONSTRAINT")"
   printf '"promotion_source":%s,' "$(json_string "$DISPLAY_PHONE_PROMOTION_SOURCE")"
   printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"

@@ -345,6 +345,8 @@ assert lanes["phone_app_bridge"]["trick"] == "gamescope_force_composition_full_s
 assert lanes["phone_app_bridge"]["next_reversa_action"] == "minimal_wine_gui_smoke_before_steam"
 assert lanes["phone_app_bridge"]["steam_allowed"] is False
 assert lanes["phone_app_bridge"]["kernel_va_bits_constraint"] == 39
+assert lanes["phone_app_bridge"]["kernel_va_bits_evidence"] == "live_proc_config_gz"
+assert lanes["phone_app_bridge"]["runtime_blocker"] == "ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA"
 assert lanes["anland_surface"]["status"] == "preflight_ready"
 assert lanes["anland_surface"]["repair_command_available"] is False
 assert lanes["anland_surface"]["checks"]["display_daemon_socket"] is True
@@ -377,6 +379,8 @@ assert obj["unpromoted_lead"] == "FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_
 assert obj["lead_status"] == "promotion_candidate"
 assert obj["steam_allowed"] is False
 assert obj["kernel_va_bits_constraint"] == 39
+assert obj["kernel_va_bits_evidence"] == "live_proc_config_gz"
+assert obj["runtime_blocker"] == "ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA"
 PY
 
 anland_preflight="$(

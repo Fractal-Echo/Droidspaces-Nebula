@@ -1299,6 +1299,12 @@ public final class MainActivity extends Activity {
             builder.append("\nkernelVaBitsConstraint=")
                     .append(lane.optInt("kernel_va_bits_constraint", -1));
         }
+        if (lane.has("kernel_va_bits_evidence")) {
+            builder.append("  evidence=").append(lane.optString("kernel_va_bits_evidence"));
+        }
+        if (lane.has("runtime_blocker")) {
+            builder.append("\nruntimeBlocker=").append(lane.optString("runtime_blocker"));
+        }
         if (lane.has("runtime_constraint")) {
             builder.append("\nruntimeConstraint=").append(lane.optString("runtime_constraint"));
         }
@@ -1743,6 +1749,10 @@ public final class MainActivity extends Activity {
                     if (lane.has("kernel_va_bits_constraint")) {
                         sb.append("    kernelVaBitsConstraint=")
                                 .append(lane.optInt("kernel_va_bits_constraint", -1)).append('\n');
+                    }
+                    if (lane.has("runtime_blocker")) {
+                        sb.append("    runtimeBlocker=")
+                                .append(lane.optString("runtime_blocker")).append('\n');
                     }
                     if (lane.has("evidence_captured")) {
                         sb.append("    evidenceCaptured=").append(lane.optBoolean("evidence_captured", false)).append('\n');
