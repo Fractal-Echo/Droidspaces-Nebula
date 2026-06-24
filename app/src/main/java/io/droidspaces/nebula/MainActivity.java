@@ -132,7 +132,8 @@ public final class MainActivity extends Activity {
                     "dmabuf/fd-passing display target for Linux apps and games.",
                     "Expected proof: bridge fd test and dmabuf metadata test pass before replacing anything.",
                     Arrays.asList(
-                            new Target("WayLandIE Display", "io.waylandie.display", "0.1.0",
+                            new Target("WayLandIE Display", "io.droidspaces.nebula.waylandie",
+                                    "0.2.0-no-root-nebula13-rootfs-vulkan-smoke",
                                     SIGNER_WAYLANDIE_PROOF, true))),
             new Lane(
                     "DroidSpaces container",
@@ -194,6 +195,8 @@ public final class MainActivity extends Activity {
     private NebulaCoreStatus coreStatus = NebulaCoreStatus.absent("Not refreshed");
     private RedMagicProbe redMagicProbe = RedMagicProbe.unavailable("Not refreshed");
     private JSONObject adbWifiModuleStatus;
+    private JSONObject nubiaToolkitStatus;
+    private JSONObject waylandieRuntimeStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -324,6 +327,8 @@ public final class MainActivity extends Activity {
         coreStatus = coreClient.loadStatus();
         redMagicProbe = loadRedMagicProbe(coreStatus);
         adbWifiModuleStatus = loadAdbWifiModuleStatus();
+        nubiaToolkitStatus = loadNubiaToolkitStatus();
+        waylandieRuntimeStatus = loadWaylandieRuntimeStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
@@ -345,6 +350,7 @@ public final class MainActivity extends Activity {
         deviceToolsContainer.removeAllViews();
         deviceToolsContainer.addView(buildCapabilityCard(
                 "Audited Nubia capability status", nubiaDeviceAdapter.discover(this)));
+        deviceToolsContainer.addView(buildNubiaToolkitCard());
         deviceToolsContainer.addView(buildAdbWifiCard());
 
         performanceContainer.removeAllViews();
@@ -357,6 +363,7 @@ public final class MainActivity extends Activity {
                 "Mapping disabled in pass 01", redMagicButtonAdapter.discover(this)));
 
         laneContainer.removeAllViews();
+        laneContainer.addView(buildWaylandieRuntimeCard());
         for (Lane lane : lanes) {
             laneContainer.addView(buildLaneCard(lane));
         }
@@ -405,27 +412,6 @@ public final class MainActivity extends Activity {
         hero.addView(art, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
-
-        LinearLayout overlay = new LinearLayout(this);
-        overlay.setOrientation(LinearLayout.VERTICAL);
-        overlay.setGravity(Gravity.BOTTOM);
-        overlay.setPadding(dp(16), dp(14), dp(16), dp(14));
-        hero.addView(overlay, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT));
-
-        TextView lane = text("WAYLAND // DROIDSPACES // POWERDECK", 12, CYAN, Typeface.BOLD);
-        lane.setLetterSpacing(0.18f);
-        overlay.addView(lane);
-
-        TextView title = text("DROIDSPACES: NEBULA", 28, TEXT, Typeface.BOLD);
-        title.setPadding(0, dp(4), 0, 0);
-        overlay.addView(title);
-
-        TextView sub = text("ONE APP. ONE CORE MODULE. AUTOMATED WHEN PROVEN.", 12, MUTED, Typeface.BOLD);
-        sub.setLetterSpacing(0.1f);
-        sub.setPadding(0, dp(4), 0, 0);
-        overlay.addView(sub);
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -788,6 +774,80 @@ public final class MainActivity extends Activity {
         return card;
     }
 
+    private View buildNubiaToolkitCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("Nubia Toolkit compatibility", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(nubiaToolkitDetail(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(nubiaToolkitStatusLabel(), nubiaToolkitStatusColor()));
+        return card;
+    }
+
+    private String nubiaToolkitStatusLabel() {
+        JSONObject object = nubiaToolkitStatusObject();
+        if (object == null) return "Unknown";
+        JSONObject framework = object.optJSONObject("hook_framework");
+        if (framework != null && framework.optBoolean("enabled", false)) return "Vector on";
+        if (framework != null && framework.optBoolean("installed", false)) return "Vector off";
+        return "Ported";
+    }
+
+    private int nubiaToolkitStatusColor() {
+        JSONObject object = nubiaToolkitStatusObject();
+        if (object == null) return BLUE;
+        JSONObject framework = object.optJSONObject("hook_framework");
+        if (framework != null && framework.optBoolean("enabled", false)) return GREEN;
+        if (framework != null && framework.optBoolean("installed", false)) return YELLOW;
+        return CYAN;
+    }
+
+    private String nubiaToolkitDetail() {
+        JSONObject object = nubiaToolkitStatusObject();
+        if (object == null) {
+            return "moduleStatus=unavailable\nintegration=ported_status_only";
+        }
+        JSONObject framework = object.optJSONObject("hook_framework");
+        JSONObject packages = object.optJSONObject("packages");
+        JSONObject gameAssist = packages == null ? null : packages.optJSONObject("game_assist");
+        JSONObject gameLauncher = packages == null ? null : packages.optJSONObject("game_launcher");
+        JSONObject toolkit = packages == null ? null : packages.optJSONObject("toolkit_reference");
+        return "integration=" + object.optString("integration", "unknown")
+                + "\noldToolkitRequired=" + object.optBoolean("old_toolkit_required", false)
+                + "\nlsposedRequiredForHooks=" + object.optBoolean("lsposed_required_for_hooks", true)
+                + "\nhooksActive=" + object.optBoolean("lsposed_hooks_active", false)
+                + "\nframework=" + frameworkStatus(framework)
+                + "\ngameAssist=" + packageVisibleLabel(gameAssist)
+                + "\ngameLauncher=" + packageVisibleLabel(gameLauncher)
+                + "\noldToolkitApk=" + packageVisibleLabel(toolkit);
+    }
+
+    private String frameworkStatus(JSONObject framework) {
+        if (framework == null) return "unknown";
+        String enabled = framework.optBoolean("enabled", false) ? "enabled" : "disabled";
+        String installed = framework.optBoolean("installed", false) ? "installed" : "missing";
+        return framework.optString("name", "framework") + " " + installed + "/" + enabled
+                + " " + framework.optString("version", "unknown");
+    }
+
+    private String packageVisibleLabel(JSONObject object) {
+        if (object == null) return "unknown";
+        return object.optBoolean("visible", false) ? "visible" : "missing";
+    }
+
     private View buildAdbWifiCard() {
         LinearLayout card = baseCard();
 
@@ -913,11 +973,30 @@ public final class MainActivity extends Activity {
         return adbWifiModuleStatus;
     }
 
+    private JSONObject nubiaToolkitStatusObject() {
+        return nubiaToolkitStatus;
+    }
+
     private JSONObject loadAdbWifiModuleStatus() {
         if (!coreStatus.installed || coreStatus.hasVisibleError()) {
             return null;
         }
         CommandResult result = coreClient.adbWifiStatus();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
+    private JSONObject loadNubiaToolkitStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.nubiaToolkitStatus();
         if (!result.ok()) {
             return null;
         }
@@ -1004,6 +1083,107 @@ public final class MainActivity extends Activity {
         } catch (ActivityNotFoundException error) {
             return false;
         }
+    }
+
+    private View buildWaylandieRuntimeCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("WayLandIE Proton runtime", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(waylandieRuntimeDetail(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(waylandieRuntimeLabel(), waylandieRuntimeColor()));
+
+        Button smoke = smallButton("Smoke", waylandieRuntimeReady() ? NEON : PANEL_ALT);
+        smoke.setEnabled(waylandieRuntimeReady() && !waylandieRuntimeSafeMode());
+        smoke.setAlpha(smoke.isEnabled() ? 1f : 0.45f);
+        smoke.setOnClickListener(v -> runWaylandieSmoke());
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        buttonParams.topMargin = dp(12);
+        card.addView(smoke, buttonParams);
+        return card;
+    }
+
+    private JSONObject waylandieRuntimeStatusObject() {
+        return waylandieRuntimeStatus;
+    }
+
+    private JSONObject loadWaylandieRuntimeStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.waylandieRuntimeStatus();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
+    private boolean waylandieRuntimeReady() {
+        JSONObject object = waylandieRuntimeStatusObject();
+        return object != null && object.optBoolean("ready", false);
+    }
+
+    private boolean waylandieRuntimeSafeMode() {
+        JSONObject object = waylandieRuntimeStatusObject();
+        return object == null || object.optBoolean("safe_mode", true);
+    }
+
+    private String waylandieRuntimeLabel() {
+        JSONObject object = waylandieRuntimeStatusObject();
+        if (object == null) return "Unknown";
+        if (object.optBoolean("safe_mode", false)) return "Safe";
+        return object.optBoolean("ready", false) ? "Ready" : "Missing";
+    }
+
+    private int waylandieRuntimeColor() {
+        JSONObject object = waylandieRuntimeStatusObject();
+        if (object == null) return BLUE;
+        if (object.optBoolean("safe_mode", false)) return YELLOW;
+        return object.optBoolean("ready", false) ? GREEN : YELLOW;
+    }
+
+    private String waylandieRuntimeDetail() {
+        JSONObject object = waylandieRuntimeStatusObject();
+        if (object == null) {
+            return "moduleStatus=unavailable\nmethod=root_assisted_proot";
+        }
+        return "package=" + object.optString("package", "unknown")
+                + "\nmethod=" + object.optString("method", "unknown")
+                + "\nready=" + object.optBoolean("ready", false)
+                + "\nsafeMode=" + object.optBoolean("safe_mode", false)
+                + "\nimagefs=" + jsonBoolLabel(object, "imagefs_present")
+                + "\nproton=" + jsonBoolLabel(object, "proton_present")
+                + "\nwine=" + jsonBoolLabel(object, "wine_present")
+                + "\nerrors=" + object.optJSONArray("errors");
+    }
+
+    private void runWaylandieSmoke() {
+        CommandResult result = coreClient.waylandieProtonSmoke();
+        if (result.ok()) {
+            toast("WayLandIE Proton smoke passed");
+        } else {
+            toast(commandMessage("WayLandIE smoke", result));
+        }
+        refresh();
     }
 
     private View buildCapabilityRow(NebulaCapability capability) {
@@ -1346,6 +1526,11 @@ public final class MainActivity extends Activity {
         sb.append('\n');
 
         appendCapabilities(sb, "Device Tools", nubiaDeviceAdapter.discover(this));
+        sb.append("[Nubia Toolkit]\n");
+        sb.append("  status=").append(nubiaToolkitStatusLabel()).append('\n');
+        sb.append("  ").append(nubiaToolkitDetail().replace("\n", "\n  ")).append('\n');
+        sb.append("  hookMutation=deferred\n\n");
+
         sb.append("[ADB Wi-Fi]\n");
         sb.append("  status=").append(adbWifiStatus()).append('\n');
         sb.append("  ").append(adbWifiDetail().replace("\n", "\n  ")).append('\n');
@@ -1353,6 +1538,11 @@ public final class MainActivity extends Activity {
 
         appendCapabilities(sb, "Performance", redMagicPerformanceAdapter.discover(this, redMagicProbe));
         appendCapabilities(sb, "RedMagic Button", redMagicButtonAdapter.discover(this));
+
+        sb.append("[WayLandIE Runtime]\n");
+        sb.append("  status=").append(waylandieRuntimeLabel()).append('\n');
+        sb.append("  ").append(waylandieRuntimeDetail().replace("\n", "\n  ")).append('\n');
+        sb.append("  command=runtime waylandie proton-smoke --json\n\n");
 
         for (Lane lane : lanes) {
             LaneStatus laneStatus = evaluate(lane);

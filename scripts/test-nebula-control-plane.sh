@@ -132,11 +132,138 @@ required = {
     "cooling.policy",
     "snapshot.cooling",
     "legacy.modules",
+    "nubia.toolkit.status",
+    "runtime.waylandie.status",
+    "runtime.waylandie.proton-smoke",
     "adb.wifi",
 }
 missing = sorted(required - ids)
 if missing:
     raise SystemExit(f"missing capabilities: {missing}")
+PY
+
+package_dir="$tmp/packages"
+modules_root="$tmp/modules"
+mkdir -p "$package_dir/cn.nubia.gameassist" \
+  "$package_dir/cn.nubia.gamelauncher" \
+  "$modules_root/zygisk_vector"
+{
+  printf 'id=zygisk_vector\n'
+  printf 'name=Vector\n'
+  printf 'version=v2.0 (3021)\n'
+  printf 'versionCode=3021\n'
+} > "$modules_root/zygisk_vector/module.prop"
+nubia_status="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_MODULES_ROOT="$modules_root" \
+  sh "$cli" nubia toolkit status --json
+)"
+python3 - "$nubia_status" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "nubia toolkit status"
+assert obj["integration"] == "ported_status_only"
+assert obj["old_toolkit_required"] is False
+assert obj["lsposed_required_for_hooks"] is True
+assert obj["lsposed_hooks_active"] is False
+framework = obj["hook_framework"]
+assert framework["id"] == "zygisk_vector"
+assert framework["installed"] is True
+assert framework["enabled"] is True
+assert framework["android_16_compatible"] is True
+packages = obj["packages"]
+assert packages["game_assist"]["visible"] is True
+assert packages["game_launcher"]["visible"] is True
+assert packages["toolkit_reference"]["visible"] is False
+assert any(item["id"] == "super_resolution_unlock" for item in obj["features"])
+PY
+
+waylandie_data="$tmp/waylandie-data"
+waylandie_lib="$tmp/waylandie-lib"
+mkdir -p "$package_dir/io.droidspaces.nebula.waylandie" \
+  "$waylandie_data/files/imagefs" \
+  "$waylandie_data/files/contents/proton/active/files/lib/wine/aarch64-unix" \
+  "$waylandie_lib"
+: > "$waylandie_lib/libproot.so"
+: > "$waylandie_lib/libld_glibc.so"
+: > "$waylandie_data/files/contents/proton/active/files/lib/wine/aarch64-unix/wine"
+waylandie_status="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  sh "$cli" runtime waylandie status --json
+)"
+python3 - "$waylandie_status" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "runtime waylandie status"
+assert obj["package"] == "io.droidspaces.nebula.waylandie"
+assert obj["method"] == "root_assisted_proot"
+assert obj["installed"] is True
+assert obj["imagefs_present"] is True
+assert obj["proot_present"] is True
+assert obj["glibc_loader_present"] is True
+assert obj["proton_present"] is True
+assert obj["wine_present"] is True
+assert obj["ready"] is True
+assert obj["errors"] == []
+PY
+
+missing_waylandie_status="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_WAYLANDIE_DATA_DIR="$tmp/missing-waylandie" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$tmp/missing-lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  sh "$cli" runtime waylandie status --json
+)"
+python3 - "$missing_waylandie_status" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "runtime waylandie status"
+assert obj["ready"] is False
+assert "missing:imagefs" in obj["errors"]
+assert "missing:proton_active" in obj["errors"]
+PY
+
+safe_smoke_data="$tmp/safe-smoke"
+mkdir -p "$safe_smoke_data"
+touch "$safe_smoke_data/safe_mode"
+set +e
+safe_smoke="$(
+  NEBULA_DATA_DIR="$safe_smoke_data" \
+  NEBULA_TEST_WAYLANDIE_SMOKE_RESULT=pass \
+  sh "$cli" runtime waylandie proton-smoke --json
+)"
+safe_smoke_code=$?
+set -e
+[[ "$safe_smoke_code" -ne 0 ]]
+python3 - "$safe_smoke" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "runtime waylandie proton-smoke"
+assert obj["ok"] is False
+assert obj["safe_mode"] is True
+assert obj["error"] == "SAFE_MODE_ACTIVE"
+PY
+
+smoke_pass="$(
+  NEBULA_TEST_WAYLANDIE_SMOKE_RESULT=pass \
+  sh "$cli" runtime waylandie proton-smoke --json
+)"
+python3 - "$smoke_pass" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "runtime waylandie proton-smoke"
+assert obj["ok"] is True
+assert obj["method"] == "root_assisted_proot"
+assert obj["exit_code"] == 0
+assert obj["errors"] == []
 PY
 
 settings_dir="$tmp/settings"
@@ -368,7 +495,6 @@ assert pump["confidence"] == "confirmed"
 assert pump["errors"] == []
 PY
 
-modules_root="$tmp/modules"
 mkdir -p "$modules_root/droidspaces" "$modules_root/rm11-droidspace-bridge-fd"
 {
   printf 'id=droidspaces\n'
@@ -696,6 +822,12 @@ snapshot_extra_arg="$(sh "$cli" snapshot cooling rollback --dry-run --json apply
 snapshot_extra_code=$?
 adb_wifi_extra_arg="$(sh "$cli" adb-wifi enable --json /tmp/path 2>/dev/null)"
 adb_wifi_extra_code=$?
+nubia_extra_arg="$(sh "$cli" nubia toolkit status --json /tmp/path 2>/dev/null)"
+nubia_extra_code=$?
+runtime_status_extra_arg="$(sh "$cli" runtime waylandie status --json /tmp/path 2>/dev/null)"
+runtime_status_extra_code=$?
+runtime_smoke_extra_arg="$(sh "$cli" runtime waylandie proton-smoke --json /tmp/path 2>/dev/null)"
+runtime_smoke_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
@@ -703,12 +835,18 @@ set -e
 [[ "$legacy_extra_code" -ne 0 ]]
 [[ "$snapshot_extra_code" -ne 0 ]]
 [[ "$adb_wifi_extra_code" -ne 0 ]]
+[[ "$nubia_extra_code" -ne 0 ]]
+[[ "$runtime_status_extra_code" -ne 0 ]]
+[[ "$runtime_smoke_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$legacy_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$snapshot_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$adb_wifi_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$nubia_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$runtime_status_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$runtime_smoke_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'

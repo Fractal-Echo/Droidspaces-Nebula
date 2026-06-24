@@ -47,10 +47,10 @@ public final class NubiaDeviceAdapter implements DeviceCapabilityProvider {
                 "NubiaToolkit WatermarkLengthHook/SuperResolutionHook"));
 
         capabilities.add(new NebulaCapability(
-                "nubia.toolkit.lsposed",
-                "Nubia Toolkit LSPosed lane",
-                toolkit ? "installed_reference" : "not_installed",
-                "Pass 01 does not enable hooks; this is attribution and readiness only.",
+                "nubia.toolkit.compatibility",
+                "Nebula Nubia compatibility lane",
+                toolkit ? "old_reference_visible" : "ported_status_only",
+                "Nebula carries audited Nubia Toolkit knowledge; LSPosed hook activation remains a separate scoped lane.",
                 true,
                 "NubiaToolkit Apache-2.0"));
 

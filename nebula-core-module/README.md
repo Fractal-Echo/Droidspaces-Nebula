@@ -24,6 +24,9 @@ Pass 01 exposes only a fixed JSON command protocol:
 - `snapshot cooling get --json`
 - `snapshot cooling rollback --dry-run --json`
 - `legacy modules --json`
+- `nubia toolkit status --json`
+- `runtime waylandie status --json`
+- `runtime waylandie proton-smoke --json`
 
 `profile set dock` and `profile set compatibility` return `BLOCKED_NOT_READY`.
 The service creates `/data/adb/nebula/logs` and `/data/adb/nebula/state` after boot completion and does not start any target.
@@ -50,3 +53,13 @@ by re-applying only those same ADB Wi-Fi settings and the fixed ADB manager
 transaction.
 
 Pass 05 stages protected legacy Droidspaces module migration evidence. The staged SELinux policy under `sepolicy.d/` is not active module policy yet; keep the old `droidspaces` and `rm11-droidspace-bridge-fd` modules enabled until one-at-a-time migration and reboot verification pass.
+
+`nubia toolkit status --json` reports the audited Nubia Toolkit hook lane and
+the Android 16-compatible Vector/LSPosed module state. It does not enable hooks,
+scope packages, force-stop vendor apps, or require the old standalone Nubia
+Toolkit APK for status display.
+
+`runtime waylandie status --json` checks fixed WayLandIE app/runtime paths only.
+`runtime waylandie proton-smoke --json` is safe-mode guarded and runs only the
+fixed root-assisted proot Proton smoke command. It accepts no path, package, or
+shell argument and is never launched during boot.

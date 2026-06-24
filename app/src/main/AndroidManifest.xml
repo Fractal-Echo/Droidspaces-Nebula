@@ -8,6 +8,7 @@
         <package android:name="com.termux.x11" />
         <package android:name="com.droidspaces.app" />
         <package android:name="io.waylandie.display" />
+        <package android:name="io.droidspaces.nebula.waylandie" />
         <package android:name="com.codex.steamdisplay" />
         <package android:name="com.elitedarkkaiser.redmagic" />
         <package android:name="com.khanhnguyen9872.nubiatoolkit" />

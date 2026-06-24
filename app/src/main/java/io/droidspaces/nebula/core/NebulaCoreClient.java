@@ -24,6 +24,8 @@ public final class NebulaCoreClient {
                     + "else echo 'Nebula Core module path is not visible' >&2; exit 127; fi; "
                     + "exec \"$NEBULA_CORE_CLI\"";
     private static final long TIMEOUT_MS = 2500L;
+    private static final long TELEMETRY_TIMEOUT_MS = 12000L;
+    private static final long SMOKE_TIMEOUT_MS = 30000L;
     private static final Set<String> STATIC_COMMANDS = new HashSet<>(Arrays.asList(
             "status --json",
             "capabilities --json",
@@ -39,7 +41,10 @@ public final class NebulaCoreClient {
             "adb-wifi auto-disable --json",
             "cooling policy --json",
             "redmagic probe --json",
-            "redmagic pump probe --json"
+            "redmagic pump probe --json",
+            "nubia toolkit status --json",
+            "runtime waylandie status --json",
+            "runtime waylandie proton-smoke --json"
     ));
 
     public NebulaCoreStatus loadStatus() {
@@ -102,6 +107,18 @@ public final class NebulaCoreClient {
         return runFixed("redmagic", "pump", "probe", "--json");
     }
 
+    public CommandResult nubiaToolkitStatus() {
+        return runFixed("nubia", "toolkit", "status", "--json");
+    }
+
+    public CommandResult waylandieRuntimeStatus() {
+        return runFixed("runtime", "waylandie", "status", "--json");
+    }
+
+    public CommandResult waylandieProtonSmoke() {
+        return runFixed("runtime", "waylandie", "proton-smoke", "--json");
+    }
+
     public String executionModeLabel() {
         return "app_uid:/system/bin/su";
     }
@@ -115,7 +132,20 @@ public final class NebulaCoreClient {
         if (!isAllowlisted(logical)) {
             return new CommandResult(2, "", "command not allowlisted", false);
         }
-        return runRoot(MODULE_CLI_DISPATCH + " " + logical);
+        long timeoutMs = timeoutFor(logical);
+        return runRoot(MODULE_CLI_DISPATCH + " " + logical, timeoutMs);
+    }
+
+    private long timeoutFor(String logical) {
+        if ("runtime waylandie proton-smoke --json".equals(logical)) {
+            return SMOKE_TIMEOUT_MS;
+        }
+        if ("redmagic probe --json".equals(logical)
+                || "redmagic pump probe --json".equals(logical)
+                || "cooling policy --json".equals(logical)) {
+            return TELEMETRY_TIMEOUT_MS;
+        }
+        return TIMEOUT_MS;
     }
 
     private boolean isAllowlisted(String logical) {
@@ -134,7 +164,7 @@ public final class NebulaCoreClient {
         return false;
     }
 
-    private CommandResult runRoot(String fixedCommand) {
+    private CommandResult runRoot(String fixedCommand, long timeoutMs) {
         Process process = null;
         try {
             process = new ProcessBuilder(ROOT_SHELL, "-c", fixedCommand).start();
@@ -144,7 +174,7 @@ public final class NebulaCoreClient {
             Thread errThread = new Thread(stderr, "nebula-core-stderr");
             outThread.start();
             errThread.start();
-            boolean finished = process.waitFor(TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            boolean finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 return new CommandResult(124, stdout.value(), stderr.value(), true);

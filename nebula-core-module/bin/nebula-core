@@ -25,6 +25,14 @@ REDMAGIC_SOURCE_THERMAL="Redmagic-Control-Center HardwareController.kt:275-288@$
 REDMAGIC_SOURCE_IDENTITY="Redmagic-Control-Center DeviceCapabilityScanner.kt:33-36@$REDMAGIC_SOURCE_COMMIT"
 LEGACY_DROIDSPACES_SOURCE="Droidspaces: Daemon & Init /data/adb/modules/droidspaces service.sh,post-fs-data.sh,sepolicy.rule captured 2026-06-22"
 LEGACY_BRIDGE_SOURCE="RM11 Droidspaces Bridge FD Policy /data/adb/modules/rm11-droidspace-bridge-fd service.sh,sepolicy.rule captured 2026-06-22"
+NUBIA_TOOLKIT_SOURCE_COMMIT=0a2ee1a234b7f03dc6c5b0077bff003c1ba7c128
+NUBIA_TOOLKIT_SOURCE="NubiaToolkit HookEntry and feature hooks@$NUBIA_TOOLKIT_SOURCE_COMMIT"
+NUBIA_TOOLKIT_PACKAGE=com.khanhnguyen9872.nubiatoolkit
+NUBIA_GAME_ASSIST_PACKAGE=cn.nubia.gameassist
+NUBIA_GAME_LAUNCHER_PACKAGE=cn.nubia.gamelauncher
+WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie
+WAYLANDIE_SOURCE_COMMIT=1526655a2470
+WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
 
 ensure_dirs() {
   mkdir -p "$LOG_DIR" "$STATE_DIR"
@@ -76,6 +84,11 @@ json_escape() {
 
 json_string() {
   printf '"%s"' "$(json_escape "$1")"
+}
+
+json_output_string() {
+  value=$(printf '%s' "$1" | tr '\r\n' '  ' | cut -c 1-2048)
+  json_string "$value"
 }
 
 json_string_or_null() {
@@ -235,6 +248,9 @@ capabilities_json() {
   printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"},'
   printf '{"id":"snapshot.cooling","title":"Cooling snapshot and rollback dry-run","status":"available_state_only","mutating":false,"source":"nebula-core state"},'
   printf '{"id":"legacy.modules","title":"Protected legacy Droidspaces module status","status":"available_read_only","mutating":false,"source":"protected module audit"},'
+  printf '{"id":"nubia.toolkit.status","title":"Nubia Toolkit compatibility status","status":"ported_status_only","mutating":false,"source":"%s"},' "$(json_escape "$NUBIA_TOOLKIT_SOURCE")"
+  printf '{"id":"runtime.waylandie.status","title":"WayLandIE runtime readiness","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
+  printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"adb.wifi","title":"ADB Wi-Fi guardrail","status":"available_opt_in","mutating":true,"source":"Android Settings.Global adb_wifi_enabled,enable_wireless_switch"}'
   printf ']}\n'
 }
@@ -655,6 +671,332 @@ list_append_json_string() {
   else
     printf '"%s"' "$(json_escape "$item")"
   fi
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+package_visible() {
+  pkg=$1
+  if [ -n "${NEBULA_TEST_PACKAGE_DIR:-}" ]; then
+    [ -e "$NEBULA_TEST_PACKAGE_DIR/$pkg" ]
+    return
+  fi
+  cmd package path "$pkg" >/dev/null 2>&1
+}
+
+nubia_package_json() {
+  key=$1
+  pkg=$2
+  role=$3
+  visible=0
+  if package_visible "$pkg"; then visible=1; fi
+  printf '"%s":{"package":%s,"visible":%s,"role":%s}' \
+    "$key" \
+    "$(json_string "$pkg")" \
+    "$(json_bool "$visible")" \
+    "$(json_string "$role")"
+}
+
+nubia_toolkit_status_json() {
+  vector_dir="$MODULES_ROOT/zygisk_vector"
+  vector_installed=0
+  vector_enabled=0
+  vector_version=unknown
+  vector_version_code=0
+  if [ -d "$vector_dir" ]; then
+    vector_installed=1
+    [ ! -f "$vector_dir/disable" ] && vector_enabled=1
+    vector_version=$(module_prop_from_dir "$vector_dir" version)
+    vector_version_code=$(module_prop_from_dir "$vector_dir" versionCode)
+  fi
+  if [ "$vector_installed" != "1" ] && [ -x /data/adb/ksu/bin/ksud ]; then
+    vector_entry=$(/data/adb/ksu/bin/ksud module list 2>/dev/null \
+      | tr '\n' ' ' \
+      | sed 's/[{]/\
+{/g' \
+      | grep '"id": "zygisk_vector"' \
+      | head -n 1)
+    if [ -n "$vector_entry" ]; then
+      vector_installed=1
+      vector_enabled_value=$(printf '%s' "$vector_entry" | sed -n 's/.*"enabled": "\([^"]*\)".*/\1/p')
+      [ "$vector_enabled_value" = "true" ] && vector_enabled=1
+      vector_version=$(printf '%s' "$vector_entry" | sed -n 's/.*"version": "\([^"]*\)".*/\1/p')
+      vector_version_code=$(printf '%s' "$vector_entry" | sed -n 's/.*"versionCode": "\([^"]*\)".*/\1/p')
+    fi
+  fi
+  [ -n "$vector_version" ] || vector_version=unknown
+  case "$vector_version_code" in
+    ''|*[!0-9]*) vector_version_code=0 ;;
+  esac
+
+  printf '{"protocol_version":%s,"command":"nubia toolkit status",' "$PROTOCOL_VERSION"
+  printf '"source_project":"NubiaToolkit","source_commit":%s,"license":"Apache-2.0",' \
+    "$(json_string "$NUBIA_TOOLKIT_SOURCE_COMMIT")"
+  printf '"integration":"ported_status_only","old_toolkit_required":false,'
+  printf '"lsposed_required_for_hooks":true,"lsposed_hooks_active":false,'
+  printf '"hook_framework":{"id":"zygisk_vector","name":"Vector","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"android_16_compatible":true},' \
+    "$(json_bool "$vector_installed")" \
+    "$(json_bool "$vector_enabled")" \
+    "$(json_string "$vector_version")" \
+    "$vector_version_code"
+  printf '"packages":{'
+  nubia_package_json game_assist "$NUBIA_GAME_ASSIST_PACKAGE" "Game Assist hook target"
+  printf ','
+  nubia_package_json game_launcher "$NUBIA_GAME_LAUNCHER_PACKAGE" "Game Launcher hook target"
+  printf ','
+  nubia_package_json toolkit_reference "$NUBIA_TOOLKIT_PACKAGE" "Old standalone LSPosed reference APK"
+  printf '},'
+  printf '"features":['
+  printf '{"id":"no_kill","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"global_game_mode","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"hide_energy_cube","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"small_window_bypass","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"super_resolution_unlock","owner":"future_hook_or_reimplementation","state":"reference_only","mutating":true},'
+  printf '{"id":"watermark_length","owner":"future_hook_lane","state":"deferred","mutating":true}'
+  printf '],"errors":[]}\n'
+}
+
+waylandie_data_dir() {
+  if [ -n "${NEBULA_WAYLANDIE_DATA_DIR:-}" ]; then
+    printf '%s' "$NEBULA_WAYLANDIE_DATA_DIR"
+  else
+    printf '/data/user/0/%s' "$WAYLANDIE_PACKAGE"
+  fi
+}
+
+waylandie_native_lib_dir() {
+  if [ -n "${NEBULA_WAYLANDIE_NATIVE_LIB_DIR:-}" ]; then
+    printf '%s' "$NEBULA_WAYLANDIE_NATIVE_LIB_DIR"
+    return
+  fi
+  apk=$(cmd package path "$WAYLANDIE_PACKAGE" 2>/dev/null | sed -n 's/^package://p' | head -n 1)
+  if [ -n "$apk" ]; then
+    printf '%s/lib/arm64' "${apk%/base.apk}"
+  fi
+}
+
+waylandie_uid() {
+  if [ -n "${NEBULA_WAYLANDIE_UID:-}" ]; then
+    printf '%s' "$NEBULA_WAYLANDIE_UID"
+    return
+  fi
+  data_dir=$(waylandie_data_dir)
+  if [ -d "$data_dir" ]; then
+    uid=$(ls -ldn "$data_dir" 2>/dev/null | awk '{print $3}' | head -n 1)
+    case "$uid" in
+      ''|*[!0-9]*) ;;
+      *) printf '%s' "$uid"; return ;;
+    esac
+  fi
+  cmd package list packages -U "$WAYLANDIE_PACKAGE" 2>/dev/null \
+    | sed -n 's/.*uid:\([0-9][0-9]*\).*/\1/p' \
+    | head -n 1
+}
+
+waylandie_find_wine_host() {
+  proton=$1
+  for rel in \
+    files/lib/wine/aarch64-unix/wine \
+    files/bin-arm64/wine \
+    files/bin-arm64/wine64 \
+    files/bin/wine \
+    files/bin/wine64 \
+    dist/bin/wine \
+    dist/bin/wine64 \
+    bin/wine \
+    bin/wine64
+  do
+    if [ -f "$proton/$rel" ]; then
+      printf '%s' "$proton/$rel"
+      return
+    fi
+  done
+}
+
+waylandie_guest_wine_path() {
+  wine_host=$1
+  proton=$2
+  rel=${wine_host#"$proton"/}
+  if [ "$rel" != "$wine_host" ]; then
+    printf '/opt/proton/%s' "$rel"
+  else
+    printf '/opt/proton/files/lib/wine/aarch64-unix/wine'
+  fi
+}
+
+waylandie_collect() {
+  wl_data=$(waylandie_data_dir)
+  wl_native=$(waylandie_native_lib_dir)
+  wl_uid=$(waylandie_uid)
+  wl_rootfs="$wl_data/files/imagefs"
+  wl_proton="$wl_data/files/contents/proton/active"
+  wl_proot="$wl_native/libproot.so"
+  wl_loader="$wl_native/libld_glibc.so"
+  wl_wine_host=$(waylandie_find_wine_host "$wl_proton")
+  wl_wine_guest=$(waylandie_guest_wine_path "$wl_wine_host" "$wl_proton")
+  wl_errors=
+  wl_installed=0
+  wl_data_present=0
+  wl_imagefs_present=0
+  wl_native_present=0
+  wl_proot_present=0
+  wl_loader_present=0
+  wl_proton_present=0
+  wl_wine_present=0
+  wl_uid_present=0
+  wl_ready=1
+
+  if package_visible "$WAYLANDIE_PACKAGE"; then wl_installed=1; fi
+  if [ -d "$wl_data" ]; then wl_data_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_data"); fi
+  if [ -d "$wl_rootfs" ]; then wl_imagefs_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:imagefs"); fi
+  if [ -n "$wl_native" ] && [ -d "$wl_native" ]; then wl_native_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:native_lib_dir"); fi
+  if [ -f "$wl_proot" ]; then wl_proot_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libproot.so"); fi
+  if [ -f "$wl_loader" ]; then wl_loader_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libld_glibc.so"); fi
+  if [ -d "$wl_proton" ]; then wl_proton_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:proton_active"); fi
+  if [ -n "$wl_wine_host" ]; then wl_wine_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:proton_wine"); fi
+  case "$wl_uid" in
+    ''|*[!0-9]*) wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_uid") ;;
+    *) wl_uid_present=1 ;;
+  esac
+}
+
+waylandie_runtime_status_payload() {
+  waylandie_collect
+  printf '"package":%s,' "$(json_string "$WAYLANDIE_PACKAGE")"
+  printf '"source":%s,' "$(json_string "$WAYLANDIE_SOURCE")"
+  printf '"method":"root_assisted_proot","safe_mode":%s,' "$(json_bool "$(safe_mode_value)")"
+  printf '"installed":%s,"app_uid_known":%s,"data_dir_present":%s,"imagefs_present":%s,' \
+    "$(json_bool "$wl_installed")" \
+    "$(json_bool "$wl_uid_present")" \
+    "$(json_bool "$wl_data_present")" \
+    "$(json_bool "$wl_imagefs_present")"
+  printf '"native_lib_dir_present":%s,"proot_present":%s,"glibc_loader_present":%s,' \
+    "$(json_bool "$wl_native_present")" \
+    "$(json_bool "$wl_proot_present")" \
+    "$(json_bool "$wl_loader_present")"
+  printf '"proton_present":%s,"wine_present":%s,"ready":%s,"errors":[%s]' \
+    "$(json_bool "$wl_proton_present")" \
+    "$(json_bool "$wl_wine_present")" \
+    "$(json_bool "$wl_ready")" \
+    "$wl_errors"
+}
+
+waylandie_runtime_status_json() {
+  printf '{"protocol_version":%s,"command":"runtime waylandie status",' "$PROTOCOL_VERSION"
+  waylandie_runtime_status_payload
+  printf '}\n'
+}
+
+waylandie_test_smoke_json() {
+  mode=${NEBULA_TEST_WAYLANDIE_SMOKE_RESULT:-}
+  case "$mode" in
+    pass)
+      printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":true,"safe_mode":false,"method":"root_assisted_proot","exit_code":0,"stdout":"Nebula Proton smoke fixture","stderr":"","source":%s,"errors":[]}\n' \
+        "$PROTOCOL_VERSION" "$(json_string "$WAYLANDIE_SOURCE")"
+      return 0
+      ;;
+    fail)
+      printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":false,"method":"root_assisted_proot","exit_code":1,"stdout":"","stderr":"fixture failure","source":%s,"errors":["fixture_failure"]}\n' \
+        "$PROTOCOL_VERSION" "$(json_string "$WAYLANDIE_SOURCE")"
+      return 1
+      ;;
+  esac
+  return 99
+}
+
+waylandie_runtime_smoke_json() {
+  ensure_dirs
+  if [ "$(safe_mode_value)" = "1" ]; then
+    printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":true,"error":"SAFE_MODE_ACTIVE","errors":["SAFE_MODE_ACTIVE"]}\n' "$PROTOCOL_VERSION"
+    return 75
+  fi
+
+  if [ -n "${NEBULA_TEST_WAYLANDIE_SMOKE_RESULT:-}" ]; then
+    waylandie_test_smoke_json
+    return $?
+  fi
+
+  waylandie_collect
+  if [ "$wl_ready" != "1" ]; then
+    printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":false,"error":"RUNTIME_NOT_READY","status":{' "$PROTOCOL_VERSION"
+    waylandie_runtime_status_payload
+    printf '}}\n'
+    return 2
+  fi
+
+  script_path="$wl_data/files/nebula-core-proton-smoke-$$.sh"
+  out_path="$wl_data/files/nebula-core-proton-smoke-$$.out"
+  err_path="$wl_data/files/nebula-core-proton-smoke-$$.err"
+  q_script=$(shell_quote "$script_path")
+  q_out=$(shell_quote "$out_path")
+  q_err=$(shell_quote "$err_path")
+  q_rootfs=$(shell_quote "$wl_rootfs")
+  q_native=$(shell_quote "$wl_native")
+  q_data=$(shell_quote "$wl_data")
+  q_proton=$(shell_quote "$wl_proton")
+  q_wine_guest=$(shell_quote "$wl_wine_guest")
+
+  if ! su "$wl_uid" -c "cat > $q_script" <<EOF
+#!/system/bin/sh
+set -u
+ROOTFS=$q_rootfs
+NATIVE=$q_native
+DATA=$q_data
+PROTON=$q_proton
+WINE_GUEST=$q_wine_guest
+PROOT="\$NATIVE/libproot.so"
+mkdir -p "\$ROOTFS/home/xuser" "\$ROOTFS/tmp" "\$ROOTFS/android-lib" "\$ROOTFS/opt/proton" "\$DATA/cache/proot-tmp" "\$DATA/cache/proot-l2s"
+export HOME=/home/xuser
+export USER=xuser
+export LOGNAME=xuser
+export LANG=en_US.UTF-8
+export TERM=xterm-256color
+export TMPDIR=/tmp
+export XDG_RUNTIME_DIR=/tmp
+export WINEPREFIX=/home/xuser/.wine
+export WINEDEBUG=-all
+export WINE_NO_DUPLICATE_EXPLORER=1
+export WINE_GST_NO_GL=1
+export WINE_DISABLE_FULLSCREEN_HACK=1
+export PROOT_TMP_DIR="\$DATA/cache/proot-tmp"
+export PROOT_L2S_DIR="\$DATA/cache/proot-l2s"
+export WAYLANDIE_CONTENTS_DIR=/waylandie-contents
+export PATH=/waylandie-scripts:/opt/proton/files/bin-arm64:/opt/proton/files/bin:/opt/proton/bin:/usr/local/bin:/usr/bin:/bin
+export LD_LIBRARY_PATH=/opt/proton/files/lib/wine/aarch64-unix:/opt/proton/files/lib/wine/aarch64-windows:/opt/proton/files/lib:/opt/proton/lib:/usr/lib:/usr/local/lib:/system/lib64
+exec "\$PROOT" -r "\$ROOTFS" -w /home/xuser -b /dev:/dev -b /dev/urandom:/dev/random -b /proc:/proc -b /sys:/sys -b /sdcard:/sdcard -b /storage:/storage:ro -b "\$ROOTFS/home/xuser:/home/xuser" -b "\$ROOTFS/tmp:/tmp" -b "\$DATA/files/contents:/waylandie-contents" -b "\$NATIVE:/android-lib" -b "\$PROTON:/opt/proton" /android-lib/libld_glibc.so --library-path /usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:/usr/lib:/lib:/usr/local/lib "\$WINE_GUEST" cmd /c ver
+EOF
+  then
+    printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":false,"error":"SCRIPT_WRITE_FAILED","errors":["SCRIPT_WRITE_FAILED"]}\n' "$PROTOCOL_VERSION"
+    return 1
+  fi
+
+  su "$wl_uid" -c "chmod 700 $q_script" >/dev/null 2>&1 || true
+  if command -v timeout >/dev/null 2>&1; then
+    su "$wl_uid" -c "timeout 25 sh $q_script > $q_out 2> $q_err"
+    rc=$?
+  else
+    su "$wl_uid" -c "sh $q_script > $q_out 2> $q_err"
+    rc=$?
+  fi
+  stdout=$(head -c 4096 "$out_path" 2>/dev/null || true)
+  stderr=$(head -c 4096 "$err_path" 2>/dev/null || true)
+  su "$wl_uid" -c "rm -f $q_script $q_out $q_err" >/dev/null 2>&1 || rm -f "$script_path" "$out_path" "$err_path"
+
+  errors=
+  if [ "$rc" -ne 0 ]; then
+    errors=$(list_append_json_string "$errors" "exit_code:$rc")
+  fi
+  printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":%s,"safe_mode":false,"method":"root_assisted_proot","exit_code":%s,"stdout":%s,"stderr":%s,"source":%s,"errors":[%s]}\n' \
+    "$PROTOCOL_VERSION" \
+    "$(json_bool "$([ "$rc" -eq 0 ] && printf 1 || printf 0)")" \
+    "$rc" \
+    "$(json_output_string "$stdout")" \
+    "$(json_output_string "$stderr")" \
+    "$(json_string "$WAYLANDIE_SOURCE")" \
+    "$errors"
+  [ "$rc" -eq 0 ]
 }
 
 is_test_denied_path() {
@@ -1650,6 +1992,27 @@ main() {
     legacy)
       if [ "${2:-}" = "modules" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
         legacy_modules_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    nubia)
+      if [ "${2:-}" = "toolkit" ] && [ "${3:-}" = "status" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "nubia_toolkit_status"
+        nubia_toolkit_status_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    runtime)
+      if [ "${2:-}" = "waylandie" ] && [ "${3:-}" = "status" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "runtime_waylandie_status"
+        waylandie_runtime_status_json
+      elif [ "${2:-}" = "waylandie" ] && [ "${3:-}" = "proton-smoke" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "runtime_waylandie_proton_smoke"
+        waylandie_runtime_smoke_json
       else
         usage_json
         return 2

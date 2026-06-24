@@ -47,6 +47,9 @@ Allowed fixed commands:
 | `snapshot cooling get --json` | Returns the stored cooling snapshot. |
 | `snapshot cooling rollback --dry-run --json` | Returns a rollback plan with `applied=false`; no hardware writes. |
 | `legacy modules --json` | Reports protected old Droidspaces module status from fixed module IDs. |
+| `nubia toolkit status --json` | Reports audited Nubia Toolkit/Vector readiness without enabling hooks. |
+| `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, and linker readiness. |
+| `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
 
 Blocked pass 01 activations:
 
@@ -92,6 +95,9 @@ Pass 01 defaults:
 - The auto cooling policy is preview-only in pass 04: it returns fan/pump intents with `applied=false`, reads thresholds only from `nebula-core-module/config/defaults.json`, and performs no hardware writes.
 - Pass 05 snapshot commands write only Nebula Core state, never device control nodes. Rollback remains dry-run.
 - Pass 05 legacy module migration is staged only. Nebula Core does not disable, delete, replace, or launch the protected Droidspaces modules.
+- Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane. Nebula Core reports its module state, but hook scoping and mutating Nubia Toolkit behavior remain deferred.
+- The WayLandIE Proton smoke command accepts no arbitrary path, package, or shell input and is blocked by Nebula safe mode.
+- The DRM Control package is treated as a confirmed future Dock reference for composer-fd DRM leasing, SCM_RIGHTS handoff, wlroots receiver startup, and explicit revoke/stop. It is not executed from this control-plane patch.
 
 ## Source Integration
 
@@ -104,6 +110,8 @@ RedMagic PowerDeck is a local archived source reference with no recovered origin
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
 See `LEGACY_MODULE_MIGRATION.md` for the protected module audit and migration guardrails.
+
+See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be promoted only in a separate crash-gated pass.
 
 Online references checked for future work:
 
