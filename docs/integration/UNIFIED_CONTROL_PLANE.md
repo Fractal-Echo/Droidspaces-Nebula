@@ -97,7 +97,10 @@ Pass 01 defaults:
 - Pass 05 legacy module migration is staged only. Nebula Core does not disable, delete, replace, or launch the protected Droidspaces modules.
 - Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane. Nebula Core reports its module state, but hook scoping and mutating Nubia Toolkit behavior remain deferred.
 - The WayLandIE Proton smoke command accepts no arbitrary path, package, or shell input and is blocked by Nebula safe mode.
-- The DRM Control package is treated as a confirmed future Dock reference for composer-fd DRM leasing, SCM_RIGHTS handoff, wlroots receiver startup, and explicit revoke/stop. It is not executed from this control-plane patch.
+- The DRM Control package and Bob Dilian evidence are treated as confirmed
+  future Dock references for external-display-only composer-fd DRM leasing,
+  `SCM_RIGHTS` handoff, wlroots receiver startup, and explicit revoke/stop. It
+  is not executed from this control-plane patch.
 
 ## Source Integration
 
@@ -107,11 +110,32 @@ RedMagic Control Center source is permitted by user-supplied author approval evi
 
 RedMagic PowerDeck is a local archived source reference with no recovered origin URL. Its dry-run/snapshot design is reimplemented conceptually in Nebula Core, not copied as a third-party payload.
 
+## Display Lane Strategy
+
+Nebula should solve and expose multiple display/runtime lanes because hardware,
+kernels, docks, monitors, and user goals differ. The app is the selector and
+diagnostic hub; Nebula Core is the fixed privileged executor. No lane should
+silently replace another working lane.
+
+Initial lane model:
+
+| Lane | Purpose | Current ownership | Risk gate |
+| --- | --- | --- | --- |
+| Phone/App Mode | Run through the known WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Keep using known-good sidecar evidence; current blocker is GLX visual/fbconfig exposure. |
+| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Crash-gated; external-display-only; explicit stop/revoke; no boot auto-launch. |
+| Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Snapshot config before any repair; fixed commands only; no raw helper-script execution. |
+| Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
+| Recovery/Safe Mode | Preserve rollback, ADB visibility, module safe mode, and phone usability. | Nebula Core and protected old modules until replacement is proven. | Always available; blocks target launches and risky display mutation. |
+
+The target experience is one app and one core module coordinating these lanes,
+not one rendering path forced onto every user.
+
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
 See `LEGACY_MODULE_MIGRATION.md` for the protected module audit and migration guardrails.
 
-See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be promoted only in a separate crash-gated pass.
+See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be
+promoted only in a separate crash-gated pass.
 
 Online references checked for future work:
 
