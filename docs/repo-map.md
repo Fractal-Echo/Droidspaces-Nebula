@@ -15,7 +15,7 @@ Core upstreams and forks:
 | `Fractal-Echo/anland` | Working Android Wayland stack reference | Keep as high-priority reference |
 | `Goldzxcbug/anland` | Active upstream lead for Android Wayland runtime | Track, do not vendor blindly |
 | `Fractal-Echo/WayLandIE` | Existing Fractal fork of WayLandIE | Keep as source reference |
-| `Vower2993/WayLandIE` | No-root/Wayland lead | Track as active lead |
+| `Vower2993/WayLandIE` | No-root/Wayland/GPU compatibility lead | Track as active lead and non-RM11Pro compatibility candidate |
 | `cakroni1580/WayLandIE` | AdrenoTools/Turnip bridge reference | Track as active lead |
 | `Fractal-Echo/mesa-for-android-container-rm11pro` | KGSL/Turnip/Mesa source | Keep as driver staging reference |
 | `Fractal-Echo/Droidspaces-rootfs-KDE-builder` | Rootfs builder reference | Keep for KDE/rootfs workflow |
@@ -32,3 +32,11 @@ Support and future lanes:
 | `Fractal-Echo/RM11Plus_KernelSU_SUSFS` | Kernel/root lane | Post-Wayland only |
 
 Cleanup rule: delete local comparison clones only when this map names the retained upstream or active worktree.
+
+Current Vower compatibility worktree:
+
+```text
+/home/richtofen/.android/repositories/rm11mainassets/projects/droidspace-repos/compatibility-candidates/vower-waylandie-origin-main-20260626
+commit: 3ea02d5
+status: synced compatibility candidate, not RM11 R6 proof baseline
+```

@@ -37,6 +37,23 @@ Nebula then reports the status of the other lanes from one place:
 - RedMagic Control Center hardware references;
 - PowerDeck dry-run automation readiness.
 
+## Compatibility Ladder
+
+RM11 Pro gets the strongest proof lane because it is the device we can verify
+directly, but Nebula is not meant to strand users on weaker or different phones.
+Keep compatibility lanes explicit:
+
+| Tier | Lane | Status |
+| --- | --- | --- |
+| 1 | RM11 Pro WayLandIE/Gamescope/Xwayland R6 sidecars | Proven display lane: `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`. |
+| 2 | Anland + DroidSpaces Ubuntu26/KDE | Proven visible lane: `NEBULA_R6_ANLAND_DROIDSPACES_WAYLAND_VISIBLE`. |
+| 3 | DroidSpaces native profiles | Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio profiles exist; each needs its own proof. |
+| 4 | Vower WayLandIE latest | Compatibility candidate for non-RM11Pro/lower-spec devices; synced locally at `3ea02d5`, not promoted as the RM11 R6 baseline. |
+
+Vower latest is tracked because it targets GPU, DXVK, shader-cache, Turnip, AHB,
+and direct Android compositing work that may help devices outside the RM11 Pro
+lane. It needs bounded install/launch/display proof before user promotion.
+
 ## Requirements
 
 - Rooted Android device for the Nebula Core module.
@@ -241,6 +258,8 @@ Do not vendor that whole worktree until the active diffs are reviewed and trimme
 - PowerDeck: dry-run module lane
 - RedMagic controls: RedMagic Control Center and Nubia Toolkit reference lane
 - Vower reference: build-pass lead, not a drop-in install target
+- Vower latest compatibility: synced candidate for broader device support, not
+  the RM11 R6 proof baseline
 
 See:
 
@@ -248,6 +267,7 @@ See:
 - [Repo Map](docs/repo-map.md)
 - [Workflow](docs/workflow.md)
 - [Baseline Integrations](docs/integration/BASELINE_INTEGRATIONS.md)
+- [Third-Party Notices](THIRD_PARTY_NOTICES.md)
 
 ## Safety
 
