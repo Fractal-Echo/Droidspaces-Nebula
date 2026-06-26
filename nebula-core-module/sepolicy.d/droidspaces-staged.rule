@@ -1,0 +1,48 @@
+# Staged legacy import evidence only. Not loaded by KernelSU from this path.
+# Activate in Nebula Core sepolicy.rule only after one-at-a-time migration tests.
+
+# Droidspaces: Daemon & Init preserved rules.
+type droidspacesd domain
+type ksu domain
+type magisk domain
+type su domain
+type droidspacesd_exec exec_type
+permissive droidspacesd
+
+allow droidspacesd_exec droidspacesd_exec file { entrypoint execute execute_no_trans getattr map open read relabelfrom relabelto }
+allow droidspacesd_exec labeledfs filesystem associate
+allow init droidspacesd process { noatsecure rlimitinh siginh transition }
+allow init droidspacesd process2 nosuid_transition
+allow init droidspacesd_exec file { execute getattr map open read }
+allow init droidspacesd_exec lnk_file { getattr read }
+allow init system_data_file file { execute getattr map open read }
+allow kernel device blk_file { create getattr setattr unlink }
+allow kernel device chr_file { create setattr }
+allow kernel device dir { add_name write }
+allow kernel droidspacesd fd use
+allow kernel system_data_file file { getattr open read write }
+allow kernel vold_data_file file { getattr open read write }
+allow ksu droidspacesd process { dyntransition noatsecure rlimitinh siginh transition }
+allow ksu droidspacesd process2 nosuid_transition
+allow ksu droidspacesd_exec file { entrypoint execute execute_no_trans getattr map open read relabelfrom relabelto }
+allow ksu system_data_file file entrypoint
+allow servicemanager droidspacesd binder { call transfer }
+allow servicemanager droidspacesd dir search
+allow servicemanager droidspacesd file { getattr open read }
+allow servicemanager droidspacesd process getattr
+allow su droidspacesd process { dyntransition noatsecure rlimitinh siginh transition }
+allow su droidspacesd process2 nosuid_transition
+allow su droidspacesd_exec file { entrypoint execute execute_no_trans getattr map open read relabelfrom relabelto }
+allow su system_data_file file entrypoint
+allow system_server droidspacesd binder { call transfer }
+allow system_server droidspacesd fd use
+allow system_server droidspacesd fifo_file write
+allow untrusted_app_27 droidspacesd fd use
+allow untrusted_app_27 droidspacesd fifo_file write
+allow audioserver droidspacesd binder { call transfer }
+allow audioserver droidspacesd fd use
+allow mediaserver droidspacesd binder { call transfer }
+allow mediaserver droidspacesd fd use
+
+# RM11 bridge fd policy preserved rule.
+allow untrusted_app droidspacesd fd use

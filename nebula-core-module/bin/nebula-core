@@ -1,0 +1,3195 @@
+#!/system/bin/sh
+set -u
+
+PROTOCOL_VERSION=1
+MODULE_ID=nebula_core
+DATA_DIR=${NEBULA_DATA_DIR:-/data/adb/nebula}
+LOG_DIR="$DATA_DIR/logs"
+STATE_DIR="$DATA_DIR/state"
+LOG_FILE="$LOG_DIR/nebula-core.log"
+PROFILE_FILE="$STATE_DIR/profile"
+SNAPSHOT_DIR="$STATE_DIR/snapshots"
+COOLING_SNAPSHOT_FILE="$SNAPSHOT_DIR/cooling.json"
+ADB_WIFI_AUTO_FILE="$STATE_DIR/adb_wifi_auto_enable"
+ADB_WIFI_STATE_FILE="$STATE_DIR/adb_wifi.state"
+SAFE_MODE_FILE="$DATA_DIR/safe_mode"
+SCRIPT_DIR=${0%/*}
+MODDIR=${NEBULA_MODULE_DIR:-${SCRIPT_DIR%/*}}
+MODULE_PROP=${NEBULA_MODULE_PROP:-$MODDIR/module.prop}
+DEFAULTS_JSON=${NEBULA_DEFAULTS_JSON:-$MODDIR/config/defaults.json}
+MODULES_ROOT=${NEBULA_MODULES_ROOT:-/data/adb/modules}
+REDMAGIC_SOURCE_COMMIT=e94d36e8204c228c6e8781157dea22946cf715e3
+REDMAGIC_SOURCE_FAN="Redmagic-Control-Center HardwareController.kt:25-28,48-77@$REDMAGIC_SOURCE_COMMIT"
+REDMAGIC_SOURCE_PUMP="Redmagic-Control-Center HardwareController.kt:30-32,80-98; DashboardSnapshot.kt:16-18; DeviceCapabilityScanner.kt:43-45@$REDMAGIC_SOURCE_COMMIT"
+REDMAGIC_SOURCE_THERMAL="Redmagic-Control-Center HardwareController.kt:275-288@$REDMAGIC_SOURCE_COMMIT"
+REDMAGIC_SOURCE_IDENTITY="Redmagic-Control-Center DeviceCapabilityScanner.kt:33-36@$REDMAGIC_SOURCE_COMMIT"
+LEGACY_DROIDSPACES_SOURCE="Droidspaces: Daemon & Init /data/adb/modules/droidspaces service.sh,post-fs-data.sh,sepolicy.rule captured 2026-06-22"
+LEGACY_BRIDGE_SOURCE="RM11 Droidspaces Bridge FD Policy /data/adb/modules/rm11-droidspace-bridge-fd service.sh,sepolicy.rule captured 2026-06-22"
+NUBIA_TOOLKIT_SOURCE_COMMIT=0a2ee1a234b7f03dc6c5b0077bff003c1ba7c128
+NUBIA_TOOLKIT_SOURCE="NubiaToolkit HookEntry and feature hooks@$NUBIA_TOOLKIT_SOURCE_COMMIT"
+NUBIA_TOOLKIT_PACKAGE=com.khanhnguyen9872.nubiatoolkit
+NUBIA_GAME_ASSIST_PACKAGE=cn.nubia.gameassist
+NUBIA_GAME_LAUNCHER_PACKAGE=cn.nubia.gamelauncher
+REDMAGIC_CONTROL_PACKAGE=com.elitedarkkaiser.redmagic
+DROIDSPACES_PACKAGE=com.droidspaces.app
+POWERDECK_MODULE_ID=redmagic_powerdeck
+WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie
+WAYLANDIE_SOURCE_COMMIT=1526655a2470
+WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
+DISPLAY_PHONE_PROOF_CLASSIFICATION=NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS
+DISPLAY_PHONE_PROOF_RESULT="/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-wayland-working-03/result.md"
+DISPLAY_PHONE_GAMESCOPE_SIDECAR=xwayland-gamescope-14-exportable-fence-guard-a4-473ba531
+DISPLAY_PHONE_XWAYLAND_SIDECAR=xwayland-gamescope-06-xwayland-9f1a3d62
+DISPLAY_PHONE_SOURCE="R6 Wayland proof 03: dmabuf-present, real-buffer commits, zero vkGetMemoryFdKHR failures, Gamescope/Xwayland ready"
+DISPLAY_PHONE_PROMOTION_SOURCE="R6 proof sidecars: $DISPLAY_PHONE_GAMESCOPE_SIDECAR + $DISPLAY_PHONE_XWAYLAND_SIDECAR"
+DISPLAY_PHONE_RUNTIME_CONSTRAINT="live-confirmed NX809J stock RedMagic ROM with OnePlus Wild kernel: CONFIG_ARM64_VA_BITS=39, 4K pages, PA_BITS=48, compat enabled; avoid 45-bit runtime assumptions"
+DISPLAY_PHONE_RUNTIME_BLOCKER="Wayland display is proven; game-client runtime is not promoted because Proton/Wine/Steam were not run in the proof. Earlier ARM64EC Wine GUI attempts hit winex11.drv SEH invalid-frame/c0000005 under 39-bit VA."
+ANLAND_REPAIR_SOURCE="Droidspaces-OSS CLI --env/--bind; Droidspaces-rootfs-KDE-builder Ubuntu26 anland_kde; Anland daemon/consumer"
+DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
+ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
+ANLAND_CONTAINERS_DIR=/data/local/Droidspaces/Containers
+ANLAND_PIDS_DIR=/data/local/Droidspaces/Pids
+ANLAND_DEFAULT_CONTAINER=ubuntu
+ANLAND_CONTAINER=${NEBULA_ANLAND_CONTAINER:-$ANLAND_DEFAULT_CONTAINER}
+ANLAND_CONFIG=$ANLAND_CONTAINERS_DIR/$ANLAND_CONTAINER/container.config
+ANLAND_ENV=$ANLAND_CONTAINERS_DIR/$ANLAND_CONTAINER/anland.env
+ANLAND_SOCKET_HOST=/data/local/tmp/display_daemon.sock
+ANLAND_SOCKET_GUEST=/run/display.sock
+ANLAND_RENDER_NODE=/dev/dri/renderD128
+ANLAND_RECOMMENDED_CONTAINER=anland-ubuntu26-kde
+ANLAND_RECOMMENDED_ENV=$ANLAND_CONTAINERS_DIR/$ANLAND_RECOMMENDED_CONTAINER/anland.env
+ANLAND_RECOMMENDED_ROOTFS_IMG=$ANLAND_CONTAINERS_DIR/$ANLAND_RECOMMENDED_CONTAINER/rootfs.img
+ANLAND_RECOMMENDED_ROOTFS_ARCHIVE=/sdcard/Download/anland-ubuntu26-kde.tar.xz
+ANLAND_RECOMMENDED_ROOTFS_SIZE=32G
+ANLAND_DAEMON_MODULE_ID=virtual-drm-daemon
+ANLAND_CONSUMER_PACKAGE=com.anland.consumer
+DROIDSPACES_NATIVE_METHOD_SOURCE="Droidspaces-OSS README.md, Documentation/Features.md, src/config.c, src/environment.c, src/android/x11.c, src/android/virgl.c, src/android/pulseaudio.c"
+DROIDSPACES_ROOTFS_METHOD_SOURCE="Droidspaces-OSS src/main.c, src/utils.c, src/config.c rootfs flags and persisted container.config"
+
+ensure_dirs() {
+  mkdir -p "$LOG_DIR" "$STATE_DIR" 2>/dev/null || return 0
+  if [ ! -s "$PROFILE_FILE" ]; then
+    printf '%s\n' safe > "$PROFILE_FILE" 2>/dev/null || true
+  fi
+}
+
+prop_value() {
+  key=$1
+  if [ -f "$MODULE_PROP" ]; then
+    sed -n "s/^$key=//p" "$MODULE_PROP" | head -n 1
+  fi
+}
+
+module_version() {
+  value=$(prop_value version)
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' unknown
+  fi
+}
+
+module_version_code() {
+  value=$(prop_value versionCode)
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' 0
+  fi
+}
+
+git_commit() {
+  value=${NEBULA_GIT_COMMIT:-}
+  if [ -z "$value" ] && [ -f "$MODDIR/config/git-commit.txt" ]; then
+    value=$(sed -n '1p' "$MODDIR/config/git-commit.txt")
+  fi
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' unknown
+  fi
+}
+
+json_escape() {
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g'
+}
+
+json_string() {
+  printf '"%s"' "$(json_escape "$1")"
+}
+
+json_output_string() {
+  value=$(printf '%s' "$1" | tr '\r\n' '  ' | cut -c 1-2048)
+  json_string "$value"
+}
+
+json_string_or_null() {
+  if [ -n "$1" ]; then
+    json_string "$1"
+  else
+    printf '%s' null
+  fi
+}
+
+json_int_or_null() {
+  case "$1" in
+    ''|*[!0-9-]*) printf '%s' null ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+is_unsigned_integer() {
+  case "$1" in
+    ''|*[!0-9]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+json_number_from_milli() {
+  milli=$1
+  case "$milli" in
+    ''|*[!0-9-]*) printf '%s' null; return ;;
+  esac
+  sign=
+  case "$milli" in
+    -*) sign=-; milli=${milli#-} ;;
+  esac
+  whole=$((milli / 1000))
+  frac=$((milli % 1000))
+  printf '%s%s.%03d' "$sign" "$whole" "$frac"
+}
+
+config_bool() {
+  key=$1
+  if [ -f "$DEFAULTS_JSON" ]; then
+    sed -n \
+      -e "s/.*\"$key\"[[:space:]]*:[[:space:]]*true.*/true/p" \
+      -e "s/.*\"$key\"[[:space:]]*:[[:space:]]*false.*/false/p" \
+      "$DEFAULTS_JSON" | head -n 1
+  fi
+}
+
+config_number() {
+  key=$1
+  if [ -f "$DEFAULTS_JSON" ]; then
+    sed -n "s/.*\"$key\"[[:space:]]*:[[:space:]]*\\([-0-9.][0-9.]*\\).*/\\1/p" "$DEFAULTS_JSON" | head -n 1
+  fi
+}
+
+config_number_default() {
+  key=$1
+  fallback=$2
+  value=$(config_number "$key")
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf '%s' "$fallback"
+  fi
+}
+
+json_bool() {
+  if [ "$1" = "1" ]; then
+    printf '%s' true
+  else
+    printf '%s' false
+  fi
+}
+
+safe_mode_value() {
+  if [ -f "$SAFE_MODE_FILE" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+current_profile() {
+  if [ -s "$PROFILE_FILE" ]; then
+    value=$(head -n 1 "$PROFILE_FILE")
+  else
+    value=safe
+  fi
+  case "$value" in
+    safe|phone|dock|compatibility) printf '%s' "$value" ;;
+    *) printf '%s' safe ;;
+  esac
+}
+
+daemon_running_value() {
+  pid_file="$STATE_DIR/service.pid"
+  if [ -s "$pid_file" ]; then
+    pid=$(head -n 1 "$pid_file")
+    case "$pid" in
+      *[!0-9]*|'') printf '%s' 0 ;;
+      *)
+        if kill -0 "$pid" 2>/dev/null; then
+          printf '%s' 1
+        else
+          printf '%s' 0
+        fi
+        ;;
+    esac
+  else
+    printf '%s' 0
+  fi
+}
+
+service_status() {
+  if [ "$(daemon_running_value)" = "1" ]; then
+    printf '%s' running
+  elif [ -d "$STATE_DIR" ]; then
+    printf '%s' state_ready
+  else
+    printf '%s' missing_state
+  fi
+}
+
+log_command() {
+  ensure_dirs
+  if [ -d "$LOG_DIR" ]; then
+    printf '%s command=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)" "$1" >> "$LOG_FILE" 2>/dev/null || true
+  fi
+}
+
+status_json() {
+  ensure_dirs
+  safe=$(safe_mode_value)
+  daemon=$(daemon_running_value)
+  profile=$(current_profile)
+  printf '{"protocol_version":%s,"module_id":"%s","module_version":"%s","module_version_code":%s,"git_commit":"%s","safe_mode":%s,"profile":"%s","daemon_running":%s,"service_status":"%s"}\n' \
+    "$PROTOCOL_VERSION" \
+    "$MODULE_ID" \
+    "$(json_escape "$(module_version)")" \
+    "$(module_version_code)" \
+    "$(json_escape "$(git_commit)")" \
+    "$(json_bool "$safe")" \
+    "$profile" \
+    "$(json_bool "$daemon")" \
+    "$(service_status)"
+}
+
+capabilities_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"capabilities":[' "$PROTOCOL_VERSION"
+  printf '{"id":"profile.safe","title":"Recovery / Safe Mode","status":"available","mutating":false,"source":"nebula-core"},'
+  printf '{"id":"profile.phone","title":"Phone / App Mode","status":"available_no_launch","mutating":false,"source":"nebula-core"},'
+  printf '{"id":"profile.dock","title":"Dock Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
+  printf '{"id":"profile.compatibility","title":"Compatibility Mode","status":"BLOCKED_NOT_READY","mutating":true,"source":"nebula-core"},'
+  printf '{"id":"safe-mode","title":"Safe mode","status":"available","mutating":true,"source":"nebula-core"},'
+  printf '{"id":"logs.tail","title":"Command logs","status":"available","mutating":false,"source":"nebula-core"},'
+  printf '{"id":"redmagic.probe","title":"RM11 Pro read-only RedMagic probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_FAN")"
+  printf '{"id":"redmagic.pump.probe","title":"RM11 Pro read-only liquid-cooling pump probe","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$REDMAGIC_SOURCE_PUMP")"
+  printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"},'
+  printf '{"id":"snapshot.cooling","title":"Cooling snapshot and rollback dry-run","status":"available_state_only","mutating":false,"source":"nebula-core state"},'
+  printf '{"id":"legacy.modules","title":"Protected legacy Droidspaces module status","status":"available_read_only","mutating":false,"source":"protected module audit"},'
+  printf '{"id":"integrations.baseline","title":"Baseline APK/module integration status","status":"available_read_only","mutating":false,"source":"nebula-core integration registry"},'
+  printf '{"id":"nubia.toolkit.status","title":"Nubia Toolkit compatibility status","status":"ported_status_only","mutating":false,"source":"%s"},' "$(json_escape "$NUBIA_TOOLKIT_SOURCE")"
+  printf '{"id":"runtime.waylandie.status","title":"WayLandIE runtime readiness","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
+  printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
+  printf '{"id":"display.lanes","title":"Display lane selector status","status":"available_read_only","mutating":false,"source":"nebula-core lane registry"},'
+  printf '{"id":"display.method-containers","title":"Display method container map","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method container registry"},'
+  printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DISPLAY_PHONE_SOURCE")"
+  printf '{"id":"display.lane.anland.preflight","title":"Anland surface lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_REPAIR_SOURCE")"
+  printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"proven_reference_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DRM_LEASE_SOURCE")"
+  printf '{"id":"adb.wifi","title":"ADB Wi-Fi guardrail","status":"available_opt_in","mutating":true,"source":"Android Settings.Global adb_wifi_enabled,enable_wireless_switch"}'
+  printf ']}\n'
+}
+
+profile_get_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"profile":"%s","safe_mode":%s}\n' \
+    "$PROTOCOL_VERSION" "$(current_profile)" "$(json_bool "$(safe_mode_value)")"
+}
+
+blocked_profile_json() {
+  profile=$1
+  printf '{"protocol_version":%s,"ok":false,"profile":"%s","error":"BLOCKED_NOT_READY"}\n' \
+    "$PROTOCOL_VERSION" "$profile"
+}
+
+profile_set() {
+  ensure_dirs
+  profile=$1
+  case "$profile" in
+    safe)
+      touch "$SAFE_MODE_FILE"
+      printf '%s\n' safe > "$PROFILE_FILE"
+      printf '{"protocol_version":%s,"ok":true,"profile":"safe","safe_mode":true}\n' "$PROTOCOL_VERSION"
+      ;;
+    phone)
+      rm -f "$SAFE_MODE_FILE"
+      printf '%s\n' phone > "$PROFILE_FILE"
+      printf '{"protocol_version":%s,"ok":true,"profile":"phone","safe_mode":false,"launch_started":false}\n' "$PROTOCOL_VERSION"
+      ;;
+    dock|compatibility)
+      blocked_profile_json "$profile"
+      return 75
+      ;;
+    *)
+      printf '{"protocol_version":%s,"ok":false,"error":"UNKNOWN_PROFILE"}\n' "$PROTOCOL_VERSION"
+      return 2
+      ;;
+  esac
+}
+
+safe_mode_get_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"safe_mode":%s}\n' \
+    "$PROTOCOL_VERSION" "$(json_bool "$(safe_mode_value)")"
+}
+
+safe_mode_enable() {
+  ensure_dirs
+  touch "$SAFE_MODE_FILE"
+  printf '%s\n' safe > "$PROFILE_FILE"
+  printf '{"protocol_version":%s,"ok":true,"safe_mode":true,"profile":"safe"}\n' "$PROTOCOL_VERSION"
+}
+
+adb_wifi_read_adb_enabled() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/global_adb_enabled" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/global_adb_enabled" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  settings get global adb_enabled 2>/dev/null | head -n 1 | tr -d '\r'
+}
+
+adb_wifi_read_wireless_enabled() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/global_adb_wifi_enabled" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/global_adb_wifi_enabled" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  settings get global adb_wifi_enabled 2>/dev/null | head -n 1 | tr -d '\r'
+}
+
+adb_wifi_read_ui_switch() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/global_enable_wireless_switch" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/global_enable_wireless_switch" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  settings get global enable_wireless_switch 2>/dev/null | head -n 1 | tr -d '\r'
+}
+
+adb_wifi_write_adb_enabled() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
+    printf '%s\n' 1 > "$NEBULA_SETTINGS_DIR/global_adb_enabled"
+    return $?
+  fi
+  settings put global adb_enabled 1 >/dev/null 2>&1
+}
+
+adb_wifi_write_wireless_enabled() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
+    printf '%s\n' 1 > "$NEBULA_SETTINGS_DIR/global_adb_wifi_enabled"
+    return $?
+  fi
+  settings put global adb_wifi_enabled 1 >/dev/null 2>&1
+}
+
+adb_wifi_write_ui_switch() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
+    printf '%s\n' 1 > "$NEBULA_SETTINGS_DIR/global_enable_wireless_switch"
+    return $?
+  fi
+  settings put global enable_wireless_switch 1 >/dev/null 2>&1
+}
+
+adb_wifi_bool_json() {
+  case "$1" in
+    1) printf '%s' true ;;
+    0) printf '%s' false ;;
+    *) printf '%s' null ;;
+  esac
+}
+
+adb_wifi_effective_value() {
+  wifi_value=$1
+  switch_value=$2
+  port_value=${3:-}
+  if adb_wifi_port_active "$port_value"; then
+    printf '%s' 1
+    return
+  fi
+  if [ "$wifi_value" = "1" ] || [ "$switch_value" = "1" ]; then
+    printf '%s' 0
+    return
+  fi
+  case "$wifi_value$switch_value" in
+    *0*) printf '%s' 0 ;;
+    *) printf '%s' unknown ;;
+  esac
+}
+
+adb_wifi_port_active() {
+  port_value=${1:-}
+  [ -n "$port_value" ] && [ "$port_value" -gt 0 ] 2>/dev/null && [ "$port_value" -le 65535 ] 2>/dev/null
+}
+
+adb_wifi_port_valid_or_zero() {
+  port_value=${1:-}
+  case "$port_value" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  [ "$port_value" -ge 0 ] 2>/dev/null && [ "$port_value" -le 65535 ] 2>/dev/null
+}
+
+adb_wifi_requested_value() {
+  adb_value=$1
+  wifi_value=$2
+  switch_value=$3
+  if [ "$adb_value" = "1" ] && { [ "$wifi_value" = "1" ] || [ "$switch_value" = "1" ]; }; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+adb_wifi_activation_state() {
+  effective_value=$1
+  requested_value=$2
+  if [ "$effective_value" = "1" ]; then
+    printf '%s' live
+  elif [ "$requested_value" = "1" ]; then
+    printf '%s' manual_toggle_required
+  elif [ "$effective_value" = "0" ]; then
+    printf '%s' disabled
+  else
+    printf '%s' unknown
+  fi
+}
+
+adb_wifi_current_bssid() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/current_bssid" ]; then
+      head -n 1 "$NEBULA_SETTINGS_DIR/current_bssid" | tr -d '\r'
+      return 0
+    fi
+    return 2
+  fi
+  cmd wifi status 2>/dev/null \
+    | sed -n 's/.*BSSID: \([0-9A-Fa-f:][0-9A-Fa-f:]*\),.*/\1/p' \
+    | head -n 1 \
+    | tr -d '\r'
+}
+
+adb_wifi_valid_bssid() {
+  case "$1" in
+    [0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f])
+      [ "$1" != "02:00:00:00:00:00" ]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+adb_wifi_manager_allow() {
+  bssid=$1
+  if ! adb_wifi_valid_bssid "$bssid"; then
+    return 2
+  fi
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    mkdir -p "$NEBULA_SETTINGS_DIR" || return 1
+    printf '%s\n' "$bssid" > "$NEBULA_SETTINGS_DIR/manager_allow_bssid"
+    return $?
+  fi
+  service call adb 4 i32 1 s16 "$bssid" >/dev/null 2>&1
+}
+
+adb_wifi_read_wireless_port() {
+  if [ -n "${NEBULA_SETTINGS_DIR:-}" ]; then
+    if [ -f "$NEBULA_SETTINGS_DIR/adb_wireless_port" ]; then
+      value=$(head -n 1 "$NEBULA_SETTINGS_DIR/adb_wireless_port" | tr -d '\r')
+      if adb_wifi_port_valid_or_zero "$value"; then
+        printf '%s' "$value"
+        return 0
+      fi
+      return 2
+    fi
+    return 2
+  fi
+  parcel=$(service call adb 10 2>/dev/null | tr -d '\r')
+  value=$(printf '%s\n' "$parcel" | sed -n 's/.*00000000 \([0-9A-Fa-f][0-9A-Fa-f]*\).*/\1/p' | head -n 1)
+  if [ -n "$value" ]; then
+    port=$(printf '%d' "0x$value" 2>/dev/null || true)
+    if adb_wifi_port_valid_or_zero "$port"; then
+      printf '%s' "$port"
+      return 0
+    fi
+  fi
+  return 2
+}
+
+adb_wifi_auto_value() {
+  if [ -f "$ADB_WIFI_AUTO_FILE" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+adb_wifi_state_snapshot() {
+  ensure_dirs
+  if [ ! -s "$ADB_WIFI_STATE_FILE" ]; then
+    adb_value=$(adb_wifi_read_adb_enabled 2>/dev/null || printf unknown)
+    wifi_value=$(adb_wifi_read_wireless_enabled 2>/dev/null || printf unknown)
+    switch_value=$(adb_wifi_read_ui_switch 2>/dev/null || printf unknown)
+    bssid_value=$(adb_wifi_current_bssid 2>/dev/null || printf unknown)
+    {
+      printf 'adb_enabled=%s\n' "$adb_value"
+      printf 'adb_wifi_enabled=%s\n' "$wifi_value"
+      printf 'enable_wireless_switch=%s\n' "$switch_value"
+      printf 'current_bssid=%s\n' "$bssid_value"
+    } > "$ADB_WIFI_STATE_FILE"
+  fi
+}
+
+adb_wifi_status_payload() {
+  errors=
+  adb_value=$(adb_wifi_read_adb_enabled)
+  adb_rc=$?
+  if [ "$adb_rc" != "0" ]; then
+    adb_value=
+    errors=$(list_append_json_string "$errors" "unreadable:settings_global_adb_enabled")
+  fi
+  wifi_value=$(adb_wifi_read_wireless_enabled)
+  wifi_rc=$?
+  if [ "$wifi_rc" != "0" ]; then
+    wifi_value=
+    errors=$(list_append_json_string "$errors" "unreadable:settings_global_adb_wifi_enabled")
+  fi
+  switch_value=$(adb_wifi_read_ui_switch)
+  switch_rc=$?
+  if [ "$switch_rc" != "0" ]; then
+    switch_value=
+    errors=$(list_append_json_string "$errors" "unreadable:settings_global_enable_wireless_switch")
+  fi
+  port_value=$(adb_wifi_read_wireless_port)
+  port_rc=$?
+  if [ "$port_rc" != "0" ]; then
+    port_value=
+    errors=$(list_append_json_string "$errors" "unreadable:adb_manager_wireless_port")
+  fi
+  bssid_value=$(adb_wifi_current_bssid)
+  bssid_rc=$?
+  if [ "$bssid_rc" != "0" ] || ! adb_wifi_valid_bssid "$bssid_value"; then
+    bssid_value=
+    errors=$(list_append_json_string "$errors" "unreadable:current_wifi_bssid")
+  fi
+  effective_value=$(adb_wifi_effective_value "$wifi_value" "$switch_value" "$port_value")
+  requested_value=$(adb_wifi_requested_value "$adb_value" "$wifi_value" "$switch_value")
+  manual_required=0
+  if [ "$requested_value" = "1" ] && [ "$effective_value" != "1" ]; then
+    manual_required=1
+    errors=$(list_append_json_string "$errors" "manual_toggle_required:wireless_port_inactive")
+  fi
+
+  printf '"adb_debugging":%s,' "$(adb_wifi_bool_json "$adb_value")"
+  printf '"wireless_debugging":%s,' "$(adb_wifi_bool_json "$effective_value")"
+  printf '"settings_wireless_debugging":%s,' "$(adb_wifi_bool_json "$wifi_value")"
+  printf '"ui_wireless_switch":%s,' "$(adb_wifi_bool_json "$switch_value")"
+  if [ -n "$port_value" ] && [ "$port_value" -ge 0 ] 2>/dev/null; then
+    printf '"wireless_port":%s,' "$port_value"
+  else
+    printf '"wireless_port":null,'
+  fi
+  printf '"manager_bssid_available":%s,' "$(json_bool "$([ -n "$bssid_value" ] && printf 1 || printf 0)")"
+  printf '"settings_requested":%s,' "$(json_bool "$requested_value")"
+  printf '"manual_toggle_required":%s,' "$(json_bool "$manual_required")"
+  printf '"activation_state":"%s",' "$(adb_wifi_activation_state "$effective_value" "$requested_value")"
+  printf '"ui_switch_source":"Android Settings.Global enable_wireless_switch",'
+  printf '"auto_enable":%s,' "$(json_bool "$(adb_wifi_auto_value)")"
+  printf '"source":"Android Settings.Global adb_enabled,adb_wifi_enabled,enable_wireless_switch; android.debug.IAdbManager allowWirelessDebugging/getAdbWirelessPort",'
+  printf '"errors":[%s]' "$errors"
+}
+
+adb_wifi_status_json() {
+  ensure_dirs
+  printf '{"protocol_version":%s,"command":"adb-wifi status",' "$PROTOCOL_VERSION"
+  adb_wifi_status_payload
+  printf '}\n'
+}
+
+adb_wifi_enable_json() {
+  ensure_dirs
+  adb_wifi_state_snapshot
+  errors=
+  settings_ok=1
+  manager_ok=1
+  if ! adb_wifi_write_adb_enabled; then
+    settings_ok=0
+    errors=$(list_append_json_string "$errors" "write_failed:settings_global_adb_enabled")
+  fi
+  if ! adb_wifi_write_wireless_enabled; then
+    settings_ok=0
+    errors=$(list_append_json_string "$errors" "write_failed:settings_global_adb_wifi_enabled")
+  fi
+  if ! adb_wifi_write_ui_switch; then
+    settings_ok=0
+    errors=$(list_append_json_string "$errors" "write_failed:settings_global_enable_wireless_switch")
+  fi
+  bssid_value=$(adb_wifi_current_bssid 2>/dev/null || true)
+  if adb_wifi_valid_bssid "$bssid_value"; then
+    if ! adb_wifi_manager_allow "$bssid_value"; then
+      manager_ok=0
+      errors=$(list_append_json_string "$errors" "write_failed:adb_manager_allow_wireless_debugging")
+    fi
+  else
+    manager_ok=0
+    errors=$(list_append_json_string "$errors" "unavailable:current_wifi_bssid")
+  fi
+  requested=0
+  if [ "$settings_ok" = "1" ]; then
+    requested=1
+    touch "$ADB_WIFI_AUTO_FILE" 2>/dev/null || {
+      requested=0
+      errors=$(list_append_json_string "$errors" "write_failed:adb_wifi_auto_enable")
+    }
+  fi
+  port_value=$(adb_wifi_read_wireless_port 2>/dev/null || true)
+  live=0
+  if adb_wifi_port_active "$port_value"; then
+    live=1
+  elif [ "$settings_ok" = "1" ]; then
+    errors=$(list_append_json_string "$errors" "manual_toggle_required:wireless_port_inactive")
+  fi
+  printf '{"protocol_version":%s,"command":"adb-wifi enable","ok":%s,"applied":%s,"requested":%s,"manager_request_ok":%s,' \
+    "$PROTOCOL_VERSION" "$(json_bool "$live")" "$(json_bool "$live")" "$(json_bool "$requested")" "$(json_bool "$manager_ok")"
+  adb_wifi_status_payload
+  printf '}\n'
+  [ "$live" = "1" ]
+}
+
+adb_wifi_auto_disable_json() {
+  ensure_dirs
+  rm -f "$ADB_WIFI_AUTO_FILE"
+  printf '{"protocol_version":%s,"command":"adb-wifi auto-disable","ok":true,"current_session_changed":false,' "$PROTOCOL_VERSION"
+  adb_wifi_status_payload
+  printf '}\n'
+}
+
+logs_tail_json() {
+  ensure_dirs
+  lines=$1
+  case "$lines" in
+    ''|*[!0-9]*) lines=50 ;;
+  esac
+  if [ "$lines" -lt 1 ]; then lines=1; fi
+  if [ "$lines" -gt 500 ]; then lines=500; fi
+  printf '{"protocol_version":%s,"lines":[' "$PROTOCOL_VERSION"
+  if [ -f "$LOG_FILE" ]; then
+    out=$(tail -n "$lines" "$LOG_FILE" 2>/dev/null || true)
+    if [ -n "$out" ]; then
+      first=1
+      printf '%s\n' "$out" | while IFS= read -r line; do
+        if [ "$first" = "1" ]; then
+          first=0
+        else
+          printf ','
+        fi
+        printf '"%s"' "$(json_escape "$line")"
+      done
+    fi
+  fi
+  printf ']}\n'
+}
+
+list_append_json_string() {
+  current=$1
+  item=$2
+  if [ -n "$current" ]; then
+    printf '%s,"%s"' "$current" "$(json_escape "$item")"
+  else
+    printf '"%s"' "$(json_escape "$item")"
+  fi
+}
+
+shell_quote() {
+  printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
+}
+
+package_visible() {
+  pkg=$1
+  if [ -n "${NEBULA_TEST_PACKAGE_DIR:-}" ]; then
+    [ -e "$NEBULA_TEST_PACKAGE_DIR/$pkg" ]
+    return
+  fi
+  cmd package path "$pkg" >/dev/null 2>&1
+}
+
+nubia_package_json() {
+  key=$1
+  pkg=$2
+  role=$3
+  visible=0
+  if package_visible "$pkg"; then visible=1; fi
+  printf '"%s":{"package":%s,"visible":%s,"role":%s}' \
+    "$key" \
+    "$(json_string "$pkg")" \
+    "$(json_bool "$visible")" \
+    "$(json_string "$role")"
+}
+
+nubia_toolkit_status_json() {
+  vector_dir="$MODULES_ROOT/zygisk_vector"
+  vector_installed=0
+  vector_enabled=0
+  vector_version=unknown
+  vector_version_code=0
+  if [ -d "$vector_dir" ]; then
+    vector_installed=1
+    [ ! -f "$vector_dir/disable" ] && vector_enabled=1
+    vector_version=$(module_prop_from_dir "$vector_dir" version)
+    vector_version_code=$(module_prop_from_dir "$vector_dir" versionCode)
+  fi
+  if [ "$vector_installed" != "1" ] && [ -x /data/adb/ksu/bin/ksud ]; then
+    vector_entry=$(/data/adb/ksu/bin/ksud module list 2>/dev/null \
+      | tr '\n' ' ' \
+      | sed 's/[{]/\
+{/g' \
+      | grep '"id": "zygisk_vector"' \
+      | head -n 1)
+    if [ -n "$vector_entry" ]; then
+      vector_installed=1
+      vector_enabled_value=$(printf '%s' "$vector_entry" | sed -n 's/.*"enabled": "\([^"]*\)".*/\1/p')
+      [ "$vector_enabled_value" = "true" ] && vector_enabled=1
+      vector_version=$(printf '%s' "$vector_entry" | sed -n 's/.*"version": "\([^"]*\)".*/\1/p')
+      vector_version_code=$(printf '%s' "$vector_entry" | sed -n 's/.*"versionCode": "\([^"]*\)".*/\1/p')
+    fi
+  fi
+  [ -n "$vector_version" ] || vector_version=unknown
+  case "$vector_version_code" in
+    ''|*[!0-9]*) vector_version_code=0 ;;
+  esac
+
+  printf '{"protocol_version":%s,"command":"nubia toolkit status",' "$PROTOCOL_VERSION"
+  printf '"source_project":"NubiaToolkit","source_commit":%s,"license":"Apache-2.0",' \
+    "$(json_string "$NUBIA_TOOLKIT_SOURCE_COMMIT")"
+  printf '"integration":"ported_status_only","old_toolkit_required":false,'
+  printf '"lsposed_required_for_hooks":true,"lsposed_hooks_active":false,'
+  printf '"hook_framework":{"id":"zygisk_vector","name":"Vector","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"android_16_compatible":true},' \
+    "$(json_bool "$vector_installed")" \
+    "$(json_bool "$vector_enabled")" \
+    "$(json_string "$vector_version")" \
+    "$vector_version_code"
+  printf '"packages":{'
+  nubia_package_json game_assist "$NUBIA_GAME_ASSIST_PACKAGE" "Game Assist hook target"
+  printf ','
+  nubia_package_json game_launcher "$NUBIA_GAME_LAUNCHER_PACKAGE" "Game Launcher hook target"
+  printf ','
+  nubia_package_json toolkit_reference "$NUBIA_TOOLKIT_PACKAGE" "Old standalone LSPosed reference APK"
+  printf '},'
+  printf '"features":['
+  printf '{"id":"no_kill","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"global_game_mode","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"hide_energy_cube","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"small_window_bypass","owner":"future_hook_lane","state":"deferred","mutating":true},'
+  printf '{"id":"super_resolution_unlock","owner":"future_hook_or_reimplementation","state":"reference_only","mutating":true},'
+  printf '{"id":"watermark_length","owner":"future_hook_lane","state":"deferred","mutating":true}'
+  printf '],"errors":[]}\n'
+}
+
+waylandie_data_dir() {
+  if [ -n "${NEBULA_WAYLANDIE_DATA_DIR:-}" ]; then
+    printf '%s' "$NEBULA_WAYLANDIE_DATA_DIR"
+  else
+    printf '/data/user/0/%s' "$WAYLANDIE_PACKAGE"
+  fi
+}
+
+waylandie_native_lib_dir() {
+  if [ -n "${NEBULA_WAYLANDIE_NATIVE_LIB_DIR:-}" ]; then
+    printf '%s' "$NEBULA_WAYLANDIE_NATIVE_LIB_DIR"
+    return
+  fi
+  apk=$(cmd package path "$WAYLANDIE_PACKAGE" 2>/dev/null | sed -n 's/^package://p' | head -n 1)
+  if [ -n "$apk" ]; then
+    printf '%s/lib/arm64' "${apk%/base.apk}"
+  fi
+}
+
+waylandie_uid() {
+  if [ -n "${NEBULA_WAYLANDIE_UID:-}" ]; then
+    printf '%s' "$NEBULA_WAYLANDIE_UID"
+    return
+  fi
+  data_dir=$(waylandie_data_dir)
+  if [ -d "$data_dir" ]; then
+    uid=$(ls -ldn "$data_dir" 2>/dev/null | awk '{print $3}' | head -n 1)
+    case "$uid" in
+      ''|*[!0-9]*) ;;
+      *) printf '%s' "$uid"; return ;;
+    esac
+  fi
+  cmd package list packages -U "$WAYLANDIE_PACKAGE" 2>/dev/null \
+    | sed -n 's/.*uid:\([0-9][0-9]*\).*/\1/p' \
+    | head -n 1
+}
+
+waylandie_find_wine_host() {
+  proton=$1
+  for rel in \
+    files/lib/wine/aarch64-unix/wine \
+    files/bin-arm64/wine \
+    files/bin-arm64/wine64 \
+    files/bin/wine \
+    files/bin/wine64 \
+    dist/bin/wine \
+    dist/bin/wine64 \
+    bin/wine \
+    bin/wine64
+  do
+    if [ -f "$proton/$rel" ]; then
+      printf '%s' "$proton/$rel"
+      return
+    fi
+  done
+}
+
+waylandie_guest_wine_path() {
+  wine_host=$1
+  proton=$2
+  rel=${wine_host#"$proton"/}
+  if [ "$rel" != "$wine_host" ]; then
+    printf '/opt/proton/%s' "$rel"
+  else
+    printf '/opt/proton/files/lib/wine/aarch64-unix/wine'
+  fi
+}
+
+waylandie_collect() {
+  wl_data=$(waylandie_data_dir)
+  wl_native=$(waylandie_native_lib_dir)
+  wl_uid=$(waylandie_uid)
+  wl_rootfs="$wl_data/files/imagefs"
+  wl_proton="$wl_data/files/contents/proton/active"
+  wl_proot="$wl_native/libproot.so"
+  wl_loader="$wl_native/libld_glibc.so"
+  wl_wine_host=$(waylandie_find_wine_host "$wl_proton")
+  wl_wine_guest=$(waylandie_guest_wine_path "$wl_wine_host" "$wl_proton")
+  wl_bridge="$wl_rootfs/usr/local/bin/waylandie-wayland-bridge"
+  wl_local_icd="$wl_rootfs/usr/local/etc/vulkan/icd.d/freedreno_icd.json"
+  wl_local_vulkan_driver="$wl_rootfs/usr/local/lib/libvulkan_freedreno.so"
+  wl_gamescope_sidecar="$wl_data/files/sidecars/$DISPLAY_PHONE_GAMESCOPE_SIDECAR"
+  wl_xwayland_sidecar="$wl_data/files/sidecars/$DISPLAY_PHONE_XWAYLAND_SIDECAR"
+  wl_gamescope_bin="$wl_gamescope_sidecar/usr/local/bin/gamescope"
+  wl_xwayland_bin="$wl_xwayland_sidecar/usr/bin/Xwayland"
+  wl_errors=
+  wl_display_errors=
+  wl_installed=0
+  wl_data_present=0
+  wl_imagefs_present=0
+  wl_native_present=0
+  wl_proot_present=0
+  wl_loader_present=0
+  wl_proton_present=0
+  wl_wine_present=0
+  wl_uid_present=0
+  wl_bridge_present=0
+  wl_local_icd_present=0
+  wl_local_vulkan_driver_present=0
+  wl_gamescope_sidecar_present=0
+  wl_xwayland_sidecar_present=0
+  wl_ready=1
+  wl_display_ready=1
+
+  if package_visible "$WAYLANDIE_PACKAGE"; then
+    wl_installed=1
+  else
+    wl_ready=0
+    wl_display_ready=0
+    wl_errors=$(list_append_json_string "$wl_errors" "missing:package")
+    wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:package")
+  fi
+  if [ -d "$wl_data" ]; then wl_data_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_data"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:app_data"); fi
+  if [ -d "$wl_rootfs" ]; then wl_imagefs_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:imagefs"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:imagefs"); fi
+  if [ -n "$wl_native" ] && [ -d "$wl_native" ]; then wl_native_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:native_lib_dir"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:native_lib_dir"); fi
+  if [ -f "$wl_proot" ]; then wl_proot_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libproot.so"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:libproot.so"); fi
+  if [ -f "$wl_loader" ]; then wl_loader_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libld_glibc.so"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:libld_glibc.so"); fi
+  if [ -x "$wl_bridge" ]; then wl_bridge_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:waylandie_wayland_bridge"); fi
+  if [ -f "$wl_local_icd" ]; then wl_local_icd_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:local_freedreno_icd"); fi
+  if [ -f "$wl_local_vulkan_driver" ]; then wl_local_vulkan_driver_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:local_freedreno_driver"); fi
+  if [ -x "$wl_gamescope_bin" ]; then wl_gamescope_sidecar_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:gamescope_sidecar"); fi
+  if [ -x "$wl_xwayland_bin" ]; then wl_xwayland_sidecar_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:xwayland_sidecar"); fi
+  if [ -d "$wl_proton" ]; then wl_proton_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:proton_active"); fi
+  if [ -n "$wl_wine_host" ]; then wl_wine_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:proton_wine"); fi
+  case "$wl_uid" in
+    ''|*[!0-9]*) wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_uid"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:app_uid") ;;
+    *) wl_uid_present=1 ;;
+  esac
+}
+
+waylandie_runtime_status_payload() {
+  waylandie_collect
+  printf '"package":%s,' "$(json_string "$WAYLANDIE_PACKAGE")"
+  printf '"source":%s,' "$(json_string "$WAYLANDIE_SOURCE")"
+  printf '"method":"root_assisted_proot","safe_mode":%s,' "$(json_bool "$(safe_mode_value)")"
+  printf '"installed":%s,"app_uid_known":%s,"data_dir_present":%s,"imagefs_present":%s,' \
+    "$(json_bool "$wl_installed")" \
+    "$(json_bool "$wl_uid_present")" \
+    "$(json_bool "$wl_data_present")" \
+    "$(json_bool "$wl_imagefs_present")"
+  printf '"native_lib_dir_present":%s,"proot_present":%s,"glibc_loader_present":%s,' \
+    "$(json_bool "$wl_native_present")" \
+    "$(json_bool "$wl_proot_present")" \
+    "$(json_bool "$wl_loader_present")"
+  printf '"proton_present":%s,"wine_present":%s,"ready":%s,' \
+    "$(json_bool "$wl_proton_present")" \
+    "$(json_bool "$wl_wine_present")" \
+    "$(json_bool "$wl_ready")"
+  printf '"display_ready":%s,"bridge_present":%s,"local_icd_present":%s,"local_vulkan_driver_present":%s,' \
+    "$(json_bool "$wl_display_ready")" \
+    "$(json_bool "$wl_bridge_present")" \
+    "$(json_bool "$wl_local_icd_present")" \
+    "$(json_bool "$wl_local_vulkan_driver_present")"
+  printf '"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,' \
+    "$(json_bool "$wl_gamescope_sidecar_present")" \
+    "$(json_bool "$wl_xwayland_sidecar_present")"
+  printf '"errors":[%s],"display_errors":[%s]' "$wl_errors" "$wl_display_errors"
+}
+
+waylandie_runtime_status_json() {
+  printf '{"protocol_version":%s,"command":"runtime waylandie status",' "$PROTOCOL_VERSION"
+  waylandie_runtime_status_payload
+  printf '}\n'
+}
+
+waylandie_test_smoke_json() {
+  mode=${NEBULA_TEST_WAYLANDIE_SMOKE_RESULT:-}
+  case "$mode" in
+    pass)
+      printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":true,"safe_mode":false,"method":"root_assisted_proot","exit_code":0,"stdout":"Nebula Proton smoke fixture","stderr":"","source":%s,"errors":[]}\n' \
+        "$PROTOCOL_VERSION" "$(json_string "$WAYLANDIE_SOURCE")"
+      return 0
+      ;;
+    fail)
+      printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":false,"method":"root_assisted_proot","exit_code":1,"stdout":"","stderr":"fixture failure","source":%s,"errors":["fixture_failure"]}\n' \
+        "$PROTOCOL_VERSION" "$(json_string "$WAYLANDIE_SOURCE")"
+      return 1
+      ;;
+  esac
+  return 99
+}
+
+waylandie_runtime_smoke_json() {
+  ensure_dirs
+  if [ "$(safe_mode_value)" = "1" ]; then
+    printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":true,"error":"SAFE_MODE_ACTIVE","errors":["SAFE_MODE_ACTIVE"]}\n' "$PROTOCOL_VERSION"
+    return 75
+  fi
+
+  if [ -n "${NEBULA_TEST_WAYLANDIE_SMOKE_RESULT:-}" ]; then
+    waylandie_test_smoke_json
+    return $?
+  fi
+
+  waylandie_collect
+  if [ "$wl_ready" != "1" ]; then
+    printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":false,"error":"RUNTIME_NOT_READY","status":{' "$PROTOCOL_VERSION"
+    waylandie_runtime_status_payload
+    printf '}}\n'
+    return 2
+  fi
+
+  script_path="$wl_data/files/nebula-core-proton-smoke-$$.sh"
+  out_path="$wl_data/files/nebula-core-proton-smoke-$$.out"
+  err_path="$wl_data/files/nebula-core-proton-smoke-$$.err"
+  q_script=$(shell_quote "$script_path")
+  q_out=$(shell_quote "$out_path")
+  q_err=$(shell_quote "$err_path")
+  q_rootfs=$(shell_quote "$wl_rootfs")
+  q_native=$(shell_quote "$wl_native")
+  q_data=$(shell_quote "$wl_data")
+  q_proton=$(shell_quote "$wl_proton")
+  q_wine_guest=$(shell_quote "$wl_wine_guest")
+
+  if ! su "$wl_uid" -c "cat > $q_script" <<EOF
+#!/system/bin/sh
+set -u
+ROOTFS=$q_rootfs
+NATIVE=$q_native
+DATA=$q_data
+PROTON=$q_proton
+WINE_GUEST=$q_wine_guest
+PROOT="\$NATIVE/libproot.so"
+mkdir -p "\$ROOTFS/home/xuser" "\$ROOTFS/tmp" "\$ROOTFS/android-lib" "\$ROOTFS/opt/proton" "\$DATA/cache/proot-tmp" "\$DATA/cache/proot-l2s"
+export HOME=/home/xuser
+export USER=xuser
+export LOGNAME=xuser
+export LANG=en_US.UTF-8
+export TERM=xterm-256color
+export TMPDIR=/tmp
+export XDG_RUNTIME_DIR=/tmp
+export WINEPREFIX=/home/xuser/.wine
+export WINEDEBUG=-all
+export WINE_NO_DUPLICATE_EXPLORER=1
+export WINE_GST_NO_GL=1
+export WINE_DISABLE_FULLSCREEN_HACK=1
+export PROOT_TMP_DIR="\$DATA/cache/proot-tmp"
+export PROOT_L2S_DIR="\$DATA/cache/proot-l2s"
+export WAYLANDIE_CONTENTS_DIR=/waylandie-contents
+export PATH=/waylandie-scripts:/opt/proton/files/bin-arm64:/opt/proton/files/bin:/opt/proton/bin:/usr/local/bin:/usr/bin:/bin
+export LD_LIBRARY_PATH=/opt/proton/files/lib/wine/aarch64-unix:/opt/proton/files/lib/wine/aarch64-windows:/opt/proton/files/lib:/opt/proton/lib:/usr/lib:/usr/local/lib:/system/lib64
+exec "\$PROOT" -r "\$ROOTFS" -w /home/xuser -b /dev:/dev -b /dev/urandom:/dev/random -b /proc:/proc -b /sys:/sys -b /sdcard:/sdcard -b /storage:/storage:ro -b "\$ROOTFS/home/xuser:/home/xuser" -b "\$ROOTFS/tmp:/tmp" -b "\$DATA/files/contents:/waylandie-contents" -b "\$NATIVE:/android-lib" -b "\$PROTON:/opt/proton" /android-lib/libld_glibc.so --library-path /usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu:/usr/lib:/lib:/usr/local/lib "\$WINE_GUEST" cmd /c ver
+EOF
+  then
+    printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":false,"safe_mode":false,"error":"SCRIPT_WRITE_FAILED","errors":["SCRIPT_WRITE_FAILED"]}\n' "$PROTOCOL_VERSION"
+    return 1
+  fi
+
+  su "$wl_uid" -c "chmod 700 $q_script" >/dev/null 2>&1 || true
+  if command -v timeout >/dev/null 2>&1; then
+    su "$wl_uid" -c "timeout 25 sh $q_script > $q_out 2> $q_err"
+    rc=$?
+  else
+    su "$wl_uid" -c "sh $q_script > $q_out 2> $q_err"
+    rc=$?
+  fi
+  stdout=$(head -c 4096 "$out_path" 2>/dev/null || true)
+  stderr=$(head -c 4096 "$err_path" 2>/dev/null || true)
+  su "$wl_uid" -c "rm -f $q_script $q_out $q_err" >/dev/null 2>&1 || rm -f "$script_path" "$out_path" "$err_path"
+
+  errors=
+  if [ "$rc" -ne 0 ]; then
+    errors=$(list_append_json_string "$errors" "exit_code:$rc")
+  fi
+  printf '{"protocol_version":%s,"command":"runtime waylandie proton-smoke","ok":%s,"safe_mode":false,"method":"root_assisted_proot","exit_code":%s,"stdout":%s,"stderr":%s,"source":%s,"errors":[%s]}\n' \
+    "$PROTOCOL_VERSION" \
+    "$(json_bool "$([ "$rc" -eq 0 ] && printf 1 || printf 0)")" \
+    "$rc" \
+    "$(json_output_string "$stdout")" \
+    "$(json_output_string "$stderr")" \
+    "$(json_string "$WAYLANDIE_SOURCE")" \
+    "$errors"
+  [ "$rc" -eq 0 ]
+}
+
+fixed_device_path() {
+  path=$1
+  root=${NEBULA_TEST_DEVICE_ROOT:-}
+  if [ -n "$root" ]; then
+    printf '%s%s' "$root" "$path"
+  else
+    printf '%s' "$path"
+  fi
+}
+
+fixed_path_exists() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -e "$resolved_path" ]
+}
+
+fixed_path_executable() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -x "$resolved_path" ]
+}
+
+fixed_path_socket() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -S "$resolved_path" ]
+}
+
+fixed_path_socket_world_writable() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -S "$resolved_path" ] || return 1
+  perms=$(ls -ld "$resolved_path" 2>/dev/null | sed -n 's/^\(..........\).*/\1/p')
+  case "$perms" in
+    ????????w*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+fixed_path_dir() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -d "$resolved_path" ]
+}
+
+fixed_file_contains() {
+  resolved_path=$(fixed_device_path "$1")
+  pattern=$2
+  [ -f "$resolved_path" ] && grep -F "$pattern" "$resolved_path" >/dev/null 2>&1
+}
+
+fixed_file_value() {
+  resolved_path=$(fixed_device_path "$1")
+  key=$2
+  if [ -f "$resolved_path" ]; then
+    sed -n "s/^$key=//p" "$resolved_path" | head -n 1
+  fi
+}
+
+anland_config_for_container() {
+  printf '%s/%s/container.config' "$ANLAND_CONTAINERS_DIR" "$1"
+}
+
+anland_env_for_container() {
+  printf '%s/%s/anland.env' "$ANLAND_CONTAINERS_DIR" "$1"
+}
+
+anland_safe_container_name() {
+  case "$1" in
+    ''|*/*|*..*|*[!A-Za-z0-9._-]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+anland_pid_from_real_file() {
+  pid=$(sed -n '1{s/[^0-9].*$//;p;q}' "$1" 2>/dev/null)
+  case "$pid" in
+    ''|*[!0-9]*) ;;
+    *) printf '%s' "$pid" ;;
+  esac
+}
+
+anland_pid_running() {
+  pid=$1
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  fixed_path_exists "/proc/$pid"
+}
+
+anland_collect_active_pidfiles() {
+  anland_active_name=
+  anland_active_pidfile=
+  anland_active_pid=
+  anland_active_ambiguous=0
+  dir=$(fixed_device_path "$ANLAND_PIDS_DIR")
+  [ -d "$dir" ] || return 0
+  for pid_file in "$dir"/*.pid "$dir"/*.init; do
+    [ -s "$pid_file" ] || continue
+    base=${pid_file##*/}
+    suffix=${base##*.}
+    name=${base%."$suffix"}
+    anland_safe_container_name "$name" || continue
+	    fixed_path_exists "$(anland_config_for_container "$name")" || continue
+	    canonical_pidfile="$ANLAND_PIDS_DIR/$name.$suffix"
+	    pid=$(anland_pid_from_real_file "$pid_file")
+	    anland_pid_running "$pid" || continue
+	    if [ -z "$anland_active_name" ]; then
+      anland_active_name=$name
+      anland_active_pidfile=$canonical_pidfile
+      anland_active_pid=$pid
+    elif [ "$anland_active_name" = "$name" ]; then
+      case "$anland_active_pidfile" in
+        *.init)
+          if [ "$suffix" = "pid" ]; then
+            anland_active_pidfile=$canonical_pidfile
+            anland_active_pid=$pid
+          fi
+          ;;
+      esac
+    else
+      anland_active_ambiguous=1
+    fi
+  done
+}
+
+anland_pidfile_for_container() {
+  container=$1
+  for suffix in pid init; do
+    candidate_path="$ANLAND_PIDS_DIR/$container.$suffix"
+    real_path=$(fixed_device_path "$candidate_path")
+    if [ -s "$real_path" ]; then
+      pid=$(anland_pid_from_real_file "$real_path")
+      if anland_pid_running "$pid"; then
+        printf '%s' "$candidate_path"
+        return
+      fi
+    fi
+  done
+}
+
+anland_pid_for_canonical_file() {
+  path=$1
+  [ -n "$path" ] || return
+  anland_pid_from_real_file "$(fixed_device_path "$path")"
+}
+
+anland_env_from_config() {
+  config=$1
+  container=$2
+  configured_env=$(fixed_file_value "$config" env_file)
+  case "$configured_env" in
+    "$ANLAND_CONTAINERS_DIR/$container"/*)
+      case "$configured_env" in
+        *..*) ;;
+        *) printf '%s' "$configured_env"; return ;;
+      esac
+      ;;
+  esac
+  anland_env_for_container "$container"
+}
+
+anland_rootfs_from_config() {
+  config=$1
+  container=$2
+  rootfs=$(fixed_file_value "$config" rootfs_path)
+  if [ -n "$rootfs" ]; then
+    printf '%s' "$rootfs"
+  else
+    printf '%s/%s/rootfs' "$ANLAND_CONTAINERS_DIR" "$container"
+  fi
+}
+
+anland_rootfs_mode_for_path() {
+  path=$1
+  case "$path" in
+    *.img|*.img.raw|*.qcow2) printf '%s' image ;;
+    *) printf '%s' directory ;;
+  esac
+}
+
+anland_path_belongs_to_container() {
+  container=$1
+  path=$2
+  case "$container:$path" in
+    :*) return 1 ;;
+    *:"$ANLAND_CONTAINERS_DIR/$container"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+anland_rootfs_has_producer() {
+  rootfs=$1
+  [ -n "$rootfs" ] || return 1
+  [ "$(anland_rootfs_mode_for_path "$rootfs")" = "directory" ] || return 1
+  real_rootfs=$(fixed_device_path "$rootfs")
+  [ -d "$real_rootfs" ] || return 1
+  [ -x "$real_rootfs/usr/local/bin/startanland-kde.sh" ] && return 0
+  [ -x "$real_rootfs/usr/bin/kwin_wayland" ] && return 0
+  [ -x "$real_rootfs/usr/bin/weston" ] && return 0
+  find "$real_rootfs/usr" -maxdepth 6 -iname '*anland*' -print -quit 2>/dev/null | grep . >/dev/null 2>&1
+}
+
+anland_active_image_has_producer() {
+  container=$1
+  [ -n "$container" ] || return 1
+  [ "$anland_container_active" = "1" ] || return 1
+  bin=$(fixed_device_path "$ANLAND_DROIDSPACES_BIN")
+  [ -x "$bin" ] || return 1
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 8 "$bin" --name="$container" run sh -lc 'test -x /usr/local/bin/startanland-kde.sh' >/dev/null 2>&1
+  else
+    "$bin" --name="$container" run sh -lc 'test -x /usr/local/bin/startanland-kde.sh' >/dev/null 2>&1
+  fi
+}
+
+anland_required_env_json() {
+  printf '["ANLAND=1","ANLAND_SOCKET=%s","ANLAND_DRM_DEVICE=%s","WAYLAND_DISPLAY=wayland-0","XDG_SESSION_TYPE=wayland","QT_QPA_PLATFORM=wayland","MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform"]' \
+    "$(json_escape "$ANLAND_SOCKET_GUEST")" \
+    "$(json_escape "$ANLAND_RENDER_NODE")"
+}
+
+anland_required_config_json() {
+  printf '["enable_termux_x11=0","enable_hw_access=1","enable_gpu_mode=1","selinux_permissive=1","privileged=nocaps,noseccomp","env_file=<container>/anland.env","bind_mounts=%s:%s"]' \
+    "$(json_escape "$ANLAND_SOCKET_HOST")" \
+    "$(json_escape "$ANLAND_SOCKET_GUEST")"
+}
+
+anland_recommended_start_command() {
+  printf '%s --name=%s --rootfs-img=%s --net=host --hw-access --gpu --selinux-permissive --privileged=nocaps,noseccomp --env=%s --bind=%s:%s start' \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_CONTAINER" \
+    "$ANLAND_RECOMMENDED_ROOTFS_IMG" \
+    "$ANLAND_RECOMMENDED_ENV" \
+    "$ANLAND_SOCKET_HOST" \
+	    "$ANLAND_SOCKET_GUEST"
+}
+
+anland_recommended_create_command() {
+  printf '%s --rootfs-arc=%s --rootfs-img=%s --size=%s create' \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE" \
+    "$ANLAND_RECOMMENDED_ROOTFS_IMG" \
+    "$ANLAND_RECOMMENDED_ROOTFS_SIZE"
+}
+
+anland_recommended_producer_verify_command() {
+  printf "%s --name=%s run sh -lc 'test -x /usr/local/bin/startanland-kde.sh'" \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_CONTAINER"
+}
+
+anland_recommended_producer_run_command() {
+  printf "%s --name=%s run sh -lc 'nohup /usr/local/bin/startanland-kde.sh >/tmp/anland-kde.log 2>&1 &'" \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_CONTAINER"
+}
+
+anland_selected_restart_command() {
+  [ -n "$anland_selected_container" ] || return 0
+  printf '%s --name=%s --env=%s --bind=%s:%s restart' \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$anland_selected_container" \
+    "$anland_selected_env" \
+    "$ANLAND_SOCKET_HOST" \
+    "$ANLAND_SOCKET_GUEST"
+}
+
+anland_setup_commands_json() {
+  selected_restart=$(anland_selected_restart_command)
+  printf '{"recommended_container":%s,' "$(json_string "$ANLAND_RECOMMENDED_CONTAINER")"
+  printf '"recommended_rootfs_archive":%s,' "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE")"
+  printf '"recommended_rootfs_img":%s,' "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_IMG")"
+  printf '"recommended_rootfs_size":%s,' "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_SIZE")"
+  printf '"recommended_env_file":%s,' "$(json_string "$ANLAND_RECOMMENDED_ENV")"
+  printf '"droidspaces_create_rootfs_img":%s,' "$(json_string "$(anland_recommended_create_command)")"
+  printf '"droidspaces_start_recommended":%s,' "$(json_string "$(anland_recommended_start_command)")"
+  printf '"droidspaces_restart_selected":%s,' "$(json_string "$selected_restart")"
+  printf '"daemon_module_install":"ksud module install /data/local/tmp/anland-2.0-virtual-drm-daemon.zip",'
+  printf '"consumer_apk_package":%s,' "$(json_string "$ANLAND_CONSUMER_PACKAGE")"
+  printf '"producer_start_command":"startanland-kde.sh",'
+  printf '"producer_verify_command":%s,' "$(json_string "$(anland_recommended_producer_verify_command)")"
+  printf '"producer_run_command":%s,' "$(json_string "$(anland_recommended_producer_run_command)")"
+  printf '"repo_build_profile":"Droidspaces-rootfs-KDE-builder Ubuntu26 with KDE auto-start and anland_kde enabled"}'
+}
+
+anland_collect() {
+  anland_errors=
+  anland_collect_active_pidfiles
+  anland_selected_container=$ANLAND_DEFAULT_CONTAINER
+  anland_selection_source=default_fallback
+  anland_selected_pidfile=
+  anland_container_pid=
+  anland_container_active=0
+  anland_selection_ambiguous=0
+  anland_selection_invalid=0
+
+  if [ -n "${NEBULA_ANLAND_CONTAINER:-}" ]; then
+    if anland_safe_container_name "$NEBULA_ANLAND_CONTAINER"; then
+      anland_selected_container=$NEBULA_ANLAND_CONTAINER
+      anland_selection_source=env_override
+    else
+      anland_selected_container=
+      anland_selection_source=invalid_env_override
+      anland_selection_invalid=1
+      anland_errors=$(list_append_json_string "$anland_errors" "invalid:env_override_container")
+    fi
+  elif [ "$anland_active_ambiguous" = "1" ]; then
+    anland_selection_source=ambiguous_active_pidfiles
+    anland_selection_ambiguous=1
+    anland_errors=$(list_append_json_string "$anland_errors" "ambiguous:active_containers")
+    if [ -n "$anland_active_name" ]; then
+      anland_selected_container=$anland_active_name
+    fi
+  elif [ -n "$anland_active_name" ]; then
+    anland_selected_container=$anland_active_name
+    anland_selection_source=active_pidfile
+  fi
+
+  anland_selected_pidfile=$(anland_pidfile_for_container "$anland_selected_container")
+  if [ -n "$anland_selected_pidfile" ]; then
+    anland_container_active=1
+    anland_container_pid=$(anland_pid_for_canonical_file "$anland_selected_pidfile")
+  fi
+  anland_selected_config=
+  anland_selected_env=
+  anland_selected_rootfs=
+  anland_selected_rootfs_mode=missing
+  if [ -n "$anland_selected_container" ]; then
+    anland_selected_config=$(anland_config_for_container "$anland_selected_container")
+    anland_selected_env=$(anland_env_from_config "$anland_selected_config" "$anland_selected_container")
+    anland_selected_rootfs=$(anland_rootfs_from_config "$anland_selected_config" "$anland_selected_container")
+    anland_selected_rootfs_mode=$(anland_rootfs_mode_for_path "$anland_selected_rootfs")
+  fi
+  anland_bin=0
+  anland_config=0
+  anland_env=0
+  anland_socket=0
+  anland_socket_writable=0
+  anland_render=0
+  anland_rootfs=0
+  anland_rootfs_image=0
+  anland_config_env=0
+  anland_config_bind=0
+  anland_env_socket=0
+  anland_env_kgsl=0
+  anland_producer=0
+  anland_rootfs_allowed=0
+  anland_runtime_ready=0
+  anland_ready=0
+  anland_status=missing
+
+  fixed_path_executable "$ANLAND_DROIDSPACES_BIN" && anland_bin=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:droidspaces_binary")
+  [ -n "$anland_selected_config" ] && fixed_path_exists "$anland_selected_config" && anland_config=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:container_config")
+  [ -n "$anland_selected_env" ] && fixed_path_exists "$anland_selected_env" && anland_env=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:anland_env")
+  if fixed_path_socket "$ANLAND_SOCKET_HOST"; then
+    anland_socket=1
+    fixed_path_socket_world_writable "$ANLAND_SOCKET_HOST" && anland_socket_writable=1 || anland_errors=$(list_append_json_string "$anland_errors" "blocked:display_daemon_socket_not_app_writable")
+  else
+    anland_errors=$(list_append_json_string "$anland_errors" "missing:display_daemon_socket")
+  fi
+  fixed_path_exists "$ANLAND_RENDER_NODE" && anland_render=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:render_node")
+  if anland_path_belongs_to_container "$anland_selected_container" "$anland_selected_rootfs"; then
+    anland_rootfs_allowed=1
+    if [ "$anland_selected_rootfs_mode" = "image" ]; then
+      anland_rootfs_image=1
+    fi
+  elif [ -n "$anland_selected_rootfs" ]; then
+    anland_errors=$(list_append_json_string "$anland_errors" "invalid:rootfs_path_outside_container")
+  fi
+  [ "$anland_rootfs_allowed" = "1" ] && fixed_path_exists "$anland_selected_rootfs" && anland_rootfs=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:rootfs_path")
+  [ -n "$anland_selected_config" ] && fixed_file_contains "$anland_selected_config" "env_file=$anland_selected_env" && anland_config_env=1 || true
+  [ -n "$anland_selected_config" ] && fixed_file_contains "$anland_selected_config" "$ANLAND_SOCKET_HOST:$ANLAND_SOCKET_GUEST" && anland_config_bind=1 || true
+  [ -n "$anland_selected_env" ] && fixed_file_contains "$anland_selected_env" "ANLAND_SOCKET=$ANLAND_SOCKET_GUEST" && anland_env_socket=1 || true
+  [ -n "$anland_selected_env" ] && fixed_file_contains "$anland_selected_env" "MESA_LOADER_DRIVER_OVERRIDE=kgsl" && anland_env_kgsl=1 || true
+  if anland_rootfs_has_producer "$anland_selected_rootfs"; then
+    anland_producer=1
+  elif [ "$anland_rootfs_image" = "1" ] && anland_active_image_has_producer "$anland_selected_container"; then
+    anland_producer=1
+  elif [ "$anland_rootfs_image" = "1" ] && [ "$anland_rootfs" = "1" ]; then
+    anland_errors=$(list_append_json_string "$anland_errors" "unknown:anland_producer_inside_rootfs_image_run_verify_required")
+  else
+    anland_errors=$(list_append_json_string "$anland_errors" "missing:anland_producer")
+  fi
+
+  if [ "$anland_selection_ambiguous" = "1" ] || [ "$anland_selection_invalid" = "1" ]; then
+    anland_status=partial
+  elif [ "$anland_bin" = "1" ] && [ "$anland_config" = "1" ] && [ "$anland_rootfs" = "1" ] && [ "$anland_render" = "1" ]; then
+    anland_status=container_runtime_ready
+    anland_runtime_ready=1
+  elif [ "$anland_bin" = "1" ] || [ "$anland_config" = "1" ] || [ "$anland_env" = "1" ]; then
+    anland_status=partial
+  fi
+
+  if [ "$anland_runtime_ready" = "1" ] \
+    && [ "$anland_env" = "1" ] \
+    && [ "$anland_socket" = "1" ] \
+    && [ "$anland_socket_writable" = "1" ] \
+    && [ "$anland_config_env" = "1" ] \
+    && [ "$anland_config_bind" = "1" ] \
+    && [ "$anland_env_socket" = "1" ] \
+    && [ "$anland_env_kgsl" = "1" ] \
+    && [ "$anland_producer" = "1" ]; then
+    anland_status=preflight_ready
+    anland_ready=1
+  fi
+}
+
+display_bool_source() {
+  bool_value=$1
+  true_label=$2
+  false_label=$3
+  if [ "$bool_value" = "1" ]; then
+    printf '%s' "$true_label"
+  else
+    printf '%s' "$false_label"
+  fi
+}
+
+display_phone_preflight_payload() {
+  waylandie_collect
+  phone_status=missing
+  active_blocker=WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE
+  canonical_blocker=WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE
+  phone_container_status=missing
+  phone_display_status=display_missing
+  phone_runtime_status=runtime_missing
+  if [ "$wl_display_ready" = "1" ]; then
+    phone_status=wayland_display_pass
+    active_blocker=NONE_WAYLAND_DISPLAY
+    canonical_blocker=NONE_WAYLAND_DISPLAY
+    phone_display_status=display_proven
+  elif [ "$wl_installed" = "1" ]; then
+    phone_status=partial
+  fi
+  if [ "$wl_ready" = "1" ]; then
+    phone_container_status=ready
+    phone_runtime_status=runtime_ready
+  elif [ "$wl_installed" = "1" ]; then
+    phone_container_status=partial
+  fi
+  printf '"id":"phone_app_bridge",'
+  printf '"method_id":"phone_app_bridge",'
+  printf '"title":"Phone / App Mode",'
+  printf '"status":%s,' "$(json_string "$phone_status")"
+  printf '"available":%s,' "$(json_bool "$wl_display_ready")"
+  printf '"container_ref":"waylandie_app_imagefs",'
+  printf '"container_kind":"app_proot",'
+  printf '"container_status":%s,' "$(json_string "$phone_container_status")"
+  printf '"display_status":%s,' "$(json_string "$phone_display_status")"
+  printf '"runtime_status":%s,' "$(json_string "$phone_runtime_status")"
+  printf '"start_command_status":"not_available",'
+  printf '"requirement_status":"display_requirements_met",'
+  printf '"missing_requirements":["game_client_runtime_proof_not_promoted_39bit_va"],'
+  printf '"mutating":false,'
+  printf '"launch_command_available":false,'
+  printf '"active_blocker":%s,' "$(json_string "$active_blocker")"
+  printf '"canonical_blocker":%s,' "$(json_string "$canonical_blocker")"
+  printf '"current_endpoint":"SurfaceControl Vulkan native dmabuf-present via WayLandIE bridge, Gamescope, and Xwayland",'
+  printf '"proof_classification":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")"
+  printf '"proof_result":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_RESULT")"
+  printf '"proof_metrics":{"summary_commits":7189,"summary_failures":0,"vkGetMemoryFdKHR_failures":0,"real_buffer_commits":2,"xwayland_ready":true,"gamescope_exit":0,"bridge_exit":0},'
+  printf '"lead_status":"display_proven",'
+  printf '"proven_trick":"gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf",'
+  printf '"next_reversa_action":"bounded_game_client_runtime_before_steam",'
+  printf '"steam_allowed":false,'
+  printf '"kernel_va_bits_constraint":39,'
+  printf '"kernel_va_bits_evidence":"live_proc_config_gz",'
+  printf '"runtime_blocker":"GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA",'
+  printf '"runtime_blocker_detail":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_BLOCKER")"
+  printf '"runtime_constraint":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_CONSTRAINT")"
+  printf '"sidecar_source":%s,' "$(json_string "$DISPLAY_PHONE_PROMOTION_SOURCE")"
+  printf '"gamescope_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_GAMESCOPE_SIDECAR")"
+  printf '"xwayland_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_XWAYLAND_SIDECAR")"
+  printf '"selected_icd":%s,' "$(json_string "$wl_local_icd")"
+  printf '"selected_vulkan_driver":%s,' "$(json_string "$wl_local_vulkan_driver")"
+  printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
+  printf '"checks":{"display_ready":%s,"runtime_ready":%s,"package_installed":%s,"imagefs_present":%s,"bridge_present":%s,"local_icd_present":%s,"local_vulkan_driver_present":%s,"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,"proton_present":%s,"wine_present":%s},' \
+    "$(json_bool "$wl_display_ready")" \
+    "$(json_bool "$wl_ready")" \
+    "$(json_bool "$wl_installed")" \
+    "$(json_bool "$wl_imagefs_present")" \
+    "$(json_bool "$wl_bridge_present")" \
+    "$(json_bool "$wl_local_icd_present")" \
+    "$(json_bool "$wl_local_vulkan_driver_present")" \
+    "$(json_bool "$wl_gamescope_sidecar_present")" \
+    "$(json_bool "$wl_xwayland_sidecar_present")" \
+    "$(json_bool "$wl_proton_present")" \
+    "$(json_bool "$wl_wine_present")"
+  printf '"errors":[%s],"runtime_errors":[%s]' "$wl_display_errors" "$wl_errors"
+}
+
+display_phone_preflight_json() {
+  printf '{"protocol_version":%s,"command":"display lane phone preflight",' "$PROTOCOL_VERSION"
+  display_phone_preflight_payload
+  printf '}\n'
+}
+
+display_anland_preflight_payload() {
+  anland_collect
+  anland_container_status=missing
+  anland_display_status=display_missing
+  anland_runtime_status=runtime_missing
+  anland_requirement_status=missing_requirements
+  if [ "$anland_selection_ambiguous" = "1" ]; then
+    anland_container_status=ambiguous
+    anland_requirement_status=ambiguous_selection
+  elif [ -z "$anland_selected_container" ]; then
+    anland_container_status=missing
+    anland_requirement_status=invalid_selection
+  elif [ "$anland_container_active" = "1" ]; then
+    anland_container_status=active
+  elif [ "$anland_runtime_ready" = "1" ]; then
+    anland_container_status=ready
+  elif [ "$anland_config" = "1" ]; then
+    anland_container_status=idle
+  fi
+  if [ "$anland_runtime_ready" = "1" ]; then
+    anland_runtime_status=runtime_ready
+  fi
+  if [ "$anland_ready" = "1" ]; then
+    anland_display_status=display_ready
+    anland_requirement_status=complete
+  elif [ "$anland_requirement_status" = "ambiguous_selection" ] || [ "$anland_requirement_status" = "invalid_selection" ]; then
+    true
+  elif [ "$anland_rootfs_allowed" != "1" ]; then
+    anland_requirement_status=invalid_rootfs_path
+  elif [ "$anland_rootfs" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_socket" != "1" ] && [ "$anland_env" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_socket" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_socket_writable" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_env" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  fi
+
+  printf '"id":"anland_surface",'
+  printf '"method_id":"anland_surface",'
+  printf '"title":"Anland Surface Mode",'
+  printf '"status":%s,' "$(json_string "$anland_status")"
+  printf '"available":%s,' "$(json_bool "$anland_ready")"
+  printf '"runtime_ready":%s,' "$(json_bool "$anland_runtime_ready")"
+  printf '"container_ref":%s,' "$(json_string "$anland_selected_container")"
+  printf '"container_kind":"droidspaces",'
+  printf '"container_status":%s,' "$(json_string "$anland_container_status")"
+  printf '"display_status":%s,' "$(json_string "$anland_display_status")"
+  printf '"runtime_status":%s,' "$(json_string "$anland_runtime_status")"
+  printf '"start_command_status":"not_available",'
+  printf '"requirement_status":%s,' "$(json_string "$anland_requirement_status")"
+  printf '"missing_requirements":[%s],' "$anland_errors"
+  printf '"required_config":'
+  anland_required_config_json
+  printf ','
+  printf '"required_env":'
+  anland_required_env_json
+  printf ','
+  printf '"setup_commands":'
+  anland_setup_commands_json
+  printf ','
+  printf '"mutating":false,'
+  printf '"repair_command_available":false,'
+  printf '"source":%s,' "$(json_string "$ANLAND_REPAIR_SOURCE")"
+  printf '"selected_container":%s,' "$(json_string "$anland_selected_container")"
+  printf '"container_selection_source":%s,' "$(json_string "$anland_selection_source")"
+  printf '"container_active":%s,' "$(json_bool "$anland_container_active")"
+  printf '"container_pid":%s,' "$(json_int_or_null "$anland_container_pid")"
+  printf '"checks":{"droidspaces_binary":%s,"container_selected":%s,"container_config":%s,"active_container_pidfile":%s,"rootfs_path":%s,"rootfs_image":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"config_env_file":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s,"anland_producer":%s},' \
+    "$(json_bool "$anland_bin")" \
+    "$(json_bool "$([ -n "$anland_selected_container" ] && printf 1 || printf 0)")" \
+    "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_bool "$anland_rootfs")" \
+    "$(json_bool "$anland_rootfs_image")" \
+    "$(json_bool "$anland_env")" \
+    "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_socket_writable")" \
+    "$(json_bool "$anland_render")" \
+    "$(json_bool "$anland_config_env")" \
+    "$(json_bool "$anland_config_bind")" \
+    "$(json_bool "$anland_env_socket")" \
+    "$(json_bool "$anland_env_kgsl")" \
+    "$(json_bool "$anland_producer")"
+  printf '"selected_paths":{"droidspaces_binary":%s,"containers_dir":%s,"pids_dir":%s,"pidfile":%s,"container_config":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_mode":%s,"display_socket_host":%s,"display_socket_guest":%s,"render_node":%s},' \
+    "$(json_string "$ANLAND_DROIDSPACES_BIN")" \
+    "$(json_string "$ANLAND_CONTAINERS_DIR")" \
+    "$(json_string "$ANLAND_PIDS_DIR")" \
+    "$(json_string_or_null "$anland_selected_pidfile")" \
+    "$(json_string "$anland_selected_config")" \
+    "$(json_string "$anland_selected_env")" \
+    "$(json_string "$anland_selected_rootfs")" \
+    "$(json_string "$anland_selected_rootfs_mode")" \
+    "$(json_string "$ANLAND_SOCKET_HOST")" \
+    "$(json_string "$ANLAND_SOCKET_GUEST")" \
+    "$(json_string "$ANLAND_RENDER_NODE")"
+  printf '"errors":[%s]' "$anland_errors"
+}
+
+display_anland_preflight_json() {
+  printf '{"protocol_version":%s,"command":"display lane anland preflight",' "$PROTOCOL_VERSION"
+  display_anland_preflight_payload
+  printf '}\n'
+}
+
+display_dock_preflight_payload() {
+  dock_safe=$(safe_mode_value)
+  dock_status=proven_reference_not_wired
+  dock_start_status=operator_required
+  if [ "$dock_safe" = "1" ]; then
+    dock_status=safe_mode_blocks_start
+    dock_start_status=safe_mode_blocked
+  fi
+  printf '"id":"dock_drm_lease_external",'
+  printf '"method_id":"dock_drm_lease_external",'
+  printf '"title":"Dock Lease Mode",'
+  printf '"status":%s,' "$(json_string "$dock_status")"
+  printf '"available":false,'
+  printf '"container_ref":"none",'
+  printf '"container_kind":"none",'
+  printf '"container_status":"none",'
+  printf '"display_status":"reference_only",'
+  printf '"runtime_status":"not_required",'
+  printf '"start_command_status":%s,' "$(json_string "$dock_start_status")"
+  printf '"requirement_status":"reference_requirements_known",'
+  printf '"missing_requirements":["external_display_discovery_required","lease_receiver_not_wired"],'
+  printf '"mutating":false,'
+  printf '"start_command_available":false,'
+  printf '"evidence_captured":true,'
+  printf '"operator_required":true,'
+  printf '"safe_mode":%s,' "$(json_bool "$dock_safe")"
+  printf '"external_display_only":true,'
+  printf '"internal_panel_allowed":false,'
+  printf '"whole_card_takeover":false,'
+  printf '"dynamic_discovery_required":true,'
+  printf '"reported_objects":{"connector":89,"crtc":285,"planes":[137,145],"rejected_encoder":86,"composer_fd_observed":11,"hardcoded_forbidden":true},'
+  printf '"method":["composer_fd_duplicate","CREATE_LEASE_external_only","SCM_RIGHTS_fd_handoff","wlroots_drm_backend_lease_fd","explicit_stop_revoke"],'
+  printf '"source":%s,' "$(json_string "$DRM_LEASE_SOURCE")"
+  printf '"errors":[]'
+}
+
+display_dock_preflight_json() {
+  printf '{"protocol_version":%s,"command":"display lane dock preflight",' "$PROTOCOL_VERSION"
+  display_dock_preflight_payload
+  printf '}\n'
+}
+
+display_lanes_json() {
+  printf '{"protocol_version":%s,"command":"display lanes","selector":"multi_lane","lanes":[' "$PROTOCOL_VERSION"
+  printf '{'
+  display_phone_preflight_payload
+  printf '},{'
+  display_dock_preflight_payload
+  printf '},{'
+  display_anland_preflight_payload
+  printf '},{"id":"compatibility","method_id":"compatibility_software","title":"Compatibility Mode","status":"not_wired","available":false,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"not_wired","runtime_status":"runtime_missing","start_command_status":"not_available","requirement_status":"not_wired","missing_requirements":["implementation_not_wired"],"mutating":false,"source":"Nebula compatibility fallback design","errors":["NOT_WIRED_BY_DESIGN"]},{"id":"recovery_safe","method_id":"recovery_safe","title":"Recovery / Safe Mode","status":"always_available","available":true,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"safe","runtime_status":"not_required","start_command_status":"safe_mode_control","requirement_status":"complete","missing_requirements":[],"mutating":false,"source":"Nebula Core safe mode","errors":[]}'
+  printf '],"selection_rules":["prefer_phone_app_for_internal_display","prefer_dock_lease_for_external_monitor_when_wired","use_anland_surface_as_compatibility_fallback","safe_mode_blocks_mutating_lane_start","no_lane_silently_replaces_another"]}\n'
+}
+
+display_method_containers_json() {
+  anland_collect
+  anland_selected_recommended=0
+  if [ "$anland_selected_container" = "$ANLAND_RECOMMENDED_CONTAINER" ]; then
+    anland_selected_recommended=1
+  fi
+  droidspaces_native_status=source_available
+  if [ "$anland_bin" = "1" ]; then
+    droidspaces_native_status=runtime_binary_visible
+  fi
+  printf '{"protocol_version":%s,"command":"display method-containers","containers":[' "$PROTOCOL_VERSION"
+  printf '{"method_id":"phone_app_bridge","container_ref":"waylandie_app_imagefs","container_kind":"app_proot","owner":"WayLandIE companion APK","status":"display_proven","recommended_for":"internal_display","requirements":["WayLandIE package installed","imagefs present","pinned local ICD and Vulkan driver","Gamescope and Xwayland sidecars"],"current_limit":"game_client_runtime_proof_not_promoted_39bit_va","source":%s},' \
+    "$(json_string "$DISPLAY_PHONE_SOURCE")"
+  printf '{"method_id":"anland_surface","container_ref":%s,"container_kind":"droidspaces","owner":"DroidSpaces plus Anland","status":%s,"runtime_ready":%s,"display_ready":%s,"recommended_container":%s,"selected_is_recommended":%s,"required_config":' \
+    "$(json_string "$anland_selected_container")" \
+    "$(json_string "$anland_status")" \
+    "$(json_bool "$anland_runtime_ready")" \
+    "$(json_bool "$anland_ready")" \
+    "$(json_string "$ANLAND_RECOMMENDED_CONTAINER")" \
+    "$(json_bool "$anland_selected_recommended")"
+  anland_required_config_json
+  printf ',"required_env":'
+  anland_required_env_json
+  printf ',"setup_commands":'
+  anland_setup_commands_json
+  printf ',"selected_paths":{"container_config":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_mode":%s,"display_socket_host":%s,"display_socket_guest":%s},"checks":{"display_daemon_socket":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_image":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s,"anland_producer":%s},"missing_requirements":[%s],"source":%s},' \
+    "$(json_string "$anland_selected_config")" \
+    "$(json_string "$anland_selected_env")" \
+    "$(json_string "$anland_selected_rootfs")" \
+    "$(json_string "$anland_selected_rootfs_mode")" \
+    "$(json_string "$ANLAND_SOCKET_HOST")" \
+    "$(json_string "$ANLAND_SOCKET_GUEST")" \
+    "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_env")" \
+    "$(json_bool "$anland_rootfs")" \
+    "$(json_bool "$anland_rootfs_image")" \
+    "$(json_bool "$anland_config_bind")" \
+    "$(json_bool "$anland_env_socket")" \
+    "$(json_bool "$anland_env_kgsl")" \
+	    "$(json_bool "$anland_producer")" \
+	    "$anland_errors" \
+	    "$(json_string "$ANLAND_REPAIR_SOURCE")"
+  printf '{"method_id":"droidspaces_rootfs_image","container_ref":"rootfs.img","container_kind":"droidspaces_rootfs_image","owner":"DroidSpaces","status":%s,"recommended_for":"stable_android_container_storage","requirements":["--name=<container>","--rootfs-img=<path>","optional --rootfs-arc=<archive> create","container.config rootfs_path=<rootfs.img>"],"setup_commands":{"create_from_archive":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<archive.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/<container>/rootfs.img --size=<size> create","start_image":"/data/local/Droidspaces/bin/droidspaces --name=<container> --rootfs-img=/data/local/Droidspaces/Containers/<container>/rootfs.img start"},"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_ROOTFS_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_rootfs_directory","container_ref":"rootfs_directory","container_kind":"droidspaces_rootfs_directory","owner":"DroidSpaces","status":%s,"recommended_for":"simple_unpacked_rootfs_testing","requirements":["--name=<container>","--rootfs=<path>","container.config rootfs_path=<directory>"],"setup_commands":{"start_directory":"/data/local/Droidspaces/bin/droidspaces --name=<container> --rootfs=/data/local/Droidspaces/Containers/<container>/rootfs start"},"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_ROOTFS_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_termux_x11","container_ref":"droidspaces_container_enable_termux_x11","container_kind":"droidspaces_native_x11","owner":"DroidSpaces","status":%s,"recommended_for":"x11_gui_apps","required_config":["enable_termux_x11=1"],"required_env":["DISPLAY=:0"],"runtime_artifacts":["/run/droidspaces.env","Termux:X11 socket"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_virgl","container_ref":"droidspaces_container_enable_virgl","container_kind":"droidspaces_native_gpu","owner":"DroidSpaces","status":%s,"recommended_for":"virpipe_3d_acceleration","required_config":["enable_virgl=1","virgl_extra_flags=<optional>"],"required_env":["GALLIUM_DRIVER=virpipe"],"runtime_artifacts":["/run/droidspaces.env","/tmp/.virgl_test"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_turnip_kgsl","container_ref":"droidspaces_container_enable_gpu_mode","container_kind":"droidspaces_native_gpu","owner":"DroidSpaces","status":%s,"recommended_for":"qualcomm_adreno_turnip_kgsl","required_config":["enable_gpu_mode=1","enable_hw_access=1"],"required_env":["device_specific_turnip_kgsl_env"],"runtime_artifacts":["/dev/dri/renderD128 when exposed","Mesa Turnip/KGSL userspace inside rootfs"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_llvmpipe","container_ref":"droidspaces_container_software_gl","container_kind":"droidspaces_native_software","owner":"DroidSpaces","status":%s,"recommended_for":"software_rendering_fallback","required_config":["enable_virgl=0","enable_gpu_mode=0"],"required_env":["LIBGL_ALWAYS_SOFTWARE=1 optional"],"runtime_artifacts":["Mesa llvmpipe inside rootfs"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_pulseaudio","container_ref":"droidspaces_container_enable_pulseaudio","container_kind":"droidspaces_native_audio","owner":"DroidSpaces","status":%s,"recommended_for":"container_audio","required_config":["enable_pulseaudio=1"],"required_env":["PULSE_SERVER=unix:/tmp/.pulse-socket"],"runtime_artifacts":["/run/droidspaces.env","/tmp/.pulse-socket"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"dock_drm_lease_external","container_ref":"none","container_kind":"none","owner":"future external-display lease receiver","status":"reference_only","recommended_for":"external_monitor","requirements":["external display discovery","lease receiver","explicit stop/revoke path"],"source":%s},' \
+    "$(json_string "$DRM_LEASE_SOURCE")"
+  printf '{"method_id":"compatibility_software","container_ref":"compatibility-software","container_kind":"future_droidspaces_or_app_proot","owner":"Nebula compatibility fallback","status":"not_wired","recommended_for":"software_fallback","requirements":["dedicated compatibility rootfs/profile","software GL/Vulkan policy","bounded start command"],"source":"Nebula compatibility fallback design"},'
+  printf '{"method_id":"recovery_safe","container_ref":"none","container_kind":"none","owner":"Nebula Core","status":"always_available","recommended_for":"recovery","requirements":[],"source":"Nebula Core safe mode"}'
+  printf '],"rule":"each display method keeps its own container reference; DroidSpaces native X11, VirGL, Turnip/KGSL, llvmpipe, PulseAudio, rootfs image, and rootfs directory methods stay explicit; Anland uses a dedicated Ubuntu26/KDE/anland_kde producer rootfs, not the daily Alpine runtime test container"}\n'
+}
+
+display_method_profiles_json() {
+  printf '{"protocol_version":%s,"command":"display method-profiles","mutating":false,' "$PROTOCOL_VERSION"
+  printf '"rootfs_policy":"use one writable rootfs image or directory per profile; do not start multiple active writable profiles against the same rootfs.img",'
+  printf '"config_materialization":"write /data/local/Droidspaces/Containers/<name>/container.config atomically from a temp file; chmod 0644; start later with droidspaces --config=<container.config> start",'
+  printf '"profiles":['
+  printf '{"profile_id":"anland_wayland_kde","method_id":"anland_surface","container_name":%s,"rootfs_mode":"image","rootfs_image":%s,"rootfs_archive":%s,"env_file":%s,"config_path":"/data/local/Droidspaces/Containers/anland-ubuntu26-kde/container.config",' \
+    "$(json_string "$ANLAND_RECOMMENDED_CONTAINER")" \
+    "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_IMG")" \
+    "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE")" \
+    "$(json_string "$ANLAND_RECOMMENDED_ENV")"
+  printf '"config_lines":["name=anland-ubuntu26-kde","hostname=anland-ubuntu26-kde","rootfs_path=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=0","enable_hw_access=1","enable_gpu_mode=1","enable_virgl=0","enable_pulseaudio=1","selinux_permissive=1","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","privileged=nocaps,noseccomp","foreground=0","net_mode=host","env_file=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/anland.env","bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],'
+  printf '"env_lines":["ANLAND=1","ANLAND_SOCKET=/run/display.sock","ANLAND_DRM_DEVICE=/dev/dri/renderD128","WAYLAND_DISPLAY=wayland-0","XDG_SESSION_TYPE=wayland","QT_QPA_PLATFORM=wayland","MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform","PULSE_SERVER=unix:/tmp/.pulse-socket"],'
+  printf '"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=/sdcard/Download/anland-ubuntu26-kde.tar.xz --rootfs-img=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --name=anland-ubuntu26-kde --rootfs-img=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img --net=host --hw-access --gpu --selinux-permissive --privileged=nocaps,noseccomp --env=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/anland.env --bind=/data/local/tmp/display_daemon.sock:/run/display.sock start","producer_verify":"/data/local/Droidspaces/bin/droidspaces --name=anland-ubuntu26-kde run sh -lc '\''test -x /usr/local/bin/startanland-kde.sh'\''","producer_start":"/data/local/Droidspaces/bin/droidspaces --name=anland-ubuntu26-kde run sh -lc '\''nohup /usr/local/bin/startanland-kde.sh >/tmp/anland-kde.log 2>&1 &'\''"},"source":%s},' \
+    "$(json_string "$ANLAND_REPAIR_SOURCE")"
+  printf '{"profile_id":"termux_x11_desktop","method_id":"droidspaces_termux_x11","container_name":"rm11-termux-x11","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-termux-x11/rootfs.img","config_path":"/data/local/Droidspaces/Containers/rm11-termux-x11/container.config","config_lines":["name=rm11-termux-x11","hostname=rm11-termux-x11","rootfs_path=/data/local/Droidspaces/Containers/rm11-termux-x11/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"expected_env":["DISPLAY=:0","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-termux-x11/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-termux-x11/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"virgl_desktop","method_id":"droidspaces_virgl","container_name":"rm11-virgl","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-virgl/rootfs.img","config_path":"/data/local/Droidspaces/Containers/rm11-virgl/container.config","config_lines":["name=rm11-virgl","hostname=rm11-virgl","rootfs_path=/data/local/Droidspaces/Containers/rm11-virgl/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=1","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"expected_env":["DISPLAY=:0","GALLIUM_DRIVER=virpipe","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-virgl/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-virgl/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"turnip_kgsl_desktop","method_id":"droidspaces_turnip_kgsl","container_name":"rm11-turnip-kgsl","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-turnip-kgsl/rootfs.img","env_file":"/data/local/Droidspaces/Containers/rm11-turnip-kgsl/turnip-kgsl.env","config_path":"/data/local/Droidspaces/Containers/rm11-turnip-kgsl/container.config","config_lines":["name=rm11-turnip-kgsl","hostname=rm11-turnip-kgsl","rootfs_path=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=1","enable_gpu_mode=1","selinux_permissive=1","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","env_file=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/turnip-kgsl.env","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"env_lines":["MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"llvmpipe_software","method_id":"droidspaces_llvmpipe","container_name":"rm11-llvmpipe","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-llvmpipe/rootfs.img","env_file":"/data/local/Droidspaces/Containers/rm11-llvmpipe/llvmpipe.env","config_path":"/data/local/Droidspaces/Containers/rm11-llvmpipe/container.config","config_lines":["name=rm11-llvmpipe","hostname=rm11-llvmpipe","rootfs_path=/data/local/Droidspaces/Containers/rm11-llvmpipe/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","env_file=/data/local/Droidspaces/Containers/rm11-llvmpipe/llvmpipe.env","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"env_lines":["LIBGL_ALWAYS_SOFTWARE=1","GALLIUM_DRIVER=llvmpipe","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-llvmpipe/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-llvmpipe/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"pulse_audio","method_id":"droidspaces_pulseaudio","container_name":"rm11-pulseaudio","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-pulseaudio/rootfs.img","config_path":"/data/local/Droidspaces/Containers/rm11-pulseaudio/container.config","config_lines":["name=rm11-pulseaudio","hostname=rm11-pulseaudio","rootfs_path=/data/local/Droidspaces/Containers/rm11-pulseaudio/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=0","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"expected_env":["PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-pulseaudio/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-pulseaudio/container.config start"},"source":%s}' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '],"materialization_rules":["templates are read-only and safe to inspect","safe config-only materialization is direct atomic file creation, not a DroidSpaces CLI command","write container.config.tmp then move to container.config and chmod 0644","create only creates the image; start persists or mirrors the profile config","start later with droidspaces --config=<container.config> start","never share one writable rootfs.img across active profiles","prefer copying or rebuilding a rootfs image per profile before live testing"]}\n'
+}
+
+is_test_denied_path() {
+  path=$1
+  deny_list=${NEBULA_TEST_DENY_PATHS:-}
+  old_ifs=$IFS
+  IFS=:
+  for denied in $deny_list; do
+    if [ "$denied" = "$path" ]; then
+      IFS=$old_ifs
+      return 0
+    fi
+  done
+  IFS=$old_ifs
+  return 1
+}
+
+resolve_read_path() {
+  path=$1
+  root=${NEBULA_SYSROOT:-}
+  if [ -n "$root" ]; then
+    printf '%s%s' "$root" "$path"
+  else
+    printf '%s' "$path"
+  fi
+}
+
+is_allowlisted_read_path() {
+  case "$1" in
+    /sys/kernel/fan/fan_enable|\
+    /sys/kernel/fan/fan_speed_level|\
+    /sys/kernel/fan/fan_speed_count|\
+    /proc/driver/micropump/enable|\
+    /proc/driver/micropump/freq|\
+    /proc/driver/micropump/speed|\
+    /sys/class/thermal/thermal_zone0/temp|\
+    /sys/class/thermal/thermal_zone1/temp|\
+    /sys/class/thermal/thermal_zone2/temp|\
+    /sys/class/thermal/thermal_zone3/temp|\
+    /sys/devices/virtual/thermal/thermal_zone0/temp|\
+    /sys/devices/virtual/thermal/thermal_zone1/temp|\
+    /sys/devices/virtual/thermal/thermal_zone2/temp|\
+    /sys/devices/virtual/thermal/thermal_zone3/temp)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+read_allowlisted_file() {
+  path=$1
+  if ! is_allowlisted_read_path "$path"; then
+    return 8
+  fi
+  actual=$(resolve_read_path "$path")
+  if [ ! -e "$actual" ]; then
+    return 2
+  fi
+  if is_test_denied_path "$path"; then
+    return 3
+  fi
+  if [ ! -r "$actual" ]; then
+    return 3
+  fi
+  head -n 1 "$actual" 2>/dev/null | cut -c 1-128
+}
+
+path_present() {
+  path=$1
+  actual=$(resolve_read_path "$path")
+  [ -e "$actual" ]
+}
+
+read_prop() {
+  name=$1
+  case "$name" in
+    ro.product.manufacturer|ro.product.model|ro.product.product.name|\
+    ro.product.device|ro.board.platform|ro.product.marketname|ro.build.fingerprint)
+      ;;
+    *)
+      return 8
+      ;;
+  esac
+  prop_dir=${NEBULA_TEST_PROP_DIR:-}
+  if [ -n "$prop_dir" ] && [ -f "$prop_dir/$name" ]; then
+    head -n 1 "$prop_dir/$name" 2>/dev/null | cut -c 1-128
+    return 0
+  fi
+  if command -v getprop >/dev/null 2>&1; then
+    getprop "$name" 2>/dev/null | head -n 1 | cut -c 1-128
+  fi
+}
+
+read_kernel_release() {
+  if [ -n "${NEBULA_TEST_KERNEL:-}" ]; then
+    printf '%s' "$NEBULA_TEST_KERNEL"
+  else
+    uname -r 2>/dev/null | head -n 1 | cut -c 1-128
+  fi
+}
+
+value_or_unknown() {
+  if [ -n "$1" ]; then
+    printf '%s' "$1"
+  else
+    printf '%s' unknown
+  fi
+}
+
+normalize_temp_c() {
+  raw=$1
+  case "$raw" in
+    ''|*[!0-9.-]*) printf '%s' null; return ;;
+  esac
+  case "$raw" in
+    *.*) printf '%s' "$raw"; return ;;
+  esac
+  if [ "$raw" -gt 1000 ] 2>/dev/null && [ "$raw" -lt 200000 ] 2>/dev/null; then
+    whole=$((raw / 1000))
+    frac=$((raw % 1000))
+    printf '%s.%03d' "$whole" "$frac"
+  elif [ "$raw" -gt -100 ] 2>/dev/null && [ "$raw" -lt 200 ] 2>/dev/null; then
+    printf '%s' "$raw"
+  else
+    printf '%s' null
+  fi
+}
+
+temp_to_milli_c() {
+  raw=$1
+  case "$raw" in
+    ''|*[!0-9.]*|*.*.*) return 1 ;;
+  esac
+  case "$raw" in
+    *.*)
+      whole=${raw%%.*}
+      frac=${raw#*.}
+      case "$whole$frac" in
+        ''|*[!0-9]*) return 1 ;;
+      esac
+      frac3=$(printf '%-3.3s' "$frac" | tr ' ' '0')
+      printf '%s' $((whole * 1000 + frac3))
+      ;;
+    *)
+      if [ "$raw" -gt 1000 ] 2>/dev/null; then
+        printf '%s' "$raw"
+      else
+        printf '%s' $((raw * 1000))
+      fi
+      ;;
+  esac
+}
+
+state_rank() {
+  case "$1" in
+    COOL) printf '%s' 1 ;;
+    BALANCED) printf '%s' 2 ;;
+    HOT) printf '%s' 3 ;;
+    CRITICAL) printf '%s' 4 ;;
+    *) printf '%s' 0 ;;
+  esac
+}
+
+state_threshold_milli() {
+  state=$1
+  case "$state" in
+    BALANCED) printf '%s' "$cp_balanced_milli" ;;
+    HOT) printf '%s' "$cp_hot_milli" ;;
+    CRITICAL) printf '%s' "$cp_critical_milli" ;;
+    *) printf '%s' 0 ;;
+  esac
+}
+
+intent_for_state() {
+  supported=$1
+  state=$2
+  channel=$3
+  if [ "$supported" != "1" ]; then
+    printf '%s' unavailable
+    return
+  fi
+  case "$state" in
+    SAFE_MODE) printf '%s' stock ;;
+    UNAVAILABLE) printf '%s' stock ;;
+    COOL) printf '%s' off ;;
+    BALANCED)
+      if [ "$channel" = "fan" ]; then
+        printf '%s' medium
+      else
+        printf '%s' low
+      fi
+      ;;
+    HOT) printf '%s' high ;;
+    CRITICAL) printf '%s' maximum ;;
+    *) printf '%s' unavailable ;;
+  esac
+}
+
+cooling_policy_fields() {
+  cp_errors=
+  cp_reason=
+  cp_configured_text=$(config_bool configured)
+  cp_configured=0
+  if [ "$cp_configured_text" = "true" ]; then
+    cp_configured=1
+  fi
+
+  cp_min_c=$(config_number_default temperature_min_c 0)
+  cp_max_c=$(config_number_default temperature_max_c 120)
+  cp_balanced_c=$(config_number_default balanced_c 38)
+  cp_hot_c=$(config_number_default hot_c 42)
+  cp_critical_c=$(config_number_default critical_c 46)
+  cp_hysteresis_c=$(config_number_default hysteresis_c 2)
+  cp_dwell=$(config_number_default minimum_dwell_seconds 30)
+
+  cp_limit_min_milli=$(temp_to_milli_c "$cp_min_c") || cp_configured=0
+  cp_limit_max_milli=$(temp_to_milli_c "$cp_max_c") || cp_configured=0
+  cp_balanced_milli=$(temp_to_milli_c "$cp_balanced_c") || cp_configured=0
+  cp_hot_milli=$(temp_to_milli_c "$cp_hot_c") || cp_configured=0
+  cp_critical_milli=$(temp_to_milli_c "$cp_critical_c") || cp_configured=0
+  cp_hysteresis_milli=$(temp_to_milli_c "$cp_hysteresis_c") || cp_configured=0
+  case "$cp_dwell" in
+    ''|*[!0-9]*) cp_dwell=30; cp_configured=0 ;;
+  esac
+  if ! [ "$cp_limit_min_milli" -le "$cp_balanced_milli" ] 2>/dev/null || \
+     ! [ "$cp_balanced_milli" -le "$cp_hot_milli" ] 2>/dev/null || \
+     ! [ "$cp_hot_milli" -le "$cp_critical_milli" ] 2>/dev/null || \
+     ! [ "$cp_critical_milli" -le "$cp_limit_max_milli" ] 2>/dev/null; then
+    cp_configured=0
+  fi
+
+  if [ "$cp_configured" != "1" ]; then
+    cp_errors=$(list_append_json_string "$cp_errors" "CALIBRATION_REQUIRED")
+  fi
+
+  cp_fan_present=0
+  cp_fan_supported=0
+  cp_fan_enabled=
+  cp_fan_rpm=
+  cp_fan_level=
+  for cp_fan_path in /sys/kernel/fan/fan_enable /sys/kernel/fan/fan_speed_level /sys/kernel/fan/fan_speed_count; do
+    if path_present "$cp_fan_path"; then
+      cp_fan_present=1
+      cp_fan_supported=1
+    fi
+  done
+  if [ "$cp_fan_present" = "1" ]; then
+    cp_value=$(read_allowlisted_file /sys/kernel/fan/fan_enable)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ]; then
+      case "$cp_value" in
+        0) cp_fan_enabled=false ;;
+        1) cp_fan_enabled=true ;;
+        *) cp_reason=$(list_append_json_string "$cp_reason" "invalid_fan_enabled:/sys/kernel/fan/fan_enable") ;;
+      esac
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/sys/kernel/fan/fan_enable")
+    fi
+    cp_value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_count)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value"; then
+      cp_fan_rpm=$cp_value
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/sys/kernel/fan/fan_speed_count")
+    fi
+    cp_value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_level)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value"; then
+      cp_fan_level=$cp_value
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/sys/kernel/fan/fan_speed_level")
+    fi
+  else
+    cp_reason=$(list_append_json_string "$cp_reason" "fan_missing")
+  fi
+
+  cp_pump_present=0
+  cp_pump_supported=0
+  cp_pump_enabled=
+  cp_pump_speed=
+  cp_pump_freq=
+  for cp_pump_path in /proc/driver/micropump/enable /proc/driver/micropump/freq /proc/driver/micropump/speed /proc/driver/micropump/mode; do
+    if path_present "$cp_pump_path"; then
+      cp_pump_present=1
+    fi
+  done
+  if path_present /proc/driver/micropump/enable; then
+    cp_value=$(read_allowlisted_file /proc/driver/micropump/enable)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ]; then
+      case "$cp_value" in
+        0) cp_pump_enabled=false; cp_pump_supported=1 ;;
+        1) cp_pump_enabled=true; cp_pump_supported=1 ;;
+        *) cp_reason=$(list_append_json_string "$cp_reason" "invalid_pump_enabled:/proc/driver/micropump/enable") ;;
+      esac
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/proc/driver/micropump/enable")
+    fi
+  fi
+  if path_present /proc/driver/micropump/speed; then
+    cp_value=$(read_allowlisted_file /proc/driver/micropump/speed)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value" && [ "$cp_value" -le 100 ] 2>/dev/null; then
+      cp_pump_speed=$cp_value
+      cp_pump_supported=1
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/proc/driver/micropump/speed")
+    fi
+  fi
+  if path_present /proc/driver/micropump/freq; then
+    cp_value=$(read_allowlisted_file /proc/driver/micropump/freq)
+    cp_rc=$?
+    if [ "$cp_rc" = "0" ] && is_unsigned_integer "$cp_value" && [ "$cp_value" -le 100 ] 2>/dev/null; then
+      cp_pump_freq=$cp_value
+      cp_pump_supported=1
+    elif [ "$cp_rc" = "3" ]; then
+      cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:/proc/driver/micropump/freq")
+    fi
+  fi
+  if [ "$cp_pump_present" = "0" ]; then
+    cp_reason=$(list_append_json_string "$cp_reason" "pump_missing")
+  fi
+
+  cp_valid=0
+  cp_rejected=0
+  cp_observed_max_milli=
+  cp_sensor_name=
+  cp_sensor_source=
+  for cp_thermal_path in \
+    /sys/class/thermal/thermal_zone0/temp \
+    /sys/class/thermal/thermal_zone1/temp \
+    /sys/class/thermal/thermal_zone2/temp \
+    /sys/class/thermal/thermal_zone3/temp \
+    /sys/devices/virtual/thermal/thermal_zone0/temp \
+    /sys/devices/virtual/thermal/thermal_zone1/temp \
+    /sys/devices/virtual/thermal/thermal_zone2/temp \
+    /sys/devices/virtual/thermal/thermal_zone3/temp
+  do
+    if path_present "$cp_thermal_path"; then
+      cp_value=$(read_allowlisted_file "$cp_thermal_path")
+      cp_rc=$?
+      if [ "$cp_rc" = "0" ]; then
+        if cp_milli=$(temp_to_milli_c "$cp_value") && [ "$cp_milli" -ge "$cp_limit_min_milli" ] 2>/dev/null && [ "$cp_milli" -le "$cp_limit_max_milli" ] 2>/dev/null; then
+          cp_valid=$((cp_valid + 1))
+          if [ -z "$cp_observed_max_milli" ] || [ "$cp_milli" -gt "$cp_observed_max_milli" ] 2>/dev/null; then
+            cp_observed_max_milli=$cp_milli
+            cp_sensor_name=$cp_thermal_path
+            cp_sensor_source=$REDMAGIC_SOURCE_THERMAL
+          fi
+        else
+          cp_rejected=$((cp_rejected + 1))
+          cp_reason=$(list_append_json_string "$cp_reason" "rejected_thermal:$cp_thermal_path")
+        fi
+      elif [ "$cp_rc" = "3" ]; then
+        cp_rejected=$((cp_rejected + 1))
+        cp_errors=$(list_append_json_string "$cp_errors" "permission_denied:$cp_thermal_path")
+      fi
+    fi
+  done
+
+  cp_state=UNAVAILABLE
+  if [ "$cp_configured" != "1" ]; then
+    cp_reason=$(list_append_json_string "$cp_reason" "CALIBRATION_REQUIRED")
+  elif [ "$(safe_mode_value)" = "1" ]; then
+    cp_state=SAFE_MODE
+    cp_reason=$(list_append_json_string "$cp_reason" "safe_mode")
+  elif [ "$cp_configured" = "1" ] && [ "$cp_valid" -gt 0 ]; then
+    if [ "$cp_observed_max_milli" -ge "$cp_critical_milli" ] 2>/dev/null; then
+      cp_state=CRITICAL
+    elif [ "$cp_observed_max_milli" -ge "$cp_hot_milli" ] 2>/dev/null; then
+      cp_state=HOT
+    elif [ "$cp_observed_max_milli" -ge "$cp_balanced_milli" ] 2>/dev/null; then
+      cp_state=BALANCED
+    else
+      cp_state=COOL
+    fi
+
+    cp_previous=${NEBULA_POLICY_PREVIOUS_STATE:-}
+    cp_age=${NEBULA_POLICY_PREVIOUS_STATE_AGE_SECONDS:-999999}
+    case "$cp_age" in
+      ''|*[!0-9]*) cp_age=999999 ;;
+    esac
+    cp_prev_rank=$(state_rank "$cp_previous")
+    cp_state_rank=$(state_rank "$cp_state")
+    if [ "$cp_prev_rank" -gt "$cp_state_rank" ] 2>/dev/null; then
+      if [ "$cp_age" -lt "$cp_dwell" ] 2>/dev/null; then
+        cp_state=$cp_previous
+        cp_reason=$(list_append_json_string "$cp_reason" "minimum_dwell_active")
+      else
+        cp_hold_threshold=$(state_threshold_milli "$cp_previous")
+        cp_hold_floor=$((cp_hold_threshold - cp_hysteresis_milli))
+        if [ "$cp_hold_threshold" -gt 0 ] 2>/dev/null && [ "$cp_observed_max_milli" -ge "$cp_hold_floor" ] 2>/dev/null; then
+          cp_state=$cp_previous
+          cp_reason=$(list_append_json_string "$cp_reason" "hysteresis_hold")
+        fi
+      fi
+    fi
+  elif [ "$cp_valid" = "0" ]; then
+    cp_reason=$(list_append_json_string "$cp_reason" "no_valid_thermal")
+  fi
+
+  cp_fan_intent=$(intent_for_state "$cp_fan_supported" "$cp_state" fan)
+  cp_pump_intent=$(intent_for_state "$cp_pump_supported" "$cp_state" pump)
+
+  if [ -z "$cp_fan_enabled" ]; then cp_fan_enabled_json=null; else cp_fan_enabled_json=$cp_fan_enabled; fi
+  if [ -z "$cp_pump_enabled" ]; then cp_pump_enabled_json=null; else cp_pump_enabled_json=$cp_pump_enabled; fi
+  if [ -z "$cp_observed_max_milli" ]; then cp_max_json=null; else cp_max_json=$(json_number_from_milli "$cp_observed_max_milli"); fi
+  if [ -z "$cp_sensor_name" ]; then cp_sensor_name_json=null; else cp_sensor_name_json=$(json_string "$cp_sensor_name"); fi
+  if [ -z "$cp_sensor_source" ]; then cp_sensor_source_json=null; else cp_sensor_source_json=$(json_string "$cp_sensor_source"); fi
+
+  printf '"preview_only":true,'
+  printf '"configured":%s,' "$(json_bool "$cp_configured")"
+  printf '"safe_mode":%s,' "$(json_bool "$(safe_mode_value)")"
+  printf '"state":%s,' "$(json_string "$cp_state")"
+  printf '"controlling_sensor":{"name":%s,"source":%s,"temperature_c":%s},' \
+    "$cp_sensor_name_json" "$cp_sensor_source_json" "$cp_max_json"
+  printf '"thermal":{"maximum_c":%s,"valid_sensor_count":%s,"rejected_sensor_count":%s},' \
+    "$cp_max_json" "$cp_valid" "$cp_rejected"
+  printf '"fan":{"supported":%s,"present":%s,"current":{"enabled":%s,"rpm":%s,"level":%s},"intent":%s,"applied":false},' \
+    "$(json_bool "$cp_fan_supported")" \
+    "$(json_bool "$cp_fan_present")" \
+    "$cp_fan_enabled_json" \
+    "$(json_int_or_null "$cp_fan_rpm")" \
+    "$(json_int_or_null "$cp_fan_level")" \
+    "$(json_string "$cp_fan_intent")"
+  printf '"pump":{"supported":%s,"present":%s,"current":{"enabled":%s,"speed":%s,"freq":%s},"intent":%s,"applied":false},' \
+    "$(json_bool "$cp_pump_supported")" \
+    "$(json_bool "$cp_pump_present")" \
+    "$cp_pump_enabled_json" \
+    "$(json_int_or_null "$cp_pump_speed")" \
+    "$(json_int_or_null "$cp_pump_freq")" \
+    "$(json_string "$cp_pump_intent")"
+  printf '"policy":{"threshold_source":"defaults.json","hysteresis_c":%s,"minimum_dwell_seconds":%s},' \
+    "$(json_number_from_milli "$cp_hysteresis_milli")" \
+    "$cp_dwell"
+  printf '"reason":[%s],"errors":[%s]' "$cp_reason" "$cp_errors"
+}
+
+cooling_policy_json() {
+  printf '{"protocol_version":%s,"command":"cooling policy",' "$PROTOCOL_VERSION"
+  cooling_policy_fields
+  printf '}\n'
+}
+
+module_prop_from_dir() {
+  dir=$1
+  key=$2
+  prop="$dir/module.prop"
+  if [ -f "$prop" ]; then
+    sed -n "s/^$key=//p" "$prop" | head -n 1
+  fi
+}
+
+legacy_module_entry() {
+  id=$1
+  title=$2
+  source=$3
+  staged=$4
+  dir="$MODULES_ROOT/$id"
+  installed=0
+  disabled=0
+  remove_marker=0
+  version=unknown
+  version_code=0
+  description=
+  if [ -d "$dir" ]; then
+    installed=1
+    version=$(module_prop_from_dir "$dir" version)
+    version_code=$(module_prop_from_dir "$dir" versionCode)
+    description=$(module_prop_from_dir "$dir" description)
+    [ -f "$dir/disable" ] && disabled=1
+    [ -f "$dir/remove" ] && remove_marker=1
+  fi
+  [ -n "$version" ] || version=unknown
+  case "$version_code" in
+    ''|*[!0-9]*) version_code=0 ;;
+  esac
+  if [ -z "$description" ]; then description=unknown; fi
+  printf '{"id":%s,"title":%s,"protected":true,"installed":%s,"disabled":%s,"remove_marker":%s,"version":%s,"version_code":%s,"description":%s,"nebula_import":%s,"source":%s}' \
+    "$(json_string "$id")" \
+    "$(json_string "$title")" \
+    "$(json_bool "$installed")" \
+    "$(json_bool "$disabled")" \
+    "$(json_bool "$remove_marker")" \
+    "$(json_string "$version")" \
+    "$version_code" \
+    "$(json_string "$description")" \
+    "$(json_string "$staged")" \
+    "$(json_string "$source")"
+}
+
+legacy_modules_json() {
+  printf '{"protocol_version":%s,"command":"legacy modules","migration_enabled":false,"modules":[' "$PROTOCOL_VERSION"
+  legacy_module_entry droidspaces "Droidspaces: Daemon & Init" "$LEGACY_DROIDSPACES_SOURCE" "staged_audit_only"
+  printf ','
+  legacy_module_entry rm11-droidspace-bridge-fd "RM11 Droidspaces Bridge FD Policy" "$LEGACY_BRIDGE_SOURCE" "staged_audit_only"
+  printf '],"guardrails":["do_not_disable_both","do_not_delete_until_reboot_verified","nebula_core_does_not_start_targets_by_default"]}\n'
+}
+
+module_installed_value() {
+  if [ -d "$MODULES_ROOT/$1" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+module_disabled_value() {
+  if [ -f "$MODULES_ROOT/$1/disable" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+package_visible_value() {
+  if package_visible "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+path_present_value() {
+  if path_present "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+fixed_path_executable_value() {
+  if fixed_path_executable "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+fixed_path_exists_value() {
+  if fixed_path_exists "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+fixed_path_socket_value() {
+  if fixed_path_socket "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+integrations_baseline_json() {
+  ensure_dirs
+  waylandie_collect
+
+  droidspaces_package=$(package_visible_value "$DROIDSPACES_PACKAGE")
+  droidspaces_module=$(module_installed_value droidspaces)
+  droidspaces_module_disabled=$(module_disabled_value droidspaces)
+  droidspaces_bridge_module=$(module_installed_value rm11-droidspace-bridge-fd)
+  anland_collect
+  droidspaces_installed=0
+  if [ "$droidspaces_package" = "1" ] || [ "$droidspaces_module" = "1" ] || [ "$anland_bin" = "1" ]; then
+    droidspaces_installed=1
+  fi
+  droidspaces_status=$anland_status
+  droidspaces_ready=$anland_runtime_ready
+  if [ "$droidspaces_installed" = "0" ]; then
+    droidspaces_status=missing
+    droidspaces_ready=0
+	  elif [ "$anland_runtime_ready" != "1" ] && [ "$droidspaces_installed" = "1" ] && [ "$anland_status" = "missing" ]; then
+	    droidspaces_status=partial
+	  fi
+	  wl_integration_status=missing
+	  wl_container_status=missing
+	  wl_display_status=display_missing
+	  wl_runtime_status=runtime_missing
+	  if [ "$wl_display_ready" = "1" ]; then
+	    wl_integration_status=display_ready
+	    wl_display_status=display_proven
+	  elif [ "$wl_installed" = "1" ]; then
+	    wl_integration_status=partial
+	  fi
+	  if [ "$wl_ready" = "1" ]; then
+	    wl_container_status=ready
+	    wl_runtime_status=runtime_ready
+	  elif [ "$wl_installed" = "1" ]; then
+	    wl_container_status=partial
+	  fi
+	  droidspaces_container_status=missing
+	  droidspaces_display_status=display_missing
+	  droidspaces_runtime_status=runtime_missing
+	  droidspaces_requirement_status=missing_requirements
+	  if [ "$droidspaces_installed" = "0" ]; then
+	    droidspaces_requirement_status=droidspaces_missing
+	  elif [ "$anland_selection_ambiguous" = "1" ]; then
+	    droidspaces_container_status=ambiguous
+	    droidspaces_requirement_status=ambiguous_selection
+	  elif [ -z "$anland_selected_container" ]; then
+	    droidspaces_requirement_status=invalid_selection
+	  elif [ "$anland_container_active" = "1" ]; then
+	    droidspaces_container_status=active
+	  elif [ "$anland_runtime_ready" = "1" ]; then
+	    droidspaces_container_status=ready
+	  elif [ "$anland_config" = "1" ]; then
+	    droidspaces_container_status=idle
+	  fi
+	  if [ "$anland_runtime_ready" = "1" ]; then
+	    droidspaces_runtime_status=runtime_ready
+	  fi
+	  if [ "$anland_ready" = "1" ]; then
+	    droidspaces_display_status=display_ready
+	    droidspaces_requirement_status=complete
+	  elif [ "$droidspaces_requirement_status" = "ambiguous_selection" ] || [ "$droidspaces_requirement_status" = "invalid_selection" ] || [ "$droidspaces_requirement_status" = "droidspaces_missing" ]; then
+	    true
+	  elif [ "$anland_rootfs_allowed" != "1" ]; then
+	    droidspaces_requirement_status=invalid_rootfs_path
+	  elif [ "$anland_rootfs" != "1" ]; then
+	    droidspaces_requirement_status=missing_requirements
+	  elif [ "$anland_socket" != "1" ] && [ "$anland_env" != "1" ]; then
+	    droidspaces_requirement_status=missing_requirements
+    elif [ "$anland_socket" != "1" ]; then
+      droidspaces_requirement_status=missing_requirements
+    elif [ "$anland_socket_writable" != "1" ]; then
+      droidspaces_requirement_status=missing_requirements
+    elif [ "$anland_env" != "1" ]; then
+      droidspaces_requirement_status=missing_requirements
+	  fi
+
+  vector_installed=$(module_installed_value zygisk_vector)
+  vector_enabled=0
+  if [ "$vector_installed" = "1" ] && [ "$(module_disabled_value zygisk_vector)" = "0" ]; then
+    vector_enabled=1
+  fi
+  nubia_game_assist=$(package_visible_value "$NUBIA_GAME_ASSIST_PACKAGE")
+  nubia_game_launcher=$(package_visible_value "$NUBIA_GAME_LAUNCHER_PACKAGE")
+  nubia_toolkit_reference=$(package_visible_value "$NUBIA_TOOLKIT_PACKAGE")
+  nubia_status=hook_lane_deferred
+  nubia_installed=0
+  nubia_ready=0
+  if [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ] || [ "$nubia_toolkit_reference" = "1" ]; then
+    nubia_installed=1
+  fi
+  if [ "$vector_enabled" = "1" ] && { [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ]; }; then
+    nubia_status=hook_framework_ready_scope_deferred
+    nubia_ready=1
+  elif [ "$vector_installed" = "1" ] || [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ]; then
+    nubia_status=partial
+  fi
+
+  redmagic_control_package=$(package_visible_value "$REDMAGIC_CONTROL_PACKAGE")
+  redmagic_fan=$(path_present_value /sys/kernel/fan/fan_enable)
+  redmagic_fan_level=$(path_present_value /sys/kernel/fan/fan_speed_level)
+  redmagic_pump=$(path_present_value /proc/driver/micropump/enable)
+  redmagic_led=$(path_present_value /sys/class/leds/aw22xxx_led/effect)
+  redmagic_triggers=0
+  if path_present /sys/class/leds/sar0/mode_operation || path_present /sys/class/leds/sar1/mode_operation; then
+    redmagic_triggers=1
+  fi
+  redmagic_status=nodes_missing
+  redmagic_ready=0
+  if [ "$redmagic_fan" = "1" ] || [ "$redmagic_fan_level" = "1" ] || [ "$redmagic_pump" = "1" ]; then
+    redmagic_status=read_only_nodes_visible
+    redmagic_ready=1
+  elif [ "$redmagic_control_package" = "1" ]; then
+    redmagic_status=reference_apk_visible
+  fi
+
+  powerdeck_module=$(module_installed_value "$POWERDECK_MODULE_ID")
+  powerdeck_disabled=$(module_disabled_value "$POWERDECK_MODULE_ID")
+  powerdeck_tmp_apply=$(fixed_path_executable_value /data/local/tmp/redmagic_powerdeck/rm-powerdeck-apply.sh)
+  powerdeck_status=nebula_preview_ready
+  if [ "$powerdeck_module" = "1" ]; then
+    powerdeck_status=external_module_detected_dry_run_required
+  fi
+
+  overall_status=baseline_partial
+  if [ "$wl_display_ready" = "1" ] \
+    && { [ "$droidspaces_ready" = "1" ] || [ "$droidspaces_module" = "1" ] || [ "$droidspaces_package" = "1" ]; } \
+    && { [ "$redmagic_fan" = "1" ] || [ "$redmagic_pump" = "1" ]; }; then
+    overall_status=baseline_ready_read_only
+  elif [ "$wl_installed" != "1" ] && [ "$droidspaces_package" != "1" ] && [ "$droidspaces_module" != "1" ]; then
+    overall_status=baseline_bootstrap
+  fi
+
+  printf '{"protocol_version":%s,"command":"integrations baseline",' "$PROTOCOL_VERSION"
+  printf '"baseline_id":"nebula_rm11pro_baseline","overall_status":%s,' "$(json_string "$overall_status")"
+  printf '"apk_package":"io.droidspaces.nebula","module_id":"%s","safe_default":true,"mutating_controls_enabled":false,' "$MODULE_ID"
+  printf '"requirements":["Root with KernelSU/Magisk-compatible module support","Nebula Core module installed for root-side status","WayLandIE companion APK for Phone/App display lane","DroidSpaces/Anland files for container surface fallback","RM11 Pro/NX809J hardware for RedMagic fan, pump, LED, and trigger nodes","Vector/LSPosed only when hook lanes are intentionally enabled"],'
+  printf '"integrations":['
+  printf '{"id":"nebula_core","title":"Nebula Core module","owner":"Nebula","role":"fixed_root_contract","status":"ready","installed":true,"ready":true,"mutating":false,"version":%s,"source":"nebula-core-module"},' \
+    "$(json_string "$(module_version)")"
+	  printf '{"id":"waylandie","method_id":"phone_app_bridge","title":"WayLandIE display/runtime","owner":"WayLandIE companion APK","role":"phone_app_bridge","status":%s,"installed":%s,"ready":%s,"display_ready":%s,"runtime_ready":%s,"container_ref":"waylandie_app_imagefs","container_kind":"app_proot","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":"display_requirements_met","missing_requirements":["game_client_runtime_proof_not_promoted_39bit_va"],"mutating":false,"package":%s,"evidence":%s,"source":%s,"errors":[%s]},' \
+	    "$(json_string "$wl_integration_status")" \
+	    "$(json_bool "$wl_installed")" \
+	    "$(json_bool "$wl_display_ready")" \
+	    "$(json_bool "$wl_display_ready")" \
+	    "$(json_bool "$wl_ready")" \
+	    "$(json_string "$wl_container_status")" \
+	    "$(json_string "$wl_display_status")" \
+	    "$(json_string "$wl_runtime_status")" \
+	    "$(json_string "$WAYLANDIE_PACKAGE")" \
+	    "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")" \
+	    "$(json_string "$DISPLAY_PHONE_SOURCE")" \
+	    "$wl_display_errors"
+	  printf '{"id":"droidspaces","method_id":"anland_surface","title":"DroidSpaces / Anland runtime","owner":"DroidSpaces ecosystem","role":"container_surface_fallback","status":%s,"installed":%s,"ready":%s,"runtime_ready":%s,"display_socket_ready":%s,"container_ref":%s,"container_kind":"droidspaces","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":%s,"missing_requirements":[%s],"mutating":false,"package":%s,"module_installed":%s,"module_disabled":%s,"bridge_module_installed":%s,"selected_container":%s,"container_selection_source":%s,"container_active":%s,"container_pid":%s,"checks":{"droidspaces_binary":%s,"container_selected":%s,"container_config":%s,"active_container_pidfile":%s,"rootfs_path":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"anland_producer":%s},"selected_paths":{"containers_dir":%s,"pids_dir":%s,"pidfile":%s,"container_config":%s,"anland_env":%s,"rootfs_path":%s},"source":%s,"errors":[%s]},' \
+	    "$(json_string "$droidspaces_status")" \
+	    "$(json_bool "$droidspaces_installed")" \
+	    "$(json_bool "$droidspaces_ready")" \
+	    "$(json_bool "$anland_runtime_ready")" \
+	    "$(json_bool "$anland_socket_writable")" \
+	    "$(json_string "$anland_selected_container")" \
+	    "$(json_string "$droidspaces_container_status")" \
+	    "$(json_string "$droidspaces_display_status")" \
+	    "$(json_string "$droidspaces_runtime_status")" \
+	    "$(json_string "$droidspaces_requirement_status")" \
+	    "$anland_errors" \
+	    "$(json_string "$DROIDSPACES_PACKAGE")" \
+	    "$(json_bool "$droidspaces_module")" \
+	    "$(json_bool "$droidspaces_module_disabled")" \
+    "$(json_bool "$droidspaces_bridge_module")" \
+    "$(json_string "$anland_selected_container")" \
+    "$(json_string "$anland_selection_source")" \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_int_or_null "$anland_container_pid")" \
+    "$(json_bool "$anland_bin")" \
+    "$(json_bool "$([ -n "$anland_selected_container" ] && printf 1 || printf 0)")" \
+    "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_bool "$anland_rootfs")" \
+	    "$(json_bool "$anland_env")" \
+	    "$(json_bool "$anland_socket")" \
+	    "$(json_bool "$anland_socket_writable")" \
+	    "$(json_bool "$anland_render")" \
+	    "$(json_bool "$anland_producer")" \
+    "$(json_string "$ANLAND_CONTAINERS_DIR")" \
+    "$(json_string "$ANLAND_PIDS_DIR")" \
+    "$(json_string_or_null "$anland_selected_pidfile")" \
+	    "$(json_string "$anland_selected_config")" \
+	    "$(json_string "$anland_selected_env")" \
+	    "$(json_string "$anland_selected_rootfs")" \
+	    "$(json_string "$ANLAND_REPAIR_SOURCE")" \
+	    "$anland_errors"
+  printf '{"id":"nubia_toolkit","title":"Nubia Toolkit hook lane","owner":"Nebula status port plus optional Vector/LSPosed","role":"gamehub_hooks_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"hooks_active":false,"old_toolkit_required":false,"packages":{"game_assist":%s,"game_launcher":%s,"toolkit_reference":%s},"hook_framework":{"id":"zygisk_vector","installed":%s,"enabled":%s},"source":%s},' \
+    "$(json_string "$nubia_status")" \
+    "$(json_bool "$nubia_installed")" \
+    "$(json_bool "$nubia_ready")" \
+    "$(json_bool "$nubia_game_assist")" \
+    "$(json_bool "$nubia_game_launcher")" \
+    "$(json_bool "$nubia_toolkit_reference")" \
+    "$(json_bool "$vector_installed")" \
+    "$(json_bool "$vector_enabled")" \
+    "$(json_string "$NUBIA_TOOLKIT_SOURCE")"
+  printf '{"id":"redmagic_control_center","title":"RedMagic Control Center lane","owner":"Nebula read-only probe plus optional standalone APK","role":"hardware_status_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"writes_enabled":false,"package":%s,"checks":{"fan_enable":%s,"fan_level":%s,"pump_enable":%s,"led_effect":%s,"triggers":%s},"source":%s},' \
+    "$(json_string "$redmagic_status")" \
+    "$(json_bool "$redmagic_control_package")" \
+    "$(json_bool "$redmagic_ready")" \
+    "$(json_string "$REDMAGIC_CONTROL_PACKAGE")" \
+    "$(json_bool "$redmagic_fan")" \
+    "$(json_bool "$redmagic_fan_level")" \
+    "$(json_bool "$redmagic_pump")" \
+    "$(json_bool "$redmagic_led")" \
+    "$(json_bool "$redmagic_triggers")" \
+    "$(json_string "$REDMAGIC_SOURCE_FAN; $REDMAGIC_SOURCE_PUMP")"
+  printf '{"id":"powerdeck","title":"RedMagic PowerDeck automation","owner":"Nebula Core preview contract","role":"dry_run_profile_automation","status":%s,"installed":%s,"ready":true,"mutating":false,"writes_enabled":false,"dry_run_required":true,"module_id":%s,"module_disabled":%s,"local_apply_script_visible":%s,"source":"RedMagicPowerDeck dry-run/snapshot design; Nebula cooling policy and snapshot commands"}' \
+    "$(json_string "$powerdeck_status")" \
+    "$(json_bool "$powerdeck_module")" \
+    "$(json_string "$POWERDECK_MODULE_ID")" \
+    "$(json_bool "$powerdeck_disabled")" \
+    "$(json_bool "$powerdeck_tmp_apply")"
+	  printf '],"guardrails":["single_baseline_apk_module_contract","status_before_mutation","no_hook_activation_from_baseline_status","no_device_node_writes_from_baseline_status","no_droidspaces_replacement_without_reboot_verified_migration","wayland_display_proven_game_client_runtime_not_promoted"],'
+	  printf '"next_step":"bounded_game_client_runtime"}\n'
+}
+
+cooling_snapshot_payload() {
+  snap_errors=
+  snap_fan_present=0
+  snap_pump_present=0
+  snap_fan_enabled=
+  snap_fan_rpm=
+  snap_fan_level=
+  snap_pump_enabled=
+  snap_pump_speed=
+  snap_pump_freq=
+
+  for snap_path in /sys/kernel/fan/fan_enable /sys/kernel/fan/fan_speed_level /sys/kernel/fan/fan_speed_count; do
+    path_present "$snap_path" && snap_fan_present=1
+  done
+  if [ "$snap_fan_present" = "1" ]; then
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      case "$value" in
+        0) snap_fan_enabled=false ;;
+        1) snap_fan_enabled=true ;;
+        *) snap_errors=$(list_append_json_string "$snap_errors" "invalid_fan_enabled:/sys/kernel/fan/fan_enable") ;;
+      esac
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/sys/kernel/fan/fan_enable")
+    fi
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_count)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value"; then
+      snap_fan_rpm=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/sys/kernel/fan/fan_speed_count")
+    fi
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_level)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value"; then
+      snap_fan_level=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/sys/kernel/fan/fan_speed_level")
+    fi
+  else
+    snap_errors=$(list_append_json_string "$snap_errors" "missing:/sys/kernel/fan")
+  fi
+
+  for snap_path in /proc/driver/micropump/enable /proc/driver/micropump/freq /proc/driver/micropump/speed; do
+    path_present "$snap_path" && snap_pump_present=1
+  done
+  if [ "$snap_pump_present" = "1" ]; then
+    value=$(read_allowlisted_file /proc/driver/micropump/enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      case "$value" in
+        0) snap_pump_enabled=false ;;
+        1) snap_pump_enabled=true ;;
+        *) snap_errors=$(list_append_json_string "$snap_errors" "invalid_pump_enabled:/proc/driver/micropump/enable") ;;
+      esac
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/proc/driver/micropump/enable")
+    fi
+    value=$(read_allowlisted_file /proc/driver/micropump/speed)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value" && [ "$value" -le 100 ] 2>/dev/null; then
+      snap_pump_speed=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/proc/driver/micropump/speed")
+    fi
+    value=$(read_allowlisted_file /proc/driver/micropump/freq)
+    rc=$?
+    if [ "$rc" = "0" ] && is_unsigned_integer "$value" && [ "$value" -le 100 ] 2>/dev/null; then
+      snap_pump_freq=$value
+    elif [ "$rc" = "3" ]; then
+      snap_errors=$(list_append_json_string "$snap_errors" "permission_denied:/proc/driver/micropump/freq")
+    fi
+  else
+    snap_errors=$(list_append_json_string "$snap_errors" "missing:/proc/driver/micropump")
+  fi
+
+  if [ -z "$snap_fan_enabled" ]; then snap_fan_enabled_json=null; else snap_fan_enabled_json=$snap_fan_enabled; fi
+  if [ -z "$snap_pump_enabled" ]; then snap_pump_enabled_json=null; else snap_pump_enabled_json=$snap_pump_enabled; fi
+  created=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date)
+  printf '{"scope":"cooling","created_utc":%s,"fan":{"present":%s,"enabled":%s,"rpm":%s,"level":%s},"pump":{"present":%s,"enabled":%s,"speed":%s,"freq":%s},"rollback_supported":true,"apply_supported":false,"errors":[%s]}' \
+    "$(json_string "$created")" \
+    "$(json_bool "$snap_fan_present")" \
+    "$snap_fan_enabled_json" \
+    "$(json_int_or_null "$snap_fan_rpm")" \
+    "$(json_int_or_null "$snap_fan_level")" \
+    "$(json_bool "$snap_pump_present")" \
+    "$snap_pump_enabled_json" \
+    "$(json_int_or_null "$snap_pump_speed")" \
+    "$(json_int_or_null "$snap_pump_freq")" \
+    "$snap_errors"
+}
+
+snapshot_cooling_create_json() {
+  ensure_dirs
+  mkdir -p "$SNAPSHOT_DIR"
+  payload=$(cooling_snapshot_payload)
+  printf '%s\n' "$payload" > "$COOLING_SNAPSHOT_FILE.tmp"
+  mv "$COOLING_SNAPSHOT_FILE.tmp" "$COOLING_SNAPSHOT_FILE"
+  printf '{"protocol_version":%s,"command":"snapshot cooling create","ok":true,"snapshot":%s}\n' "$PROTOCOL_VERSION" "$payload"
+}
+
+snapshot_cooling_get_json() {
+  ensure_dirs
+  if [ -s "$COOLING_SNAPSHOT_FILE" ]; then
+    printf '{"protocol_version":%s,"command":"snapshot cooling get","present":true,"snapshot":' "$PROTOCOL_VERSION"
+    sed -n '1p' "$COOLING_SNAPSHOT_FILE"
+    printf '}\n'
+  else
+    printf '{"protocol_version":%s,"command":"snapshot cooling get","present":false,"snapshot":null}\n' "$PROTOCOL_VERSION"
+  fi
+}
+
+snapshot_cooling_rollback_dry_run_json() {
+  ensure_dirs
+  if [ ! -s "$COOLING_SNAPSHOT_FILE" ]; then
+    printf '{"protocol_version":%s,"command":"snapshot cooling rollback","ok":false,"dry_run":true,"applied":false,"error":"NO_SNAPSHOT"}\n' "$PROTOCOL_VERSION"
+    return 66
+  fi
+  current=$(cooling_snapshot_payload)
+  printf '{"protocol_version":%s,"command":"snapshot cooling rollback","ok":true,"dry_run":true,"applied":false,"writes_enabled":false,"snapshot":' "$PROTOCOL_VERSION"
+  sed -n '1p' "$COOLING_SNAPSHOT_FILE"
+  printf ',"current":%s,"rollback_plan":{"fan":"restore_snapshot_values_if_apply_enabled_later","pump":"restore_snapshot_values_if_apply_enabled_later"}}\n' "$current"
+}
+
+pump_json_payload() {
+  pump_errors=
+  pump_sources=
+  pump_present=0
+  pump_supported=0
+  pump_enabled=
+  pump_speed=
+
+  for pump_path in \
+    /proc/driver/micropump/enable \
+    /proc/driver/micropump/freq \
+    /proc/driver/micropump/speed \
+    /proc/driver/micropump/mode
+  do
+    if path_present "$pump_path"; then
+      pump_present=1
+    fi
+  done
+
+  if path_present /proc/driver/micropump/enable; then
+    value=$(read_allowlisted_file /proc/driver/micropump/enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      pump_sources=$(list_append_json_string "$pump_sources" "/proc/driver/micropump/enable")
+      if [ -z "$value" ]; then
+        pump_errors=$(list_append_json_string "$pump_errors" "empty:/proc/driver/micropump/enable")
+      elif is_unsigned_integer "$value"; then
+        case "$value" in
+          0) pump_enabled=false; pump_supported=1 ;;
+          1) pump_enabled=true; pump_supported=1 ;;
+          *) pump_errors=$(list_append_json_string "$pump_errors" "out_of_range:/proc/driver/micropump/enable:$value") ;;
+        esac
+      else
+        pump_errors=$(list_append_json_string "$pump_errors" "invalid_numeric:/proc/driver/micropump/enable:$value")
+      fi
+    elif [ "$rc" = "3" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "permission_denied:/proc/driver/micropump/enable")
+    fi
+  fi
+
+  if path_present /proc/driver/micropump/freq; then
+    value=$(read_allowlisted_file /proc/driver/micropump/freq)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      pump_sources=$(list_append_json_string "$pump_sources" "/proc/driver/micropump/freq")
+      if [ -z "$value" ]; then
+        pump_errors=$(list_append_json_string "$pump_errors" "empty:/proc/driver/micropump/freq")
+      elif is_unsigned_integer "$value"; then
+        if [ "$value" -le 100 ] 2>/dev/null; then
+          pump_supported=1
+        else
+          pump_errors=$(list_append_json_string "$pump_errors" "out_of_range:/proc/driver/micropump/freq:$value")
+        fi
+      else
+        pump_errors=$(list_append_json_string "$pump_errors" "invalid_numeric:/proc/driver/micropump/freq:$value")
+      fi
+    elif [ "$rc" = "3" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "permission_denied:/proc/driver/micropump/freq")
+    fi
+  fi
+
+  if path_present /proc/driver/micropump/speed; then
+    value=$(read_allowlisted_file /proc/driver/micropump/speed)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      pump_sources=$(list_append_json_string "$pump_sources" "/proc/driver/micropump/speed")
+      if [ -z "$value" ]; then
+        pump_errors=$(list_append_json_string "$pump_errors" "empty:/proc/driver/micropump/speed")
+      elif is_unsigned_integer "$value"; then
+        if [ "$value" -le 100 ] 2>/dev/null; then
+          pump_speed=$value
+          pump_supported=1
+        else
+          pump_errors=$(list_append_json_string "$pump_errors" "out_of_range:/proc/driver/micropump/speed:$value")
+        fi
+      else
+        pump_errors=$(list_append_json_string "$pump_errors" "invalid_numeric:/proc/driver/micropump/speed:$value")
+      fi
+    elif [ "$rc" = "3" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "permission_denied:/proc/driver/micropump/speed")
+    fi
+  fi
+
+  if [ "$pump_present" = "0" ]; then
+    pump_errors=$(list_append_json_string "$pump_errors" "missing:/proc/driver/micropump")
+    pump_confidence=unsupported
+  elif [ "$pump_supported" = "1" ]; then
+    pump_confidence=confirmed
+  else
+    if [ -z "$pump_errors" ]; then
+      pump_errors=$(list_append_json_string "$pump_errors" "presence_only:/proc/driver/micropump")
+    fi
+    pump_confidence=candidate
+  fi
+
+  if [ -z "$pump_enabled" ]; then
+    pump_enabled_json=null
+  else
+    pump_enabled_json=$pump_enabled
+  fi
+
+  printf '{"supported":%s,"present":%s,"enabled":%s,"rpm":null,"speed":%s,"level":null,"flow_rate":null,"flow_rate_unit":null,"mode":null,"sources":[%s],"confidence":%s,"errors":[%s]}' \
+    "$(json_bool "$pump_supported")" \
+    "$(json_bool "$pump_present")" \
+    "$pump_enabled_json" \
+    "$(json_int_or_null "$pump_speed")" \
+    "$pump_sources" \
+    "$(json_string "$pump_confidence")" \
+    "$pump_errors"
+}
+
+redmagic_pump_probe_json() {
+  printf '{"protocol_version":%s,"command":"redmagic pump probe","pump":' "$PROTOCOL_VERSION"
+  pump_json_payload
+  printf '}\n'
+}
+
+redmagic_probe_json() {
+  manufacturer=$(value_or_unknown "$(read_prop ro.product.manufacturer)")
+  model=$(value_or_unknown "$(read_prop ro.product.model)")
+  product=$(value_or_unknown "$(read_prop ro.product.product.name)")
+  device=$(value_or_unknown "$(read_prop ro.product.device)")
+  board_platform=$(value_or_unknown "$(read_prop ro.board.platform)")
+  kernel=$(value_or_unknown "$(read_kernel_release)")
+
+  fan_errors=
+  fan_present=0
+  fan_supported=0
+  fan_enabled=
+  fan_rpm=
+  fan_level=
+
+  for fan_path in /sys/kernel/fan/fan_enable /sys/kernel/fan/fan_speed_level /sys/kernel/fan/fan_speed_count; do
+    if path_present "$fan_path"; then
+      fan_present=1
+      fan_supported=1
+    fi
+  done
+
+  if [ "$fan_present" = "1" ]; then
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_enable)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      case "$value" in
+        1) fan_enabled=true ;;
+        0) fan_enabled=false ;;
+        *) fan_enabled= ;;
+      esac
+    elif [ "$rc" = "3" ]; then
+      fan_errors=$(list_append_json_string "$fan_errors" "permission_denied:/sys/kernel/fan/fan_enable")
+    fi
+
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_count)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      fan_rpm=$value
+    elif [ "$rc" = "3" ]; then
+      fan_errors=$(list_append_json_string "$fan_errors" "permission_denied:/sys/kernel/fan/fan_speed_count")
+    fi
+
+    value=$(read_allowlisted_file /sys/kernel/fan/fan_speed_level)
+    rc=$?
+    if [ "$rc" = "0" ]; then
+      fan_level=$value
+    elif [ "$rc" = "3" ]; then
+      fan_errors=$(list_append_json_string "$fan_errors" "permission_denied:/sys/kernel/fan/fan_speed_level")
+    fi
+  else
+    fan_errors=$(list_append_json_string "$fan_errors" "missing:/sys/kernel/fan")
+  fi
+
+  thermal_errors=
+  thermal_readings=
+  thermal_supported=0
+  first=1
+  for thermal_path in \
+    /sys/class/thermal/thermal_zone0/temp \
+    /sys/class/thermal/thermal_zone1/temp \
+    /sys/class/thermal/thermal_zone2/temp \
+    /sys/class/thermal/thermal_zone3/temp \
+    /sys/devices/virtual/thermal/thermal_zone0/temp \
+    /sys/devices/virtual/thermal/thermal_zone1/temp \
+    /sys/devices/virtual/thermal/thermal_zone2/temp \
+    /sys/devices/virtual/thermal/thermal_zone3/temp
+  do
+    if path_present "$thermal_path"; then
+      value=$(read_allowlisted_file "$thermal_path")
+      rc=$?
+      if [ "$rc" = "0" ]; then
+        thermal_supported=1
+        temp_c=$(normalize_temp_c "$value")
+        entry=$(printf '{"path":"%s","raw":"%s","temp_c":%s,"source":"%s"}' \
+          "$(json_escape "$thermal_path")" \
+          "$(json_escape "$value")" \
+          "$temp_c" \
+          "$(json_escape "$REDMAGIC_SOURCE_THERMAL")")
+        if [ "$first" = "1" ]; then
+          thermal_readings=$entry
+          first=0
+        else
+          thermal_readings="$thermal_readings,$entry"
+        fi
+      elif [ "$rc" = "3" ]; then
+        thermal_errors=$(list_append_json_string "$thermal_errors" "permission_denied:$thermal_path")
+      fi
+    fi
+  done
+  if [ "$thermal_supported" = "0" ] && [ -z "$thermal_errors" ]; then
+    thermal_errors=$(list_append_json_string "$thermal_errors" "missing:thermal_temp_allowlist")
+  fi
+
+  if [ -z "$fan_enabled" ]; then
+    fan_enabled_json=null
+  else
+    fan_enabled_json=$fan_enabled
+  fi
+  pump_payload=$(pump_json_payload)
+  cooling_policy_payload=$(cooling_policy_fields)
+
+  printf '{'
+  printf '"protocol_version":%s,' "$PROTOCOL_VERSION"
+  printf '"command":"redmagic probe",'
+  printf '"device":{"manufacturer":%s,"model":%s,"product":%s,"device":%s,"board_platform":%s,"kernel":%s,"source":%s},' \
+    "$(json_string "$manufacturer")" \
+    "$(json_string "$model")" \
+    "$(json_string "$product")" \
+    "$(json_string "$device")" \
+    "$(json_string "$board_platform")" \
+    "$(json_string "$kernel")" \
+    "$(json_string "$REDMAGIC_SOURCE_IDENTITY")"
+  printf '"fan":{"supported":%s,"present":%s,"enabled":%s,"rpm":%s,"level":%s,"source":%s,"errors":[%s]},' \
+    "$(json_bool "$fan_supported")" \
+    "$(json_bool "$fan_present")" \
+    "$fan_enabled_json" \
+    "$(json_int_or_null "$fan_rpm")" \
+    "$(json_int_or_null "$fan_level")" \
+    "$(json_string "$REDMAGIC_SOURCE_FAN")" \
+    "$fan_errors"
+  printf '"pump":%s,' "$pump_payload"
+  printf '"performance":{"supported":false,"mode":null,"source":"no_confirmed_read_only_source","errors":["NO_CONFIRMED_READ_ONLY_SOURCE"]},'
+  printf '"display":{"supported":false,"refresh_rate_hz":null,"source":"no_confirmed_read_only_source","errors":["NO_CONFIRMED_READ_ONLY_SOURCE"]},'
+  printf '"thermal":{"supported":%s,"readings":[%s],"source":%s,"errors":[%s]},' \
+    "$(json_bool "$thermal_supported")" \
+    "$thermal_readings" \
+    "$(json_string "$REDMAGIC_SOURCE_THERMAL")" \
+    "$thermal_errors"
+  printf '"cooling_policy":{%s},' "$cooling_policy_payload"
+  printf '"redmagic_button":{"supported":false,"configured":false,"reason":"disabled_in_pass_02"}'
+  printf '}\n'
+}
+
+usage_json() {
+  printf '{"protocol_version":%s,"ok":false,"error":"USAGE"}\n' "$PROTOCOL_VERSION"
+}
+
+main() {
+  cmd=${1:-}
+  case "$cmd" in
+    status)
+      if [ "${2:-}" = "--json" ]; then
+        log_command "status"
+        status_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    capabilities)
+      if [ "${2:-}" = "--json" ]; then
+        log_command "capabilities"
+        capabilities_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    profile)
+      sub=${2:-}
+      case "$sub" in
+        get)
+          if [ "${3:-}" = "--json" ]; then
+            log_command "profile_get"
+            profile_get_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        set)
+          target=${3:-}
+          log_command "profile_set_$target"
+          profile_set "$target"
+          ;;
+        *)
+          usage_json
+          return 2
+          ;;
+      esac
+      ;;
+    safe-mode)
+      sub=${2:-}
+      case "$sub" in
+        get)
+          if [ "${3:-}" = "--json" ]; then
+            log_command "safe_mode_get"
+            safe_mode_get_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        enable)
+          log_command "safe_mode_enable"
+          safe_mode_enable
+          ;;
+        *)
+          usage_json
+          return 2
+          ;;
+      esac
+      ;;
+    adb-wifi)
+      sub=${2:-}
+      case "$sub" in
+        status)
+          if [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+            log_command "adb_wifi_status"
+            adb_wifi_status_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        enable)
+          if [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+            log_command "adb_wifi_enable"
+            adb_wifi_enable_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        auto-disable)
+          if [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+            log_command "adb_wifi_auto_disable"
+            adb_wifi_auto_disable_json
+          else
+            usage_json
+            return 2
+          fi
+          ;;
+        *)
+          usage_json
+          return 2
+          ;;
+      esac
+      ;;
+    logs)
+      if [ "${2:-}" = "tail" ] && [ "${3:-}" = "--lines" ]; then
+        log_command "logs_tail"
+        logs_tail_json "${4:-50}"
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    legacy)
+      if [ "${2:-}" = "modules" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        legacy_modules_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    integrations)
+      if [ "${2:-}" = "baseline" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "integrations_baseline"
+        integrations_baseline_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    nubia)
+      if [ "${2:-}" = "toolkit" ] && [ "${3:-}" = "status" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "nubia_toolkit_status"
+        nubia_toolkit_status_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    runtime)
+      if [ "${2:-}" = "waylandie" ] && [ "${3:-}" = "status" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "runtime_waylandie_status"
+        waylandie_runtime_status_json
+      elif [ "${2:-}" = "waylandie" ] && [ "${3:-}" = "proton-smoke" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "runtime_waylandie_proton_smoke"
+        waylandie_runtime_smoke_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    snapshot)
+      if [ "${2:-}" = "cooling" ] && [ "${3:-}" = "create" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        snapshot_cooling_create_json
+      elif [ "${2:-}" = "cooling" ] && [ "${3:-}" = "get" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        snapshot_cooling_get_json
+      elif [ "${2:-}" = "cooling" ] && [ "${3:-}" = "rollback" ] && [ "${4:-}" = "--dry-run" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        snapshot_cooling_rollback_dry_run_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    cooling)
+      if [ "${2:-}" = "policy" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        cooling_policy_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    display)
+      if [ "${2:-}" = "lanes" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "display_lanes"
+        display_lanes_json
+      elif [ "${2:-}" = "method-containers" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "display_method_containers"
+        display_method_containers_json
+      elif [ "${2:-}" = "method-profiles" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "display_method_profiles"
+        display_method_profiles_json
+      elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "phone" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        log_command "display_lane_phone_preflight"
+        display_phone_preflight_json
+      elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "anland" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        log_command "display_lane_anland_preflight"
+        display_anland_preflight_json
+      elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "dock" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
+        log_command "display_lane_dock_preflight"
+        display_dock_preflight_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    redmagic)
+      if [ "${2:-}" = "probe" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        redmagic_probe_json
+      elif [ "${2:-}" = "pump" ] && [ "${3:-}" = "probe" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        redmagic_pump_probe_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
+    *)
+      usage_json
+      return 2
+      ;;
+  esac
+}
+
+main "$@"
