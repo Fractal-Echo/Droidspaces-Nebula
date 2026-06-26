@@ -239,7 +239,13 @@ classification_exit_code() {
   echo 'pre_mdns_end'
 } | tee "$log_dir/reboot-start.txt"
 
-serial="$(./scripts/resolve-rm11-adb-serial.sh)"
+ADB="$adb" NEBULA_ADB_MODEL="$expected_model" ./scripts/resolve-rm11-adb-serial.sh --prefer-wireless --env \
+  | tee "$log_dir/pre-resolved-adb.env"
+serial="$(awk -F= '$1 == "ADB_SERIAL" { print $2; exit }' "$log_dir/pre-resolved-adb.env")"
+if [ -z "$serial" ]; then
+  echo "ADB resolver did not emit ADB_SERIAL" | tee "$log_dir/failure.txt"
+  exit "$(classification_exit_code ADB_UNRESOLVED)"
+fi
 printf 'pre_serial=%s\n' "$serial" | tee -a "$log_dir/reboot-start.txt"
 "$adb" -s "$serial" get-state | tee "$log_dir/pre-adb-state.txt"
 "$adb" -s "$serial" shell getprop sys.boot_completed | tee "$log_dir/pre-boot-completed.txt"
@@ -258,7 +264,9 @@ resolved=""
 for i in $(seq 1 96); do
   "$adb" devices -l > "$log_dir/devices-poll.txt" 2>&1 || true
   "$adb" mdns services > "$log_dir/mdns-poll.txt" 2>&1 || true
-  candidate="$(./scripts/resolve-rm11-adb-serial.sh 2>"$log_dir/resolve-last.err" || true)"
+  ADB="$adb" NEBULA_ADB_MODEL="$expected_model" ./scripts/resolve-rm11-adb-serial.sh --prefer-wireless --env \
+    > "$log_dir/resolve-last.env" 2>"$log_dir/resolve-last.err" || true
+  candidate="$(awk -F= '$1 == "ADB_SERIAL" { print $2; exit }' "$log_dir/resolve-last.env" 2>/dev/null || true)"
   if [ -n "$candidate" ]; then
     adb_state="$("$adb" -s "$candidate" get-state 2>/dev/null | tr -d '\r' || true)"
     boot="$("$adb" -s "$candidate" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
