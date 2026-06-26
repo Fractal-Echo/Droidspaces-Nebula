@@ -75,13 +75,13 @@ These are test artifacts, not stable releases:
 ```text
 APK:
 /home/richtofen/.android/repositories/Droidspaces-Nebula/app/build/outputs/apk/debug/app-debug.apk
-size: 6468072
-sha256: bd95eeeba50a1b725e25534959af6285b04b8696cf527271610c02ae86c4fa83
+size: 6468069
+sha256: fa6e1d5105f489f9ccbc47c847216ed9f2ed70c32251461d7d5f155b28d45af9
 
 Core module:
 /home/richtofen/.android/repositories/Droidspaces-Nebula/build/module/Droidspaces-Nebula-Core-0.2.2.zip
 size: 33756
-sha256: 8260a521b2072a835875bd942e99866246a11a9fae0490b268aa4d5a64c28aa0
+sha256: 75817ccdbf646fc31e83c522ff41afad212e7716af47928eaddca6dbedcb7e86
 ```
 
 Tester install order:
