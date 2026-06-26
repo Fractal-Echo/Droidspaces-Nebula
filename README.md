@@ -49,6 +49,39 @@ Nebula then reports the status of the other lanes from one place:
 Baseline status is read-only. It does not enable LSPosed hooks, write hardware
 nodes, start game clients, replace DroidSpaces, or launch Proton/Wine/Steam.
 
+## Current Debug Artifacts
+
+Checked: 2026-06-26
+
+These are test artifacts, not stable releases:
+
+```text
+APK:
+/home/richtofen/.android/repositories/Droidspaces-Nebula/app/build/outputs/apk/debug/app-debug.apk
+size: 6468072
+sha256: bd95eeeba50a1b725e25534959af6285b04b8696cf527271610c02ae86c4fa83
+
+Core module:
+/home/richtofen/.android/repositories/Droidspaces-Nebula/build/module/Droidspaces-Nebula-Core-0.2.2.zip
+size: 33756
+sha256: ff3997868a9f24cf29a4eefbbf390184c6d6dd14aebf82478b462a557220a9b3
+```
+
+Tester install order:
+
+1. Install the APK.
+2. Install or update the matching Nebula Core module.
+3. Reboot if your module manager requires it.
+4. Open Nebula, press **Refresh**, and save the report.
+
+Fresh Reversa-Matrix evidence scans were written locally to:
+
+```text
+/home/richtofen/.android/repositories/nebula-assets/local/reversa_matrix_nebula_current_linux_container
+/home/richtofen/.android/repositories/nebula-assets/local/reversa_matrix_nebula_current_userspace_graphics
+/home/richtofen/.android/repositories/nebula-assets/local/reversa_matrix_nebula_current_rm11pro_gaming_runtime
+```
+
 ## Method Containers
 
 Nebula reports each display method with its own `container_ref`,
