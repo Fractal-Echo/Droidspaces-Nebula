@@ -11,6 +11,32 @@ artifact, command log, hash, source path, or bounded test result.
 No device action, compositor launch, DRM operation, install, reboot, or phone
 mutation was performed for this assessment.
 
+## Current Update: 2026-06-26
+
+R6 Wayland proof 03 supersedes the old Phone/App display classification as the
+current default state:
+
+- final classification: `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`;
+- proof result:
+  `/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-wayland-working-03/result.md`;
+- display evidence: `SUMMARY_COMMITS=7189`, `SUMMARY_FAILURES=0`,
+  `SUMMARY_ZERO_COPY=dmabuf-present`, `VKGETMEMORYFD_FAILURE_COUNT=0`,
+  `REAL_COMMIT_COUNT=2`, `XWAYLAND_READY=yes`, `GAMESCOPE_EXIT=0`, and
+  `BRIDGE_EXIT=0`;
+- app presenter evidence: `DMABUF_PRESENT_STATUS=pass`,
+  `DMABUF_PRESENT_NATIVE=surfacecontrol-vulkan-native`,
+  `DMABUF_PRESENT_ZERO_COPY=gpu`, and
+  `DMABUF_PRESENT_SYNC=surfacecontrol-acquire-fence`;
+- required runtime assets: pinned local
+  `/usr/local/etc/vulkan/icd.d/freedreno_icd.json`, local
+  `/usr/local/lib/libvulkan_freedreno.so`,
+  `xwayland-gamescope-14-exportable-fence-guard-a4-473ba531`, and
+  `xwayland-gamescope-06-xwayland-9f1a3d62`.
+
+Decision: the Wayland/Gamescope/Xwayland display gate is promoted when those
+exact prerequisites are staged. Steam, Proton, Wine, and game clients remain a
+separate bounded runtime proof gate under the 39-bit VA constraint.
+
 ## Findings
 
 ### 1. Hub placeholder scan

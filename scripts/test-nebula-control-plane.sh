@@ -139,10 +139,12 @@ required = {
     "cooling.policy",
     "snapshot.cooling",
     "legacy.modules",
+    "integrations.baseline",
     "nubia.toolkit.status",
     "runtime.waylandie.status",
     "runtime.waylandie.proton-smoke",
     "display.lanes",
+    "display.method-containers",
     "display.lane.phone.preflight",
     "display.lane.anland.preflight",
     "display.lane.dock.preflight",
@@ -194,11 +196,24 @@ waylandie_data="$tmp/waylandie-data"
 waylandie_lib="$tmp/waylandie-lib"
 mkdir -p "$package_dir/io.droidspaces.nebula.waylandie" \
   "$waylandie_data/files/imagefs" \
+  "$waylandie_data/files/imagefs/usr/local/bin" \
+  "$waylandie_data/files/imagefs/usr/local/etc/vulkan/icd.d" \
+  "$waylandie_data/files/imagefs/usr/local/lib" \
   "$waylandie_data/files/contents/proton/active/files/lib/wine/aarch64-unix" \
+  "$waylandie_data/files/sidecars/xwayland-gamescope-14-exportable-fence-guard-a4-473ba531/usr/local/bin" \
+  "$waylandie_data/files/sidecars/xwayland-gamescope-06-xwayland-9f1a3d62/usr/bin" \
   "$waylandie_lib"
 : > "$waylandie_lib/libproot.so"
 : > "$waylandie_lib/libld_glibc.so"
+: > "$waylandie_data/files/imagefs/usr/local/bin/waylandie-wayland-bridge"
+: > "$waylandie_data/files/imagefs/usr/local/etc/vulkan/icd.d/freedreno_icd.json"
+: > "$waylandie_data/files/imagefs/usr/local/lib/libvulkan_freedreno.so"
+: > "$waylandie_data/files/sidecars/xwayland-gamescope-14-exportable-fence-guard-a4-473ba531/usr/local/bin/gamescope"
+: > "$waylandie_data/files/sidecars/xwayland-gamescope-06-xwayland-9f1a3d62/usr/bin/Xwayland"
 : > "$waylandie_data/files/contents/proton/active/files/lib/wine/aarch64-unix/wine"
+chmod +x "$waylandie_data/files/imagefs/usr/local/bin/waylandie-wayland-bridge" \
+  "$waylandie_data/files/sidecars/xwayland-gamescope-14-exportable-fence-guard-a4-473ba531/usr/local/bin/gamescope" \
+  "$waylandie_data/files/sidecars/xwayland-gamescope-06-xwayland-9f1a3d62/usr/bin/Xwayland"
 waylandie_status="$(
   NEBULA_TEST_PACKAGE_DIR="$package_dir" \
   NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
@@ -220,7 +235,14 @@ assert obj["glibc_loader_present"] is True
 assert obj["proton_present"] is True
 assert obj["wine_present"] is True
 assert obj["ready"] is True
+assert obj["display_ready"] is True
+assert obj["bridge_present"] is True
+assert obj["local_icd_present"] is True
+assert obj["local_vulkan_driver_present"] is True
+assert obj["gamescope_sidecar_present"] is True
+assert obj["xwayland_sidecar_present"] is True
 assert obj["errors"] == []
+assert obj["display_errors"] == []
 PY
 
 missing_waylandie_status="$(
@@ -236,8 +258,10 @@ obj = json.loads(sys.argv[1])
 assert obj["protocol_version"] == 1
 assert obj["command"] == "runtime waylandie status"
 assert obj["ready"] is False
+assert obj["display_ready"] is False
 assert "missing:imagefs" in obj["errors"]
 assert "missing:proton_active" in obj["errors"]
+assert "missing:imagefs" in obj["display_errors"]
 PY
 
 safe_smoke_data="$tmp/safe-smoke"
@@ -280,11 +304,15 @@ PY
 device_root="$tmp/device-root"
 mkdir -p "$device_root/data/local/Droidspaces/bin" \
   "$device_root/data/local/Droidspaces/Containers/ubuntu" \
+  "$device_root/data/local/Droidspaces/Containers/ubuntu/rootfs" \
+  "$device_root/data/local/Droidspaces/Containers/ubuntu/rootfs/usr/local/bin" \
   "$device_root/data/local/tmp" \
   "$device_root/dev/dri"
 : > "$device_root/dev/dri/renderD128"
+: > "$device_root/data/local/Droidspaces/Containers/ubuntu/rootfs/usr/local/bin/startanland-kde.sh"
+chmod 755 "$device_root/data/local/Droidspaces/Containers/ubuntu/rootfs/usr/local/bin/startanland-kde.sh"
 cat > "$device_root/data/local/Droidspaces/bin/droidspaces" <<'SH'
-#!/system/bin/sh
+#!/bin/sh
 exit 0
 SH
 chmod 755 "$device_root/data/local/Droidspaces/bin/droidspaces"
@@ -313,6 +341,7 @@ except FileNotFoundError:
     pass
 s = socket.socket(socket.AF_UNIX)
 s.bind(path)
+os.chmod(path, 0o666)
 s.listen(1)
 time.sleep(120)
 PY
@@ -334,29 +363,176 @@ assert obj["protocol_version"] == 1
 assert obj["command"] == "display lanes"
 assert obj["selector"] == "multi_lane"
 lanes = {item["id"]: item for item in obj["lanes"]}
-assert lanes["phone_app_bridge"]["status"] == "ready_for_glx_fix"
+assert lanes["phone_app_bridge"]["status"] == "wayland_display_pass"
+assert lanes["phone_app_bridge"]["method_id"] == "phone_app_bridge"
+assert lanes["phone_app_bridge"]["available"] is True
+assert lanes["phone_app_bridge"]["container_ref"] == "waylandie_app_imagefs"
+assert lanes["phone_app_bridge"]["container_kind"] == "app_proot"
+assert lanes["phone_app_bridge"]["container_status"] == "ready"
+assert lanes["phone_app_bridge"]["display_status"] == "display_proven"
+assert lanes["phone_app_bridge"]["runtime_status"] == "runtime_ready"
+assert lanes["phone_app_bridge"]["requirement_status"] == "display_requirements_met"
+assert "game_client_runtime_proof_not_promoted_39bit_va" in lanes["phone_app_bridge"]["missing_requirements"]
 assert lanes["phone_app_bridge"]["mutating"] is False
 assert lanes["phone_app_bridge"]["launch_command_available"] is False
-assert lanes["phone_app_bridge"]["active_blocker"] == "RGB_GLX_VISUAL_FBCONFIG_EXPOSURE"
-assert lanes["phone_app_bridge"]["canonical_blocker"] == "RGB_GLX_VISUAL_FBCONFIG_EXPOSURE"
-assert lanes["phone_app_bridge"]["unpromoted_lead"] == "FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_FD"
-assert lanes["phone_app_bridge"]["lead_status"] == "promotion_candidate"
-assert lanes["phone_app_bridge"]["trick"] == "gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf"
-assert lanes["phone_app_bridge"]["next_reversa_action"] == "minimal_wine_gui_smoke_before_steam"
+assert lanes["phone_app_bridge"]["active_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert lanes["phone_app_bridge"]["canonical_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert lanes["phone_app_bridge"]["proof_classification"] == "NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS"
+assert lanes["phone_app_bridge"]["proof_metrics"]["summary_failures"] == 0
+assert lanes["phone_app_bridge"]["proof_metrics"]["vkGetMemoryFdKHR_failures"] == 0
+assert lanes["phone_app_bridge"]["lead_status"] == "display_proven"
+assert lanes["phone_app_bridge"]["proven_trick"] == "gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf"
+assert lanes["phone_app_bridge"]["next_reversa_action"] == "bounded_game_client_runtime_before_steam"
 assert lanes["phone_app_bridge"]["steam_allowed"] is False
 assert lanes["phone_app_bridge"]["kernel_va_bits_constraint"] == 39
 assert lanes["phone_app_bridge"]["kernel_va_bits_evidence"] == "live_proc_config_gz"
-assert lanes["phone_app_bridge"]["runtime_blocker"] == "ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA"
+assert lanes["phone_app_bridge"]["runtime_blocker"] == "GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA"
+assert lanes["phone_app_bridge"]["checks"]["display_ready"] is True
+assert lanes["phone_app_bridge"]["checks"]["runtime_ready"] is True
+assert lanes["phone_app_bridge"]["checks"]["local_icd_present"] is True
+assert lanes["phone_app_bridge"]["checks"]["local_vulkan_driver_present"] is True
+assert lanes["phone_app_bridge"]["checks"]["gamescope_sidecar_present"] is True
+assert lanes["phone_app_bridge"]["checks"]["xwayland_sidecar_present"] is True
 assert lanes["anland_surface"]["status"] == "preflight_ready"
+assert lanes["anland_surface"]["method_id"] == "anland_surface"
+assert lanes["anland_surface"]["container_ref"] == "ubuntu"
+assert lanes["anland_surface"]["container_kind"] == "droidspaces"
+assert lanes["anland_surface"]["container_status"] == "ready"
+assert lanes["anland_surface"]["display_status"] == "display_ready"
+assert lanes["anland_surface"]["runtime_status"] == "runtime_ready"
+assert lanes["anland_surface"]["requirement_status"] == "complete"
+assert lanes["anland_surface"]["missing_requirements"] == []
+assert lanes["anland_surface"]["selected_container"] == "ubuntu"
+assert lanes["anland_surface"]["container_selection_source"] == "default_fallback"
+assert lanes["anland_surface"]["container_active"] is False
+assert lanes["anland_surface"]["container_pid"] is None
 assert lanes["anland_surface"]["repair_command_available"] is False
+assert lanes["anland_surface"]["checks"]["active_container_pidfile"] is False
 assert lanes["anland_surface"]["checks"]["display_daemon_socket"] is True
+assert lanes["anland_surface"]["checks"]["display_daemon_socket_writable"] is True
+assert lanes["anland_surface"]["checks"]["anland_producer"] is True
+assert lanes["anland_surface"]["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
 assert lanes["dock_drm_lease_external"]["status"] == "proven_reference_not_wired"
+assert lanes["dock_drm_lease_external"]["method_id"] == "dock_drm_lease_external"
+assert lanes["dock_drm_lease_external"]["container_ref"] == "none"
+assert lanes["dock_drm_lease_external"]["container_kind"] == "none"
+assert lanes["dock_drm_lease_external"]["display_status"] == "reference_only"
+assert lanes["dock_drm_lease_external"]["runtime_status"] == "not_required"
+assert lanes["dock_drm_lease_external"]["requirement_status"] == "reference_requirements_known"
+assert "external_display_discovery_required" in lanes["dock_drm_lease_external"]["missing_requirements"]
 assert lanes["dock_drm_lease_external"]["evidence_captured"] is True
-assert lanes["dock_drm_lease_external"]["operator_gated"] is True
+assert lanes["dock_drm_lease_external"]["operator_required"] is True
 assert lanes["dock_drm_lease_external"]["external_display_only"] is True
 assert lanes["dock_drm_lease_external"]["start_command_available"] is False
 assert lanes["dock_drm_lease_external"]["reported_objects"]["hardcoded_forbidden"] is True
+assert lanes["compatibility"]["method_id"] == "compatibility_software"
+assert lanes["compatibility"]["requirement_status"] == "not_wired"
+assert "implementation_not_wired" in lanes["compatibility"]["missing_requirements"]
+assert lanes["recovery_safe"]["method_id"] == "recovery_safe"
+assert lanes["recovery_safe"]["requirement_status"] == "complete"
 assert "no_lane_silently_replaces_another" in obj["selection_rules"]
+PY
+
+method_containers="$(
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  sh "$cli" display method-containers --json
+)"
+python3 - "$method_containers" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display method-containers"
+containers = {item["method_id"]: item for item in obj["containers"]}
+assert containers["phone_app_bridge"]["container_ref"] == "waylandie_app_imagefs"
+assert containers["phone_app_bridge"]["container_kind"] == "app_proot"
+anland = containers["anland_surface"]
+assert anland["container_kind"] == "droidspaces"
+assert anland["container_ref"] == "ubuntu"
+assert anland["recommended_container"] == "anland-ubuntu26-kde"
+assert anland["selected_is_recommended"] is False
+assert "bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock" in anland["required_config"]
+assert "ANLAND_SOCKET=/run/display.sock" in anland["required_env"]
+assert "MESA_LOADER_DRIVER_OVERRIDE=kgsl" in anland["required_env"]
+assert anland["setup_commands"]["consumer_apk_package"] == "com.anland.consumer"
+assert "ksud module install" in anland["setup_commands"]["daemon_module_install"]
+assert anland["setup_commands"]["recommended_rootfs_archive"] == "/sdcard/Download/anland-ubuntu26-kde.tar.xz"
+assert anland["setup_commands"]["recommended_rootfs_img"] == "/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img"
+assert anland["setup_commands"]["recommended_rootfs_size"] == "32G"
+assert "--rootfs-arc=/sdcard/Download/anland-ubuntu26-kde.tar.xz" in anland["setup_commands"]["droidspaces_create_rootfs_img"]
+assert "--rootfs-img=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img" in anland["setup_commands"]["droidspaces_create_rootfs_img"]
+assert "--name=anland-ubuntu26-kde" in anland["setup_commands"]["droidspaces_start_recommended"]
+assert "--bind=/data/local/tmp/display_daemon.sock:/run/display.sock" in anland["setup_commands"]["droidspaces_start_recommended"]
+assert anland["setup_commands"]["producer_start_command"] == "startanland-kde.sh"
+assert "test -x /usr/local/bin/startanland-kde.sh" in anland["setup_commands"]["producer_verify_command"]
+assert "nohup /usr/local/bin/startanland-kde.sh" in anland["setup_commands"]["producer_run_command"]
+assert anland["checks"]["anland_producer"] is True
+assert anland["checks"]["rootfs_image"] is False
+assert anland["selected_paths"]["rootfs_mode"] == "directory"
+assert containers["droidspaces_rootfs_image"]["container_kind"] == "droidspaces_rootfs_image"
+assert "--rootfs-img=<path>" in containers["droidspaces_rootfs_image"]["requirements"]
+assert "create_from_archive" in containers["droidspaces_rootfs_image"]["setup_commands"]
+assert containers["droidspaces_rootfs_directory"]["container_kind"] == "droidspaces_rootfs_directory"
+assert "--rootfs=<path>" in containers["droidspaces_rootfs_directory"]["requirements"]
+assert containers["droidspaces_termux_x11"]["container_kind"] == "droidspaces_native_x11"
+assert "enable_termux_x11=1" in containers["droidspaces_termux_x11"]["required_config"]
+assert "DISPLAY=:0" in containers["droidspaces_termux_x11"]["required_env"]
+assert containers["droidspaces_virgl"]["container_kind"] == "droidspaces_native_gpu"
+assert "enable_virgl=1" in containers["droidspaces_virgl"]["required_config"]
+assert "GALLIUM_DRIVER=virpipe" in containers["droidspaces_virgl"]["required_env"]
+assert containers["droidspaces_turnip_kgsl"]["container_kind"] == "droidspaces_native_gpu"
+assert "enable_gpu_mode=1" in containers["droidspaces_turnip_kgsl"]["required_config"]
+assert "enable_hw_access=1" in containers["droidspaces_turnip_kgsl"]["required_config"]
+assert containers["droidspaces_llvmpipe"]["container_kind"] == "droidspaces_native_software"
+assert "enable_gpu_mode=0" in containers["droidspaces_llvmpipe"]["required_config"]
+assert containers["droidspaces_pulseaudio"]["container_kind"] == "droidspaces_native_audio"
+assert "PULSE_SERVER=unix:/tmp/.pulse-socket" in containers["droidspaces_pulseaudio"]["required_env"]
+assert containers["dock_drm_lease_external"]["container_ref"] == "none"
+assert containers["compatibility_software"]["container_ref"] == "compatibility-software"
+assert containers["recovery_safe"]["status"] == "always_available"
+assert "DroidSpaces native X11, VirGL, Turnip/KGSL" in obj["rule"]
+assert "dedicated Ubuntu26/KDE/anland_kde producer rootfs" in obj["rule"]
+PY
+
+method_profiles="$(
+  sh "$cli" display method-profiles --json
+)"
+python3 - "$method_profiles" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display method-profiles"
+assert obj["mutating"] is False
+assert "do not start multiple active writable profiles against the same rootfs.img" in obj["rootfs_policy"]
+assert "write /data/local/Droidspaces/Containers/<name>/container.config atomically" in obj["config_materialization"]
+profiles = {item["profile_id"]: item for item in obj["profiles"]}
+assert profiles["anland_wayland_kde"]["method_id"] == "anland_surface"
+assert profiles["anland_wayland_kde"]["container_name"] == "anland-ubuntu26-kde"
+assert profiles["anland_wayland_kde"]["config_path"] == "/data/local/Droidspaces/Containers/anland-ubuntu26-kde/container.config"
+assert "hostname=anland-ubuntu26-kde" in profiles["anland_wayland_kde"]["config_lines"]
+assert "bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock" in profiles["anland_wayland_kde"]["config_lines"]
+assert "ANLAND_SOCKET=/run/display.sock" in profiles["anland_wayland_kde"]["env_lines"]
+assert "startanland-kde.sh" in profiles["anland_wayland_kde"]["commands"]["producer_start"]
+assert profiles["termux_x11_desktop"]["method_id"] == "droidspaces_termux_x11"
+assert profiles["termux_x11_desktop"]["config_path"] == "/data/local/Droidspaces/Containers/rm11-termux-x11/container.config"
+assert "enable_termux_x11=1" in profiles["termux_x11_desktop"]["config_lines"]
+assert "run_at_boot=0" in profiles["termux_x11_desktop"]["config_lines"]
+assert "use_sparse_image=1" in profiles["termux_x11_desktop"]["config_lines"]
+assert "DISPLAY=:0" in profiles["termux_x11_desktop"]["expected_env"]
+assert profiles["virgl_desktop"]["method_id"] == "droidspaces_virgl"
+assert "enable_virgl=1" in profiles["virgl_desktop"]["config_lines"]
+assert "GALLIUM_DRIVER=virpipe" in profiles["virgl_desktop"]["expected_env"]
+assert profiles["turnip_kgsl_desktop"]["method_id"] == "droidspaces_turnip_kgsl"
+assert "enable_gpu_mode=1" in profiles["turnip_kgsl_desktop"]["config_lines"]
+assert "MESA_LOADER_DRIVER_OVERRIDE=kgsl" in profiles["turnip_kgsl_desktop"]["env_lines"]
+assert profiles["llvmpipe_software"]["method_id"] == "droidspaces_llvmpipe"
+assert "enable_gpu_mode=0" in profiles["llvmpipe_software"]["config_lines"]
+assert "LIBGL_ALWAYS_SOFTWARE=1" in profiles["llvmpipe_software"]["env_lines"]
+assert profiles["pulse_audio"]["method_id"] == "droidspaces_pulseaudio"
+assert "enable_pulseaudio=1" in profiles["pulse_audio"]["config_lines"]
+rules = " ".join(obj["materialization_rules"])
+assert "direct atomic file creation" in rules
+assert "chmod 0644" in rules
+assert "droidspaces --config=<container.config> start" in rules
 PY
 
 phone_preflight="$(
@@ -375,12 +551,52 @@ assert obj["id"] == "phone_app_bridge"
 assert obj["available"] is True
 assert obj["mutating"] is False
 assert obj["launch_command_available"] is False
-assert obj["unpromoted_lead"] == "FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_FD"
-assert obj["lead_status"] == "promotion_candidate"
+assert obj["active_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert obj["proof_classification"] == "NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS"
+assert obj["lead_status"] == "display_proven"
+assert obj["proven_trick"] == "gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf"
+assert obj["next_reversa_action"] == "bounded_game_client_runtime_before_steam"
 assert obj["steam_allowed"] is False
 assert obj["kernel_va_bits_constraint"] == 39
 assert obj["kernel_va_bits_evidence"] == "live_proc_config_gz"
-assert obj["runtime_blocker"] == "ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA"
+assert obj["runtime_blocker"] == "GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA"
+assert obj["checks"]["display_ready"] is True
+assert obj["checks"]["runtime_ready"] is True
+assert obj["checks"]["gamescope_sidecar_present"] is True
+assert obj["checks"]["xwayland_sidecar_present"] is True
+PY
+
+waylandie_no_sidecar="$tmp/waylandie-no-sidecar"
+mkdir -p "$waylandie_no_sidecar/files/imagefs/usr/local/bin" \
+  "$waylandie_no_sidecar/files/imagefs/usr/local/etc/vulkan/icd.d" \
+  "$waylandie_no_sidecar/files/imagefs/usr/local/lib" \
+  "$waylandie_no_sidecar/files/contents/proton/active/files/lib/wine/aarch64-unix"
+: > "$waylandie_no_sidecar/files/imagefs/usr/local/bin/waylandie-wayland-bridge"
+: > "$waylandie_no_sidecar/files/imagefs/usr/local/etc/vulkan/icd.d/freedreno_icd.json"
+: > "$waylandie_no_sidecar/files/imagefs/usr/local/lib/libvulkan_freedreno.so"
+: > "$waylandie_no_sidecar/files/contents/proton/active/files/lib/wine/aarch64-unix/wine"
+chmod +x "$waylandie_no_sidecar/files/imagefs/usr/local/bin/waylandie-wayland-bridge"
+phone_preflight_no_sidecar="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_no_sidecar" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  sh "$cli" display lane phone preflight --json
+)"
+python3 - "$phone_preflight_no_sidecar" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "partial"
+assert obj["available"] is False
+assert obj["active_blocker"] == "WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE"
+assert obj["checks"]["runtime_ready"] is True
+assert obj["checks"]["display_ready"] is False
+assert obj["checks"]["local_icd_present"] is True
+assert obj["checks"]["local_vulkan_driver_present"] is True
+assert obj["checks"]["gamescope_sidecar_present"] is False
+assert obj["checks"]["xwayland_sidecar_present"] is False
+assert "missing:gamescope_sidecar" in obj["errors"]
+assert "missing:xwayland_sidecar" in obj["errors"]
 PY
 
 anland_preflight="$(
@@ -394,11 +610,300 @@ assert obj["protocol_version"] == 1
 assert obj["command"] == "display lane anland preflight"
 assert obj["id"] == "anland_surface"
 assert obj["available"] is True
+assert obj["selected_container"] == "ubuntu"
+assert obj["container_selection_source"] == "default_fallback"
+assert obj["container_active"] is False
+assert obj["container_pid"] is None
 assert obj["mutating"] is False
 assert obj["repair_command_available"] is False
 assert obj["checks"]["droidspaces_binary"] is True
+assert obj["checks"]["container_selected"] is True
+assert obj["checks"]["active_container_pidfile"] is False
+assert obj["checks"]["rootfs_path"] is True
+assert obj["checks"]["rootfs_image"] is False
 assert obj["checks"]["display_daemon_socket"] is True
+assert obj["checks"]["display_daemon_socket_writable"] is True
 assert obj["checks"]["env_kgsl"] is True
+assert "ANLAND_SOCKET=/run/display.sock" in obj["required_env"]
+assert obj["setup_commands"]["recommended_container"] == "anland-ubuntu26-kde"
+assert "--rootfs-arc=/sdcard/Download/anland-ubuntu26-kde.tar.xz" in obj["setup_commands"]["droidspaces_create_rootfs_img"]
+assert "--bind=/data/local/tmp/display_daemon.sock:/run/display.sock" in obj["setup_commands"]["droidspaces_start_recommended"]
+assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
+assert obj["selected_paths"]["rootfs_mode"] == "directory"
+PY
+
+chmod 755 "$device_root/data/local/tmp/display_daemon.sock"
+locked_socket_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$locked_socket_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "container_runtime_ready", obj
+assert obj["available"] is False
+assert obj["runtime_ready"] is True
+assert obj["checks"]["display_daemon_socket"] is True
+assert obj["checks"]["display_daemon_socket_writable"] is False
+assert "blocked:display_daemon_socket_not_app_writable" in obj["errors"]
+PY
+chmod 666 "$device_root/data/local/tmp/display_daemon.sock"
+
+invalid_override_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  NEBULA_ANLAND_CONTAINER="../bad" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$invalid_override_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "partial", obj
+assert obj["available"] is False
+assert obj["runtime_ready"] is False
+assert obj["selected_container"] == ""
+assert obj["container_selection_source"] == "invalid_env_override"
+assert obj["requirement_status"] == "invalid_selection"
+assert obj["checks"]["container_selected"] is False
+assert "invalid:env_override_container" in obj["errors"]
+PY
+
+unsafe_root="$tmp/device-root-unsafe-root"
+mkdir -p "$unsafe_root/data/local/Droidspaces/bin" \
+  "$unsafe_root/data/local/Droidspaces/Containers/unsafe" \
+  "$unsafe_root/data/local/tmp" \
+  "$unsafe_root/dev/dri"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$unsafe_root/data/local/Droidspaces/bin/droidspaces"
+: > "$unsafe_root/dev/dri/renderD128"
+cat > "$unsafe_root/data/local/Droidspaces/Containers/unsafe/container.config" <<'EOF'
+name=unsafe
+rootfs_path=/data/local/tmp
+enable_hw_access=1
+enable_gpu_mode=1
+EOF
+unsafe_root_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$unsafe_root" \
+  NEBULA_ANLAND_CONTAINER=unsafe \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$unsafe_root_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "partial", obj
+assert obj["available"] is False
+assert obj["runtime_ready"] is False
+assert obj["selected_container"] == "unsafe"
+assert obj["container_selection_source"] == "env_override"
+assert obj["checks"]["rootfs_path"] is False
+assert obj["requirement_status"] == "invalid_rootfs_path"
+assert "invalid:rootfs_path_outside_container" in obj["errors"]
+PY
+
+image_root="$tmp/device-root-image"
+mkdir -p "$image_root/data/local/Droidspaces/bin" \
+  "$image_root/data/local/Droidspaces/Containers/anland-ubuntu26-kde" \
+  "$image_root/data/local/tmp" \
+  "$image_root/dev/dri"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$image_root/data/local/Droidspaces/bin/droidspaces"
+: > "$image_root/dev/dri/renderD128"
+: > "$image_root/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img"
+cat > "$image_root/data/local/Droidspaces/Containers/anland-ubuntu26-kde/container.config" <<'EOF'
+name=anland-ubuntu26-kde
+rootfs_path=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img
+enable_termux_x11=0
+enable_hw_access=1
+enable_gpu_mode=1
+selinux_permissive=1
+privileged=nocaps,noseccomp
+env_file=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/anland.env
+bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock
+EOF
+cat > "$image_root/data/local/Droidspaces/Containers/anland-ubuntu26-kde/anland.env" <<'EOF'
+ANLAND=1
+ANLAND_SOCKET=/run/display.sock
+ANLAND_DRM_DEVICE=/dev/dri/renderD128
+WAYLAND_DISPLAY=wayland-0
+MESA_LOADER_DRIVER_OVERRIDE=kgsl
+GALLIUM_DRIVER=kgsl
+FD_FORCE_KGSL=1
+EOF
+python3 - "$image_root/data/local/tmp/display_daemon.sock" <<'PY' &
+import os, socket, sys, time
+path = sys.argv[1]
+try:
+    os.unlink(path)
+except FileNotFoundError:
+    pass
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.bind(path)
+os.chmod(path, 0o666)
+s.listen(1)
+time.sleep(30)
+PY
+socket_pids+=("$!")
+sleep 0.2
+image_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$image_root" \
+  NEBULA_ANLAND_CONTAINER=anland-ubuntu26-kde \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$image_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "container_runtime_ready", obj
+assert obj["available"] is False
+assert obj["runtime_ready"] is True
+assert obj["selected_container"] == "anland-ubuntu26-kde"
+assert obj["container_selection_source"] == "env_override"
+assert obj["checks"]["rootfs_path"] is True
+assert obj["checks"]["rootfs_image"] is True
+assert obj["checks"]["anland_env"] is True
+assert obj["checks"]["display_daemon_socket"] is True
+assert obj["checks"]["display_daemon_socket_writable"] is True
+assert obj["checks"]["anland_producer"] is False
+assert obj["selected_paths"]["rootfs_path"] == "/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img"
+assert obj["selected_paths"]["rootfs_mode"] == "image"
+assert "unknown:anland_producer_inside_rootfs_image_run_verify_required" in obj["errors"]
+assert "test -x /usr/local/bin/startanland-kde.sh" in obj["setup_commands"]["producer_verify_command"]
+PY
+
+mkdir -p "$image_root/data/local/Droidspaces/Pids" "$image_root/proc/4343"
+printf 4343 > "$image_root/data/local/Droidspaces/Pids/anland-ubuntu26-kde.pid"
+active_image_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$image_root" \
+  NEBULA_ANLAND_CONTAINER=anland-ubuntu26-kde \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$active_image_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "preflight_ready", obj
+assert obj["available"] is True
+assert obj["runtime_ready"] is True
+assert obj["container_active"] is True
+assert obj["container_pid"] == 4343
+assert obj["checks"]["rootfs_image"] is True
+assert obj["checks"]["display_daemon_socket_writable"] is True
+assert obj["checks"]["anland_producer"] is True
+assert obj["errors"] == []
+PY
+rm -f "$image_root/data/local/Droidspaces/Pids/anland-ubuntu26-kde.pid"
+
+active_root="$tmp/device-root-active"
+mkdir -p "$active_root/data/local/Droidspaces/bin" \
+  "$active_root/data/local/Droidspaces/Pids" \
+  "$active_root/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/rootfs" \
+  "$active_root/data/local/tmp" \
+  "$active_root/dev/dri" \
+  "$active_root/proc/4242"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$active_root/data/local/Droidspaces/bin/droidspaces"
+: > "$active_root/dev/dri/renderD128"
+cat > "$active_root/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/container.config" <<'EOF'
+name=rm11-alpine-324-turnip
+rootfs_path=/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+run_at_boot=1
+EOF
+printf 4242 > "$active_root/data/local/Droidspaces/Pids/rm11-alpine-324-turnip.pid"
+active_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$active_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$active_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "container_runtime_ready"
+assert obj["available"] is False
+assert obj["runtime_ready"] is True
+assert obj["selected_container"] == "rm11-alpine-324-turnip"
+assert obj["container_selection_source"] == "active_pidfile"
+assert obj["container_ref"] == "rm11-alpine-324-turnip"
+assert obj["container_status"] == "active"
+assert obj["display_status"] == "display_missing"
+assert obj["runtime_status"] == "runtime_ready"
+assert obj["requirement_status"] == "missing_requirements"
+assert "missing:anland_env" in obj["missing_requirements"]
+assert "missing:display_daemon_socket" in obj["missing_requirements"]
+assert "missing:anland_producer" in obj["missing_requirements"]
+assert obj["container_active"] is True
+assert obj["container_pid"] == 4242
+assert obj["checks"]["active_container_pidfile"] is True
+assert obj["checks"]["container_config"] is True
+assert obj["checks"]["rootfs_path"] is True
+assert obj["checks"]["anland_env"] is False
+assert obj["checks"]["display_daemon_socket"] is False
+assert obj["checks"]["anland_producer"] is False
+assert obj["selected_paths"]["pidfile"] == "/data/local/Droidspaces/Pids/rm11-alpine-324-turnip.pid"
+assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/container.config"
+assert "missing:anland_env" in obj["errors"]
+assert "missing:display_daemon_socket" in obj["errors"]
+assert "missing:anland_producer" in obj["errors"]
+PY
+
+stale_root="$tmp/device-root-stale"
+mkdir -p "$stale_root/data/local/Droidspaces/bin" \
+  "$stale_root/data/local/Droidspaces/Pids" \
+  "$stale_root/data/local/Droidspaces/Containers/ubuntu/rootfs" \
+  "$stale_root/data/local/Droidspaces/Containers/rm11-stale/rootfs" \
+  "$stale_root/data/local/tmp" \
+  "$stale_root/dev/dri"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$stale_root/data/local/Droidspaces/bin/droidspaces"
+: > "$stale_root/dev/dri/renderD128"
+cat > "$stale_root/data/local/Droidspaces/Containers/ubuntu/container.config" <<'EOF'
+name=ubuntu
+rootfs_path=/data/local/Droidspaces/Containers/ubuntu/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+EOF
+cat > "$stale_root/data/local/Droidspaces/Containers/rm11-stale/container.config" <<'EOF'
+name=rm11-stale
+rootfs_path=/data/local/Droidspaces/Containers/rm11-stale/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+EOF
+printf 99999 > "$stale_root/data/local/Droidspaces/Pids/rm11-stale.pid"
+stale_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$stale_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$stale_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["selected_container"] == "ubuntu", obj
+assert obj["container_selection_source"] == "default_fallback"
+assert obj["container_active"] is False
+assert obj["container_pid"] is None
+assert obj["checks"]["active_container_pidfile"] is False
+PY
+
+mkdir -p "$active_root/data/local/Droidspaces/Containers/rm11-second/rootfs"
+cat > "$active_root/data/local/Droidspaces/Containers/rm11-second/container.config" <<'EOF'
+name=rm11-second
+rootfs_path=/data/local/Droidspaces/Containers/rm11-second/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+run_at_boot=1
+EOF
+mkdir -p "$active_root/proc/4243"
+printf 4243 > "$active_root/data/local/Droidspaces/Pids/rm11-second.pid"
+ambiguous_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$active_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$ambiguous_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "partial"
+assert obj["available"] is False
+assert obj["runtime_ready"] is False
+assert obj["container_selection_source"] == "ambiguous_active_pidfiles"
+assert obj["container_status"] == "ambiguous"
+assert obj["requirement_status"] == "ambiguous_selection"
+assert "ambiguous:active_containers" in obj["errors"]
 PY
 
 dock_preflight="$(sh "$cli" display lane dock preflight --json)"
@@ -413,7 +918,7 @@ assert obj["available"] is False
 assert obj["mutating"] is False
 assert obj["start_command_available"] is False
 assert obj["evidence_captured"] is True
-assert obj["operator_gated"] is True
+assert obj["operator_required"] is True
 assert obj["external_display_only"] is True
 assert obj["internal_panel_allowed"] is False
 assert obj["whole_card_takeover"] is False
@@ -683,6 +1188,131 @@ assert modules["rm11-droidspace-bridge-fd"]["protected"] is True
 assert modules["rm11-droidspace-bridge-fd"]["installed"] is True
 assert modules["rm11-droidspace-bridge-fd"]["nebula_import"] == "staged_audit_only"
 assert "do_not_disable_both" in obj["guardrails"]
+PY
+
+mkdir -p "$package_dir/com.droidspaces.app" \
+  "$package_dir/com.elitedarkkaiser.redmagic" \
+  "$modules_root/redmagic_powerdeck" \
+  "$device_root/data/local/tmp/redmagic_powerdeck"
+{
+  printf 'id=redmagic_powerdeck\n'
+  printf 'name=RedMagic PowerDeck\n'
+  printf 'version=0.1.0\n'
+  printf 'versionCode=1\n'
+} > "$modules_root/redmagic_powerdeck/module.prop"
+cat > "$device_root/data/local/tmp/redmagic_powerdeck/rm-powerdeck-apply.sh" <<'SH'
+#!/system/bin/sh
+exit 0
+SH
+chmod 755 "$device_root/data/local/tmp/redmagic_powerdeck/rm-powerdeck-apply.sh"
+baseline="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_MODULES_ROOT="$modules_root" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  NEBULA_SYSROOT="$fixture" \
+  sh "$cli" integrations baseline --json
+)"
+python3 - "$baseline" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "integrations baseline"
+assert obj["baseline_id"] == "nebula_rm11pro_baseline"
+assert obj["overall_status"] == "baseline_ready_read_only"
+assert obj["safe_default"] is True
+assert obj["mutating_controls_enabled"] is False
+items = {item["id"]: item for item in obj["integrations"]}
+assert items["nebula_core"]["ready"] is True
+assert items["waylandie"]["status"] == "display_ready"
+assert items["waylandie"]["method_id"] == "phone_app_bridge"
+assert items["waylandie"]["container_ref"] == "waylandie_app_imagefs"
+assert items["waylandie"]["container_kind"] == "app_proot"
+assert items["waylandie"]["container_status"] == "ready"
+assert items["waylandie"]["display_status"] == "display_proven"
+assert items["waylandie"]["runtime_status"] == "runtime_ready"
+assert items["waylandie"]["requirement_status"] == "display_requirements_met"
+assert "game_client_runtime_proof_not_promoted_39bit_va" in items["waylandie"]["missing_requirements"]
+assert items["waylandie"]["display_ready"] is True
+assert items["waylandie"]["mutating"] is False
+assert items["droidspaces"]["status"] == "preflight_ready"
+assert items["droidspaces"]["method_id"] == "anland_surface"
+assert items["droidspaces"]["installed"] is True
+assert items["droidspaces"]["ready"] is True
+assert items["droidspaces"]["runtime_ready"] is True
+assert items["droidspaces"]["display_socket_ready"] is True
+assert items["droidspaces"]["container_ref"] == "ubuntu"
+assert items["droidspaces"]["container_kind"] == "droidspaces"
+assert items["droidspaces"]["container_status"] == "ready"
+assert items["droidspaces"]["display_status"] == "display_ready"
+assert items["droidspaces"]["runtime_status"] == "runtime_ready"
+assert items["droidspaces"]["requirement_status"] == "complete"
+assert items["droidspaces"]["missing_requirements"] == []
+assert items["droidspaces"]["bridge_module_installed"] is True
+assert items["droidspaces"]["selected_container"] == "ubuntu"
+assert items["droidspaces"]["container_selection_source"] == "default_fallback"
+assert items["droidspaces"]["container_active"] is False
+assert items["droidspaces"]["container_pid"] is None
+assert items["droidspaces"]["checks"]["container_config"] is True
+assert items["droidspaces"]["checks"]["active_container_pidfile"] is False
+assert items["droidspaces"]["checks"]["rootfs_path"] is True
+assert items["droidspaces"]["checks"]["display_daemon_socket_writable"] is True
+assert items["droidspaces"]["checks"]["anland_producer"] is True
+assert items["droidspaces"]["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
+assert items["nubia_toolkit"]["status"] == "hook_framework_ready_scope_deferred"
+assert items["nubia_toolkit"]["ready"] is True
+assert items["nubia_toolkit"]["hooks_active"] is False
+assert items["redmagic_control_center"]["status"] == "read_only_nodes_visible"
+assert items["redmagic_control_center"]["ready"] is True
+assert items["redmagic_control_center"]["writes_enabled"] is False
+assert items["powerdeck"]["status"] == "external_module_detected_dry_run_required"
+assert items["powerdeck"]["ready"] is True
+assert items["powerdeck"]["dry_run_required"] is True
+assert "status_before_mutation" in obj["guardrails"]
+assert obj["next_step"] == "bounded_game_client_runtime"
+PY
+
+rm -f "$active_root/data/local/Droidspaces/Pids/rm11-second.pid"
+active_baseline="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_MODULES_ROOT="$modules_root" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  NEBULA_TEST_DEVICE_ROOT="$active_root" \
+  NEBULA_SYSROOT="$fixture" \
+  sh "$cli" integrations baseline --json
+)"
+python3 - "$active_baseline" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["overall_status"] == "baseline_ready_read_only"
+items = {item["id"]: item for item in obj["integrations"]}
+ds = items["droidspaces"]
+assert ds["status"] == "container_runtime_ready"
+assert ds["ready"] is True
+assert ds["runtime_ready"] is True
+assert ds["display_socket_ready"] is False
+assert ds["method_id"] == "anland_surface"
+assert ds["container_ref"] == "rm11-alpine-324-turnip"
+assert ds["container_kind"] == "droidspaces"
+assert ds["container_status"] == "active"
+assert ds["display_status"] == "display_missing"
+assert ds["runtime_status"] == "runtime_ready"
+assert ds["requirement_status"] == "missing_requirements"
+assert "missing:anland_env" in ds["missing_requirements"]
+assert "missing:display_daemon_socket" in ds["missing_requirements"]
+assert "missing:anland_producer" in ds["missing_requirements"]
+assert ds["selected_container"] == "rm11-alpine-324-turnip"
+assert ds["container_selection_source"] == "active_pidfile"
+assert ds["container_active"] is True
+assert ds["container_pid"] == 4242
+assert ds["checks"]["active_container_pidfile"] is True
+assert ds["checks"]["container_config"] is True
+assert ds["checks"]["anland_producer"] is False
+assert ds["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/container.config"
 PY
 
 snapshot_create="$(
@@ -985,12 +1615,18 @@ runtime_smoke_extra_arg="$(sh "$cli" runtime waylandie proton-smoke --json /tmp/
 runtime_smoke_extra_code=$?
 display_lanes_extra_arg="$(sh "$cli" display lanes --json /tmp/path 2>/dev/null)"
 display_lanes_extra_code=$?
+display_method_containers_extra_arg="$(sh "$cli" display method-containers --json /tmp/path 2>/dev/null)"
+display_method_containers_extra_code=$?
+display_method_profiles_extra_arg="$(sh "$cli" display method-profiles --json /tmp/path 2>/dev/null)"
+display_method_profiles_extra_code=$?
 display_phone_extra_arg="$(sh "$cli" display lane phone preflight --json /tmp/path 2>/dev/null)"
 display_phone_extra_code=$?
 display_anland_extra_arg="$(sh "$cli" display lane anland preflight --json /tmp/path 2>/dev/null)"
 display_anland_extra_code=$?
 display_dock_extra_arg="$(sh "$cli" display lane dock preflight --json /tmp/path 2>/dev/null)"
 display_dock_extra_code=$?
+baseline_extra_arg="$(sh "$cli" integrations baseline --json /tmp/path 2>/dev/null)"
+baseline_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
@@ -1002,9 +1638,12 @@ set -e
 [[ "$runtime_status_extra_code" -ne 0 ]]
 [[ "$runtime_smoke_extra_code" -ne 0 ]]
 [[ "$display_lanes_extra_code" -ne 0 ]]
+[[ "$display_method_containers_extra_code" -ne 0 ]]
+[[ "$display_method_profiles_extra_code" -ne 0 ]]
 [[ "$display_phone_extra_code" -ne 0 ]]
 [[ "$display_anland_extra_code" -ne 0 ]]
 [[ "$display_dock_extra_code" -ne 0 ]]
+[[ "$baseline_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
@@ -1015,9 +1654,12 @@ set -e
 [[ "$(json_field "$runtime_status_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$runtime_smoke_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$display_lanes_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$display_method_containers_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$display_method_profiles_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$display_phone_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$display_anland_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$display_dock_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$baseline_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'

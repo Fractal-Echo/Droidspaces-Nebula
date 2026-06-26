@@ -30,22 +30,41 @@ NUBIA_TOOLKIT_SOURCE="NubiaToolkit HookEntry and feature hooks@$NUBIA_TOOLKIT_SO
 NUBIA_TOOLKIT_PACKAGE=com.khanhnguyen9872.nubiatoolkit
 NUBIA_GAME_ASSIST_PACKAGE=cn.nubia.gameassist
 NUBIA_GAME_LAUNCHER_PACKAGE=cn.nubia.gamelauncher
+REDMAGIC_CONTROL_PACKAGE=com.elitedarkkaiser.redmagic
+DROIDSPACES_PACKAGE=com.droidspaces.app
+POWERDECK_MODULE_ID=redmagic_powerdeck
 WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie
 WAYLANDIE_SOURCE_COMMIT=1526655a2470
 WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
-DISPLAY_PHONE_SOURCE="Sidecar-11 WayLandIE/Gamescope/Xwayland evidence: RGB GLX visual/fbconfig blocker"
-DISPLAY_PHONE_PROMOTION_SOURCE="Sidecar-13 XWAYLAND_GLX_RENDER_PASS_FORCE_COMPOSITION: --force-composition, ARGB8888, ready-without-sync-fd"
+DISPLAY_PHONE_PROOF_CLASSIFICATION=NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS
+DISPLAY_PHONE_PROOF_RESULT="/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-wayland-working-03/result.md"
+DISPLAY_PHONE_GAMESCOPE_SIDECAR=xwayland-gamescope-14-exportable-fence-guard-a4-473ba531
+DISPLAY_PHONE_XWAYLAND_SIDECAR=xwayland-gamescope-06-xwayland-9f1a3d62
+DISPLAY_PHONE_SOURCE="R6 Wayland proof 03: dmabuf-present, real-buffer commits, zero vkGetMemoryFdKHR failures, Gamescope/Xwayland ready"
+DISPLAY_PHONE_PROMOTION_SOURCE="R6 proof sidecars: $DISPLAY_PHONE_GAMESCOPE_SIDECAR + $DISPLAY_PHONE_XWAYLAND_SIDECAR"
 DISPLAY_PHONE_RUNTIME_CONSTRAINT="live-confirmed NX809J stock RedMagic ROM with OnePlus Wild kernel: CONFIG_ARM64_VA_BITS=39, 4K pages, PA_BITS=48, compat enabled; avoid 45-bit runtime assumptions"
-DISPLAY_PHONE_RUNTIME_BLOCKER="ARM64EC Wine GUI blocked after force-composition: winex11.drv loads then fails during process attach with SEH invalid-frame/c0000005 under 39-bit VA"
-ANLAND_REPAIR_SOURCE="Droidspaces-OSS tools/fix-anland-display.sh@6db8940190ea; anland display_producer timeout fix@5d69f36dd5a0"
+DISPLAY_PHONE_RUNTIME_BLOCKER="Wayland display is proven; game-client runtime is not promoted because Proton/Wine/Steam were not run in the proof. Earlier ARM64EC Wine GUI attempts hit winex11.drv SEH invalid-frame/c0000005 under 39-bit VA."
+ANLAND_REPAIR_SOURCE="Droidspaces-OSS CLI --env/--bind; Droidspaces-rootfs-KDE-builder Ubuntu26 anland_kde; Anland daemon/consumer"
 DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
 ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
-ANLAND_CONTAINER=ubuntu
-ANLAND_CONFIG=/data/local/Droidspaces/Containers/ubuntu/container.config
-ANLAND_ENV=/data/local/Droidspaces/Containers/ubuntu/anland.env
+ANLAND_CONTAINERS_DIR=/data/local/Droidspaces/Containers
+ANLAND_PIDS_DIR=/data/local/Droidspaces/Pids
+ANLAND_DEFAULT_CONTAINER=ubuntu
+ANLAND_CONTAINER=${NEBULA_ANLAND_CONTAINER:-$ANLAND_DEFAULT_CONTAINER}
+ANLAND_CONFIG=$ANLAND_CONTAINERS_DIR/$ANLAND_CONTAINER/container.config
+ANLAND_ENV=$ANLAND_CONTAINERS_DIR/$ANLAND_CONTAINER/anland.env
 ANLAND_SOCKET_HOST=/data/local/tmp/display_daemon.sock
 ANLAND_SOCKET_GUEST=/run/display.sock
 ANLAND_RENDER_NODE=/dev/dri/renderD128
+ANLAND_RECOMMENDED_CONTAINER=anland-ubuntu26-kde
+ANLAND_RECOMMENDED_ENV=$ANLAND_CONTAINERS_DIR/$ANLAND_RECOMMENDED_CONTAINER/anland.env
+ANLAND_RECOMMENDED_ROOTFS_IMG=$ANLAND_CONTAINERS_DIR/$ANLAND_RECOMMENDED_CONTAINER/rootfs.img
+ANLAND_RECOMMENDED_ROOTFS_ARCHIVE=/sdcard/Download/anland-ubuntu26-kde.tar.xz
+ANLAND_RECOMMENDED_ROOTFS_SIZE=32G
+ANLAND_DAEMON_MODULE_ID=virtual-drm-daemon
+ANLAND_CONSUMER_PACKAGE=com.anland.consumer
+DROIDSPACES_NATIVE_METHOD_SOURCE="Droidspaces-OSS README.md, Documentation/Features.md, src/config.c, src/environment.c, src/android/x11.c, src/android/virgl.c, src/android/pulseaudio.c"
+DROIDSPACES_ROOTFS_METHOD_SOURCE="Droidspaces-OSS src/main.c, src/utils.c, src/config.c rootfs flags and persisted container.config"
 
 ensure_dirs() {
   mkdir -p "$LOG_DIR" "$STATE_DIR" 2>/dev/null || return 0
@@ -263,10 +282,12 @@ capabilities_json() {
   printf '{"id":"cooling.policy","title":"Read-only automatic cooling policy preview","status":"available_read_only","mutating":false,"source":"nebula-core defaults.json"},'
   printf '{"id":"snapshot.cooling","title":"Cooling snapshot and rollback dry-run","status":"available_state_only","mutating":false,"source":"nebula-core state"},'
   printf '{"id":"legacy.modules","title":"Protected legacy Droidspaces module status","status":"available_read_only","mutating":false,"source":"protected module audit"},'
+  printf '{"id":"integrations.baseline","title":"Baseline APK/module integration status","status":"available_read_only","mutating":false,"source":"nebula-core integration registry"},'
   printf '{"id":"nubia.toolkit.status","title":"Nubia Toolkit compatibility status","status":"ported_status_only","mutating":false,"source":"%s"},' "$(json_escape "$NUBIA_TOOLKIT_SOURCE")"
   printf '{"id":"runtime.waylandie.status","title":"WayLandIE runtime readiness","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"display.lanes","title":"Display lane selector status","status":"available_read_only","mutating":false,"source":"nebula-core lane registry"},'
+  printf '{"id":"display.method-containers","title":"Display method container map","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method container registry"},'
   printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DISPLAY_PHONE_SOURCE")"
   printf '{"id":"display.lane.anland.preflight","title":"Anland surface lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_REPAIR_SOURCE")"
   printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"proven_reference_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DRM_LEASE_SOURCE")"
@@ -855,7 +876,15 @@ waylandie_collect() {
   wl_loader="$wl_native/libld_glibc.so"
   wl_wine_host=$(waylandie_find_wine_host "$wl_proton")
   wl_wine_guest=$(waylandie_guest_wine_path "$wl_wine_host" "$wl_proton")
+  wl_bridge="$wl_rootfs/usr/local/bin/waylandie-wayland-bridge"
+  wl_local_icd="$wl_rootfs/usr/local/etc/vulkan/icd.d/freedreno_icd.json"
+  wl_local_vulkan_driver="$wl_rootfs/usr/local/lib/libvulkan_freedreno.so"
+  wl_gamescope_sidecar="$wl_data/files/sidecars/$DISPLAY_PHONE_GAMESCOPE_SIDECAR"
+  wl_xwayland_sidecar="$wl_data/files/sidecars/$DISPLAY_PHONE_XWAYLAND_SIDECAR"
+  wl_gamescope_bin="$wl_gamescope_sidecar/usr/local/bin/gamescope"
+  wl_xwayland_bin="$wl_xwayland_sidecar/usr/bin/Xwayland"
   wl_errors=
+  wl_display_errors=
   wl_installed=0
   wl_data_present=0
   wl_imagefs_present=0
@@ -865,18 +894,36 @@ waylandie_collect() {
   wl_proton_present=0
   wl_wine_present=0
   wl_uid_present=0
+  wl_bridge_present=0
+  wl_local_icd_present=0
+  wl_local_vulkan_driver_present=0
+  wl_gamescope_sidecar_present=0
+  wl_xwayland_sidecar_present=0
   wl_ready=1
+  wl_display_ready=1
 
-  if package_visible "$WAYLANDIE_PACKAGE"; then wl_installed=1; fi
-  if [ -d "$wl_data" ]; then wl_data_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_data"); fi
-  if [ -d "$wl_rootfs" ]; then wl_imagefs_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:imagefs"); fi
-  if [ -n "$wl_native" ] && [ -d "$wl_native" ]; then wl_native_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:native_lib_dir"); fi
-  if [ -f "$wl_proot" ]; then wl_proot_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libproot.so"); fi
-  if [ -f "$wl_loader" ]; then wl_loader_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libld_glibc.so"); fi
+  if package_visible "$WAYLANDIE_PACKAGE"; then
+    wl_installed=1
+  else
+    wl_ready=0
+    wl_display_ready=0
+    wl_errors=$(list_append_json_string "$wl_errors" "missing:package")
+    wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:package")
+  fi
+  if [ -d "$wl_data" ]; then wl_data_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_data"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:app_data"); fi
+  if [ -d "$wl_rootfs" ]; then wl_imagefs_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:imagefs"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:imagefs"); fi
+  if [ -n "$wl_native" ] && [ -d "$wl_native" ]; then wl_native_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:native_lib_dir"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:native_lib_dir"); fi
+  if [ -f "$wl_proot" ]; then wl_proot_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libproot.so"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:libproot.so"); fi
+  if [ -f "$wl_loader" ]; then wl_loader_present=1; else wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:libld_glibc.so"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:libld_glibc.so"); fi
+  if [ -x "$wl_bridge" ]; then wl_bridge_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:waylandie_wayland_bridge"); fi
+  if [ -f "$wl_local_icd" ]; then wl_local_icd_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:local_freedreno_icd"); fi
+  if [ -f "$wl_local_vulkan_driver" ]; then wl_local_vulkan_driver_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:local_freedreno_driver"); fi
+  if [ -x "$wl_gamescope_bin" ]; then wl_gamescope_sidecar_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:gamescope_sidecar"); fi
+  if [ -x "$wl_xwayland_bin" ]; then wl_xwayland_sidecar_present=1; else wl_display_ready=0; wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:xwayland_sidecar"); fi
   if [ -d "$wl_proton" ]; then wl_proton_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:proton_active"); fi
   if [ -n "$wl_wine_host" ]; then wl_wine_present=1; else wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:proton_wine"); fi
   case "$wl_uid" in
-    ''|*[!0-9]*) wl_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_uid") ;;
+    ''|*[!0-9]*) wl_ready=0; wl_display_ready=0; wl_errors=$(list_append_json_string "$wl_errors" "missing:app_uid"); wl_display_errors=$(list_append_json_string "$wl_display_errors" "missing:app_uid") ;;
     *) wl_uid_present=1 ;;
   esac
 }
@@ -895,11 +942,19 @@ waylandie_runtime_status_payload() {
     "$(json_bool "$wl_native_present")" \
     "$(json_bool "$wl_proot_present")" \
     "$(json_bool "$wl_loader_present")"
-  printf '"proton_present":%s,"wine_present":%s,"ready":%s,"errors":[%s]' \
+  printf '"proton_present":%s,"wine_present":%s,"ready":%s,' \
     "$(json_bool "$wl_proton_present")" \
     "$(json_bool "$wl_wine_present")" \
-    "$(json_bool "$wl_ready")" \
-    "$wl_errors"
+    "$(json_bool "$wl_ready")"
+  printf '"display_ready":%s,"bridge_present":%s,"local_icd_present":%s,"local_vulkan_driver_present":%s,' \
+    "$(json_bool "$wl_display_ready")" \
+    "$(json_bool "$wl_bridge_present")" \
+    "$(json_bool "$wl_local_icd_present")" \
+    "$(json_bool "$wl_local_vulkan_driver_present")"
+  printf '"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,' \
+    "$(json_bool "$wl_gamescope_sidecar_present")" \
+    "$(json_bool "$wl_xwayland_sidecar_present")"
+  printf '"errors":[%s],"display_errors":[%s]' "$wl_errors" "$wl_display_errors"
 }
 
 waylandie_runtime_status_json() {
@@ -1029,24 +1084,396 @@ fixed_device_path() {
 }
 
 fixed_path_exists() {
-  path=$(fixed_device_path "$1")
-  [ -e "$path" ]
+  resolved_path=$(fixed_device_path "$1")
+  [ -e "$resolved_path" ]
 }
 
 fixed_path_executable() {
-  path=$(fixed_device_path "$1")
-  [ -x "$path" ]
+  resolved_path=$(fixed_device_path "$1")
+  [ -x "$resolved_path" ]
 }
 
 fixed_path_socket() {
-  path=$(fixed_device_path "$1")
-  [ -S "$path" ]
+  resolved_path=$(fixed_device_path "$1")
+  [ -S "$resolved_path" ]
+}
+
+fixed_path_socket_world_writable() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -S "$resolved_path" ] || return 1
+  perms=$(ls -ld "$resolved_path" 2>/dev/null | sed -n 's/^\(..........\).*/\1/p')
+  case "$perms" in
+    ????????w*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+fixed_path_dir() {
+  resolved_path=$(fixed_device_path "$1")
+  [ -d "$resolved_path" ]
 }
 
 fixed_file_contains() {
-  path=$(fixed_device_path "$1")
+  resolved_path=$(fixed_device_path "$1")
   pattern=$2
-  [ -f "$path" ] && grep -F "$pattern" "$path" >/dev/null 2>&1
+  [ -f "$resolved_path" ] && grep -F "$pattern" "$resolved_path" >/dev/null 2>&1
+}
+
+fixed_file_value() {
+  resolved_path=$(fixed_device_path "$1")
+  key=$2
+  if [ -f "$resolved_path" ]; then
+    sed -n "s/^$key=//p" "$resolved_path" | head -n 1
+  fi
+}
+
+anland_config_for_container() {
+  printf '%s/%s/container.config' "$ANLAND_CONTAINERS_DIR" "$1"
+}
+
+anland_env_for_container() {
+  printf '%s/%s/anland.env' "$ANLAND_CONTAINERS_DIR" "$1"
+}
+
+anland_safe_container_name() {
+  case "$1" in
+    ''|*/*|*..*|*[!A-Za-z0-9._-]*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+anland_pid_from_real_file() {
+  pid=$(sed -n '1{s/[^0-9].*$//;p;q}' "$1" 2>/dev/null)
+  case "$pid" in
+    ''|*[!0-9]*) ;;
+    *) printf '%s' "$pid" ;;
+  esac
+}
+
+anland_pid_running() {
+  pid=$1
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  fixed_path_exists "/proc/$pid"
+}
+
+anland_collect_active_pidfiles() {
+  anland_active_name=
+  anland_active_pidfile=
+  anland_active_pid=
+  anland_active_ambiguous=0
+  dir=$(fixed_device_path "$ANLAND_PIDS_DIR")
+  [ -d "$dir" ] || return 0
+  for pid_file in "$dir"/*.pid "$dir"/*.init; do
+    [ -s "$pid_file" ] || continue
+    base=${pid_file##*/}
+    suffix=${base##*.}
+    name=${base%."$suffix"}
+    anland_safe_container_name "$name" || continue
+	    fixed_path_exists "$(anland_config_for_container "$name")" || continue
+	    canonical_pidfile="$ANLAND_PIDS_DIR/$name.$suffix"
+	    pid=$(anland_pid_from_real_file "$pid_file")
+	    anland_pid_running "$pid" || continue
+	    if [ -z "$anland_active_name" ]; then
+      anland_active_name=$name
+      anland_active_pidfile=$canonical_pidfile
+      anland_active_pid=$pid
+    elif [ "$anland_active_name" = "$name" ]; then
+      case "$anland_active_pidfile" in
+        *.init)
+          if [ "$suffix" = "pid" ]; then
+            anland_active_pidfile=$canonical_pidfile
+            anland_active_pid=$pid
+          fi
+          ;;
+      esac
+    else
+      anland_active_ambiguous=1
+    fi
+  done
+}
+
+anland_pidfile_for_container() {
+  container=$1
+  for suffix in pid init; do
+    candidate_path="$ANLAND_PIDS_DIR/$container.$suffix"
+    real_path=$(fixed_device_path "$candidate_path")
+    if [ -s "$real_path" ]; then
+      pid=$(anland_pid_from_real_file "$real_path")
+      if anland_pid_running "$pid"; then
+        printf '%s' "$candidate_path"
+        return
+      fi
+    fi
+  done
+}
+
+anland_pid_for_canonical_file() {
+  path=$1
+  [ -n "$path" ] || return
+  anland_pid_from_real_file "$(fixed_device_path "$path")"
+}
+
+anland_env_from_config() {
+  config=$1
+  container=$2
+  configured_env=$(fixed_file_value "$config" env_file)
+  case "$configured_env" in
+    "$ANLAND_CONTAINERS_DIR/$container"/*)
+      case "$configured_env" in
+        *..*) ;;
+        *) printf '%s' "$configured_env"; return ;;
+      esac
+      ;;
+  esac
+  anland_env_for_container "$container"
+}
+
+anland_rootfs_from_config() {
+  config=$1
+  container=$2
+  rootfs=$(fixed_file_value "$config" rootfs_path)
+  if [ -n "$rootfs" ]; then
+    printf '%s' "$rootfs"
+  else
+    printf '%s/%s/rootfs' "$ANLAND_CONTAINERS_DIR" "$container"
+  fi
+}
+
+anland_rootfs_mode_for_path() {
+  path=$1
+  case "$path" in
+    *.img|*.img.raw|*.qcow2) printf '%s' image ;;
+    *) printf '%s' directory ;;
+  esac
+}
+
+anland_path_belongs_to_container() {
+  container=$1
+  path=$2
+  case "$container:$path" in
+    :*) return 1 ;;
+    *:"$ANLAND_CONTAINERS_DIR/$container"/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+anland_rootfs_has_producer() {
+  rootfs=$1
+  [ -n "$rootfs" ] || return 1
+  [ "$(anland_rootfs_mode_for_path "$rootfs")" = "directory" ] || return 1
+  real_rootfs=$(fixed_device_path "$rootfs")
+  [ -d "$real_rootfs" ] || return 1
+  [ -x "$real_rootfs/usr/local/bin/startanland-kde.sh" ] && return 0
+  [ -x "$real_rootfs/usr/bin/kwin_wayland" ] && return 0
+  [ -x "$real_rootfs/usr/bin/weston" ] && return 0
+  find "$real_rootfs/usr" -maxdepth 6 -iname '*anland*' -print -quit 2>/dev/null | grep . >/dev/null 2>&1
+}
+
+anland_active_image_has_producer() {
+  container=$1
+  [ -n "$container" ] || return 1
+  [ "$anland_container_active" = "1" ] || return 1
+  bin=$(fixed_device_path "$ANLAND_DROIDSPACES_BIN")
+  [ -x "$bin" ] || return 1
+  if command -v timeout >/dev/null 2>&1; then
+    timeout 8 "$bin" --name="$container" run sh -lc 'test -x /usr/local/bin/startanland-kde.sh' >/dev/null 2>&1
+  else
+    "$bin" --name="$container" run sh -lc 'test -x /usr/local/bin/startanland-kde.sh' >/dev/null 2>&1
+  fi
+}
+
+anland_required_env_json() {
+  printf '["ANLAND=1","ANLAND_SOCKET=%s","ANLAND_DRM_DEVICE=%s","WAYLAND_DISPLAY=wayland-0","XDG_SESSION_TYPE=wayland","QT_QPA_PLATFORM=wayland","MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform"]' \
+    "$(json_escape "$ANLAND_SOCKET_GUEST")" \
+    "$(json_escape "$ANLAND_RENDER_NODE")"
+}
+
+anland_required_config_json() {
+  printf '["enable_termux_x11=0","enable_hw_access=1","enable_gpu_mode=1","selinux_permissive=1","privileged=nocaps,noseccomp","env_file=<container>/anland.env","bind_mounts=%s:%s"]' \
+    "$(json_escape "$ANLAND_SOCKET_HOST")" \
+    "$(json_escape "$ANLAND_SOCKET_GUEST")"
+}
+
+anland_recommended_start_command() {
+  printf '%s --name=%s --rootfs-img=%s --net=host --hw-access --gpu --selinux-permissive --privileged=nocaps,noseccomp --env=%s --bind=%s:%s start' \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_CONTAINER" \
+    "$ANLAND_RECOMMENDED_ROOTFS_IMG" \
+    "$ANLAND_RECOMMENDED_ENV" \
+    "$ANLAND_SOCKET_HOST" \
+	    "$ANLAND_SOCKET_GUEST"
+}
+
+anland_recommended_create_command() {
+  printf '%s --rootfs-arc=%s --rootfs-img=%s --size=%s create' \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE" \
+    "$ANLAND_RECOMMENDED_ROOTFS_IMG" \
+    "$ANLAND_RECOMMENDED_ROOTFS_SIZE"
+}
+
+anland_recommended_producer_verify_command() {
+  printf "%s --name=%s run sh -lc 'test -x /usr/local/bin/startanland-kde.sh'" \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_CONTAINER"
+}
+
+anland_recommended_producer_run_command() {
+  printf "%s --name=%s run sh -lc 'nohup /usr/local/bin/startanland-kde.sh >/tmp/anland-kde.log 2>&1 &'" \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$ANLAND_RECOMMENDED_CONTAINER"
+}
+
+anland_selected_restart_command() {
+  [ -n "$anland_selected_container" ] || return 0
+  printf '%s --name=%s --env=%s --bind=%s:%s restart' \
+    "$ANLAND_DROIDSPACES_BIN" \
+    "$anland_selected_container" \
+    "$anland_selected_env" \
+    "$ANLAND_SOCKET_HOST" \
+    "$ANLAND_SOCKET_GUEST"
+}
+
+anland_setup_commands_json() {
+  selected_restart=$(anland_selected_restart_command)
+  printf '{"recommended_container":%s,' "$(json_string "$ANLAND_RECOMMENDED_CONTAINER")"
+  printf '"recommended_rootfs_archive":%s,' "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE")"
+  printf '"recommended_rootfs_img":%s,' "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_IMG")"
+  printf '"recommended_rootfs_size":%s,' "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_SIZE")"
+  printf '"recommended_env_file":%s,' "$(json_string "$ANLAND_RECOMMENDED_ENV")"
+  printf '"droidspaces_create_rootfs_img":%s,' "$(json_string "$(anland_recommended_create_command)")"
+  printf '"droidspaces_start_recommended":%s,' "$(json_string "$(anland_recommended_start_command)")"
+  printf '"droidspaces_restart_selected":%s,' "$(json_string "$selected_restart")"
+  printf '"daemon_module_install":"ksud module install /data/local/tmp/anland-2.0-virtual-drm-daemon.zip",'
+  printf '"consumer_apk_package":%s,' "$(json_string "$ANLAND_CONSUMER_PACKAGE")"
+  printf '"producer_start_command":"startanland-kde.sh",'
+  printf '"producer_verify_command":%s,' "$(json_string "$(anland_recommended_producer_verify_command)")"
+  printf '"producer_run_command":%s,' "$(json_string "$(anland_recommended_producer_run_command)")"
+  printf '"repo_build_profile":"Droidspaces-rootfs-KDE-builder Ubuntu26 with KDE auto-start and anland_kde enabled"}'
+}
+
+anland_collect() {
+  anland_errors=
+  anland_collect_active_pidfiles
+  anland_selected_container=$ANLAND_DEFAULT_CONTAINER
+  anland_selection_source=default_fallback
+  anland_selected_pidfile=
+  anland_container_pid=
+  anland_container_active=0
+  anland_selection_ambiguous=0
+  anland_selection_invalid=0
+
+  if [ -n "${NEBULA_ANLAND_CONTAINER:-}" ]; then
+    if anland_safe_container_name "$NEBULA_ANLAND_CONTAINER"; then
+      anland_selected_container=$NEBULA_ANLAND_CONTAINER
+      anland_selection_source=env_override
+    else
+      anland_selected_container=
+      anland_selection_source=invalid_env_override
+      anland_selection_invalid=1
+      anland_errors=$(list_append_json_string "$anland_errors" "invalid:env_override_container")
+    fi
+  elif [ "$anland_active_ambiguous" = "1" ]; then
+    anland_selection_source=ambiguous_active_pidfiles
+    anland_selection_ambiguous=1
+    anland_errors=$(list_append_json_string "$anland_errors" "ambiguous:active_containers")
+    if [ -n "$anland_active_name" ]; then
+      anland_selected_container=$anland_active_name
+    fi
+  elif [ -n "$anland_active_name" ]; then
+    anland_selected_container=$anland_active_name
+    anland_selection_source=active_pidfile
+  fi
+
+  anland_selected_pidfile=$(anland_pidfile_for_container "$anland_selected_container")
+  if [ -n "$anland_selected_pidfile" ]; then
+    anland_container_active=1
+    anland_container_pid=$(anland_pid_for_canonical_file "$anland_selected_pidfile")
+  fi
+  anland_selected_config=
+  anland_selected_env=
+  anland_selected_rootfs=
+  anland_selected_rootfs_mode=missing
+  if [ -n "$anland_selected_container" ]; then
+    anland_selected_config=$(anland_config_for_container "$anland_selected_container")
+    anland_selected_env=$(anland_env_from_config "$anland_selected_config" "$anland_selected_container")
+    anland_selected_rootfs=$(anland_rootfs_from_config "$anland_selected_config" "$anland_selected_container")
+    anland_selected_rootfs_mode=$(anland_rootfs_mode_for_path "$anland_selected_rootfs")
+  fi
+  anland_bin=0
+  anland_config=0
+  anland_env=0
+  anland_socket=0
+  anland_socket_writable=0
+  anland_render=0
+  anland_rootfs=0
+  anland_rootfs_image=0
+  anland_config_env=0
+  anland_config_bind=0
+  anland_env_socket=0
+  anland_env_kgsl=0
+  anland_producer=0
+  anland_rootfs_allowed=0
+  anland_runtime_ready=0
+  anland_ready=0
+  anland_status=missing
+
+  fixed_path_executable "$ANLAND_DROIDSPACES_BIN" && anland_bin=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:droidspaces_binary")
+  [ -n "$anland_selected_config" ] && fixed_path_exists "$anland_selected_config" && anland_config=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:container_config")
+  [ -n "$anland_selected_env" ] && fixed_path_exists "$anland_selected_env" && anland_env=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:anland_env")
+  if fixed_path_socket "$ANLAND_SOCKET_HOST"; then
+    anland_socket=1
+    fixed_path_socket_world_writable "$ANLAND_SOCKET_HOST" && anland_socket_writable=1 || anland_errors=$(list_append_json_string "$anland_errors" "blocked:display_daemon_socket_not_app_writable")
+  else
+    anland_errors=$(list_append_json_string "$anland_errors" "missing:display_daemon_socket")
+  fi
+  fixed_path_exists "$ANLAND_RENDER_NODE" && anland_render=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:render_node")
+  if anland_path_belongs_to_container "$anland_selected_container" "$anland_selected_rootfs"; then
+    anland_rootfs_allowed=1
+    if [ "$anland_selected_rootfs_mode" = "image" ]; then
+      anland_rootfs_image=1
+    fi
+  elif [ -n "$anland_selected_rootfs" ]; then
+    anland_errors=$(list_append_json_string "$anland_errors" "invalid:rootfs_path_outside_container")
+  fi
+  [ "$anland_rootfs_allowed" = "1" ] && fixed_path_exists "$anland_selected_rootfs" && anland_rootfs=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:rootfs_path")
+  [ -n "$anland_selected_config" ] && fixed_file_contains "$anland_selected_config" "env_file=$anland_selected_env" && anland_config_env=1 || true
+  [ -n "$anland_selected_config" ] && fixed_file_contains "$anland_selected_config" "$ANLAND_SOCKET_HOST:$ANLAND_SOCKET_GUEST" && anland_config_bind=1 || true
+  [ -n "$anland_selected_env" ] && fixed_file_contains "$anland_selected_env" "ANLAND_SOCKET=$ANLAND_SOCKET_GUEST" && anland_env_socket=1 || true
+  [ -n "$anland_selected_env" ] && fixed_file_contains "$anland_selected_env" "MESA_LOADER_DRIVER_OVERRIDE=kgsl" && anland_env_kgsl=1 || true
+  if anland_rootfs_has_producer "$anland_selected_rootfs"; then
+    anland_producer=1
+  elif [ "$anland_rootfs_image" = "1" ] && anland_active_image_has_producer "$anland_selected_container"; then
+    anland_producer=1
+  elif [ "$anland_rootfs_image" = "1" ] && [ "$anland_rootfs" = "1" ]; then
+    anland_errors=$(list_append_json_string "$anland_errors" "unknown:anland_producer_inside_rootfs_image_run_verify_required")
+  else
+    anland_errors=$(list_append_json_string "$anland_errors" "missing:anland_producer")
+  fi
+
+  if [ "$anland_selection_ambiguous" = "1" ] || [ "$anland_selection_invalid" = "1" ]; then
+    anland_status=partial
+  elif [ "$anland_bin" = "1" ] && [ "$anland_config" = "1" ] && [ "$anland_rootfs" = "1" ] && [ "$anland_render" = "1" ]; then
+    anland_status=container_runtime_ready
+    anland_runtime_ready=1
+  elif [ "$anland_bin" = "1" ] || [ "$anland_config" = "1" ] || [ "$anland_env" = "1" ]; then
+    anland_status=partial
+  fi
+
+  if [ "$anland_runtime_ready" = "1" ] \
+    && [ "$anland_env" = "1" ] \
+    && [ "$anland_socket" = "1" ] \
+    && [ "$anland_socket_writable" = "1" ] \
+    && [ "$anland_config_env" = "1" ] \
+    && [ "$anland_config_bind" = "1" ] \
+    && [ "$anland_env_socket" = "1" ] \
+    && [ "$anland_env_kgsl" = "1" ] \
+    && [ "$anland_producer" = "1" ]; then
+    anland_status=preflight_ready
+    anland_ready=1
+  fi
 }
 
 display_bool_source() {
@@ -1063,39 +1490,74 @@ display_bool_source() {
 display_phone_preflight_payload() {
   waylandie_collect
   phone_status=missing
-  if [ "$wl_ready" = "1" ]; then
-    phone_status=ready_for_glx_fix
+  active_blocker=WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE
+  canonical_blocker=WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE
+  phone_container_status=missing
+  phone_display_status=display_missing
+  phone_runtime_status=runtime_missing
+  if [ "$wl_display_ready" = "1" ]; then
+    phone_status=wayland_display_pass
+    active_blocker=NONE_WAYLAND_DISPLAY
+    canonical_blocker=NONE_WAYLAND_DISPLAY
+    phone_display_status=display_proven
   elif [ "$wl_installed" = "1" ]; then
     phone_status=partial
   fi
+  if [ "$wl_ready" = "1" ]; then
+    phone_container_status=ready
+    phone_runtime_status=runtime_ready
+  elif [ "$wl_installed" = "1" ]; then
+    phone_container_status=partial
+  fi
   printf '"id":"phone_app_bridge",'
+  printf '"method_id":"phone_app_bridge",'
   printf '"title":"Phone / App Mode",'
   printf '"status":%s,' "$(json_string "$phone_status")"
-  printf '"available":%s,' "$(json_bool "$wl_ready")"
+  printf '"available":%s,' "$(json_bool "$wl_display_ready")"
+  printf '"container_ref":"waylandie_app_imagefs",'
+  printf '"container_kind":"app_proot",'
+  printf '"container_status":%s,' "$(json_string "$phone_container_status")"
+  printf '"display_status":%s,' "$(json_string "$phone_display_status")"
+  printf '"runtime_status":%s,' "$(json_string "$phone_runtime_status")"
+  printf '"start_command_status":"not_available",'
+  printf '"requirement_status":"display_requirements_met",'
+  printf '"missing_requirements":["game_client_runtime_proof_not_promoted_39bit_va"],'
   printf '"mutating":false,'
   printf '"launch_command_available":false,'
-  printf '"active_blocker":"RGB_GLX_VISUAL_FBCONFIG_EXPOSURE",'
-  printf '"canonical_blocker":"RGB_GLX_VISUAL_FBCONFIG_EXPOSURE",'
-  printf '"current_endpoint":"Xwayland launches",'
-  printf '"unpromoted_lead":"FORCE_COMPOSITION_ARGB8888_READY_WITHOUT_SYNC_FD",'
-  printf '"lead_status":"promotion_candidate",'
-  printf '"trick":"gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf",'
-  printf '"next_reversa_action":"minimal_wine_gui_smoke_before_steam",'
+  printf '"active_blocker":%s,' "$(json_string "$active_blocker")"
+  printf '"canonical_blocker":%s,' "$(json_string "$canonical_blocker")"
+  printf '"current_endpoint":"SurfaceControl Vulkan native dmabuf-present via WayLandIE bridge, Gamescope, and Xwayland",'
+  printf '"proof_classification":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")"
+  printf '"proof_result":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_RESULT")"
+  printf '"proof_metrics":{"summary_commits":7189,"summary_failures":0,"vkGetMemoryFdKHR_failures":0,"real_buffer_commits":2,"xwayland_ready":true,"gamescope_exit":0,"bridge_exit":0},'
+  printf '"lead_status":"display_proven",'
+  printf '"proven_trick":"gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf",'
+  printf '"next_reversa_action":"bounded_game_client_runtime_before_steam",'
   printf '"steam_allowed":false,'
   printf '"kernel_va_bits_constraint":39,'
   printf '"kernel_va_bits_evidence":"live_proc_config_gz",'
-  printf '"runtime_blocker":"ARM64EC_WINE_WINEX11_SEH_INVALID_FRAME_39BIT_VA",'
+  printf '"runtime_blocker":"GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA",'
   printf '"runtime_blocker_detail":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_BLOCKER")"
   printf '"runtime_constraint":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_CONSTRAINT")"
-  printf '"promotion_source":%s,' "$(json_string "$DISPLAY_PHONE_PROMOTION_SOURCE")"
+  printf '"sidecar_source":%s,' "$(json_string "$DISPLAY_PHONE_PROMOTION_SOURCE")"
+  printf '"gamescope_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_GAMESCOPE_SIDECAR")"
+  printf '"xwayland_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_XWAYLAND_SIDECAR")"
+  printf '"selected_icd":%s,' "$(json_string "$wl_local_icd")"
+  printf '"selected_vulkan_driver":%s,' "$(json_string "$wl_local_vulkan_driver")"
   printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
-  printf '"checks":{"waylandie_ready":%s,"package_installed":%s,"imagefs_present":%s,"proton_present":%s,"wine_present":%s},' \
+  printf '"checks":{"display_ready":%s,"runtime_ready":%s,"package_installed":%s,"imagefs_present":%s,"bridge_present":%s,"local_icd_present":%s,"local_vulkan_driver_present":%s,"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,"proton_present":%s,"wine_present":%s},' \
+    "$(json_bool "$wl_display_ready")" \
     "$(json_bool "$wl_ready")" \
     "$(json_bool "$wl_installed")" \
     "$(json_bool "$wl_imagefs_present")" \
+    "$(json_bool "$wl_bridge_present")" \
+    "$(json_bool "$wl_local_icd_present")" \
+    "$(json_bool "$wl_local_vulkan_driver_present")" \
+    "$(json_bool "$wl_gamescope_sidecar_present")" \
+    "$(json_bool "$wl_xwayland_sidecar_present")" \
     "$(json_bool "$wl_proton_present")" \
     "$(json_bool "$wl_wine_present")"
-  printf '"errors":[%s]' "$wl_errors"
+  printf '"errors":[%s],"runtime_errors":[%s]' "$wl_display_errors" "$wl_errors"
 }
 
 display_phone_preflight_json() {
@@ -1105,57 +1567,101 @@ display_phone_preflight_json() {
 }
 
 display_anland_preflight_payload() {
-  anland_errors=
-  anland_bin=0
-  anland_config=0
-  anland_env=0
-  anland_socket=0
-  anland_render=0
-  anland_config_env=0
-  anland_config_bind=0
-  anland_env_socket=0
-  anland_env_kgsl=0
-
-  fixed_path_executable "$ANLAND_DROIDSPACES_BIN" && anland_bin=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:droidspaces_binary")
-  fixed_path_exists "$ANLAND_CONFIG" && anland_config=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:container_config")
-  fixed_path_exists "$ANLAND_ENV" && anland_env=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:anland_env")
-  fixed_path_socket "$ANLAND_SOCKET_HOST" && anland_socket=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:display_daemon_socket")
-  fixed_path_exists "$ANLAND_RENDER_NODE" && anland_render=1 || anland_errors=$(list_append_json_string "$anland_errors" "missing:render_node")
-  fixed_file_contains "$ANLAND_CONFIG" "env_file=$ANLAND_ENV" && anland_config_env=1 || true
-  fixed_file_contains "$ANLAND_CONFIG" "$ANLAND_SOCKET_HOST:$ANLAND_SOCKET_GUEST" && anland_config_bind=1 || true
-  fixed_file_contains "$ANLAND_ENV" "ANLAND_SOCKET=$ANLAND_SOCKET_GUEST" && anland_env_socket=1 || true
-  fixed_file_contains "$ANLAND_ENV" "MESA_LOADER_DRIVER_OVERRIDE=kgsl" && anland_env_kgsl=1 || true
-
-  anland_ready=0
-  anland_status=missing
-  if [ "$anland_bin" = "1" ] && [ "$anland_config" = "1" ] && [ "$anland_socket" = "1" ] && [ "$anland_render" = "1" ]; then
-    anland_status=preflight_ready
-    anland_ready=1
-  elif [ "$anland_bin" = "1" ] || [ "$anland_config" = "1" ] || [ "$anland_env" = "1" ]; then
-    anland_status=partial
+  anland_collect
+  anland_container_status=missing
+  anland_display_status=display_missing
+  anland_runtime_status=runtime_missing
+  anland_requirement_status=missing_requirements
+  if [ "$anland_selection_ambiguous" = "1" ]; then
+    anland_container_status=ambiguous
+    anland_requirement_status=ambiguous_selection
+  elif [ -z "$anland_selected_container" ]; then
+    anland_container_status=missing
+    anland_requirement_status=invalid_selection
+  elif [ "$anland_container_active" = "1" ]; then
+    anland_container_status=active
+  elif [ "$anland_runtime_ready" = "1" ]; then
+    anland_container_status=ready
+  elif [ "$anland_config" = "1" ]; then
+    anland_container_status=idle
+  fi
+  if [ "$anland_runtime_ready" = "1" ]; then
+    anland_runtime_status=runtime_ready
+  fi
+  if [ "$anland_ready" = "1" ]; then
+    anland_display_status=display_ready
+    anland_requirement_status=complete
+  elif [ "$anland_requirement_status" = "ambiguous_selection" ] || [ "$anland_requirement_status" = "invalid_selection" ]; then
+    true
+  elif [ "$anland_rootfs_allowed" != "1" ]; then
+    anland_requirement_status=invalid_rootfs_path
+  elif [ "$anland_rootfs" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_socket" != "1" ] && [ "$anland_env" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_socket" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_socket_writable" != "1" ]; then
+    anland_requirement_status=missing_requirements
+  elif [ "$anland_env" != "1" ]; then
+    anland_requirement_status=missing_requirements
   fi
 
   printf '"id":"anland_surface",'
+  printf '"method_id":"anland_surface",'
   printf '"title":"Anland Surface Mode",'
   printf '"status":%s,' "$(json_string "$anland_status")"
   printf '"available":%s,' "$(json_bool "$anland_ready")"
+  printf '"runtime_ready":%s,' "$(json_bool "$anland_runtime_ready")"
+  printf '"container_ref":%s,' "$(json_string "$anland_selected_container")"
+  printf '"container_kind":"droidspaces",'
+  printf '"container_status":%s,' "$(json_string "$anland_container_status")"
+  printf '"display_status":%s,' "$(json_string "$anland_display_status")"
+  printf '"runtime_status":%s,' "$(json_string "$anland_runtime_status")"
+  printf '"start_command_status":"not_available",'
+  printf '"requirement_status":%s,' "$(json_string "$anland_requirement_status")"
+  printf '"missing_requirements":[%s],' "$anland_errors"
+  printf '"required_config":'
+  anland_required_config_json
+  printf ','
+  printf '"required_env":'
+  anland_required_env_json
+  printf ','
+  printf '"setup_commands":'
+  anland_setup_commands_json
+  printf ','
   printf '"mutating":false,'
   printf '"repair_command_available":false,'
   printf '"source":%s,' "$(json_string "$ANLAND_REPAIR_SOURCE")"
-  printf '"checks":{"droidspaces_binary":%s,"container_config":%s,"anland_env":%s,"display_daemon_socket":%s,"render_node":%s,"config_env_file":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s},' \
+  printf '"selected_container":%s,' "$(json_string "$anland_selected_container")"
+  printf '"container_selection_source":%s,' "$(json_string "$anland_selection_source")"
+  printf '"container_active":%s,' "$(json_bool "$anland_container_active")"
+  printf '"container_pid":%s,' "$(json_int_or_null "$anland_container_pid")"
+  printf '"checks":{"droidspaces_binary":%s,"container_selected":%s,"container_config":%s,"active_container_pidfile":%s,"rootfs_path":%s,"rootfs_image":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"config_env_file":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s,"anland_producer":%s},' \
     "$(json_bool "$anland_bin")" \
+    "$(json_bool "$([ -n "$anland_selected_container" ] && printf 1 || printf 0)")" \
     "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_bool "$anland_rootfs")" \
+    "$(json_bool "$anland_rootfs_image")" \
     "$(json_bool "$anland_env")" \
     "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_socket_writable")" \
     "$(json_bool "$anland_render")" \
     "$(json_bool "$anland_config_env")" \
     "$(json_bool "$anland_config_bind")" \
     "$(json_bool "$anland_env_socket")" \
-    "$(json_bool "$anland_env_kgsl")"
-  printf '"fixed_paths":{"droidspaces_binary":%s,"container_config":%s,"anland_env":%s,"display_socket_host":%s,"display_socket_guest":%s,"render_node":%s},' \
+    "$(json_bool "$anland_env_kgsl")" \
+    "$(json_bool "$anland_producer")"
+  printf '"selected_paths":{"droidspaces_binary":%s,"containers_dir":%s,"pids_dir":%s,"pidfile":%s,"container_config":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_mode":%s,"display_socket_host":%s,"display_socket_guest":%s,"render_node":%s},' \
     "$(json_string "$ANLAND_DROIDSPACES_BIN")" \
-    "$(json_string "$ANLAND_CONFIG")" \
-    "$(json_string "$ANLAND_ENV")" \
+    "$(json_string "$ANLAND_CONTAINERS_DIR")" \
+    "$(json_string "$ANLAND_PIDS_DIR")" \
+    "$(json_string_or_null "$anland_selected_pidfile")" \
+    "$(json_string "$anland_selected_config")" \
+    "$(json_string "$anland_selected_env")" \
+    "$(json_string "$anland_selected_rootfs")" \
+    "$(json_string "$anland_selected_rootfs_mode")" \
     "$(json_string "$ANLAND_SOCKET_HOST")" \
     "$(json_string "$ANLAND_SOCKET_GUEST")" \
     "$(json_string "$ANLAND_RENDER_NODE")"
@@ -1171,17 +1677,28 @@ display_anland_preflight_json() {
 display_dock_preflight_payload() {
   dock_safe=$(safe_mode_value)
   dock_status=proven_reference_not_wired
+  dock_start_status=operator_required
   if [ "$dock_safe" = "1" ]; then
     dock_status=safe_mode_blocks_start
+    dock_start_status=safe_mode_blocked
   fi
   printf '"id":"dock_drm_lease_external",'
+  printf '"method_id":"dock_drm_lease_external",'
   printf '"title":"Dock Lease Mode",'
   printf '"status":%s,' "$(json_string "$dock_status")"
   printf '"available":false,'
+  printf '"container_ref":"none",'
+  printf '"container_kind":"none",'
+  printf '"container_status":"none",'
+  printf '"display_status":"reference_only",'
+  printf '"runtime_status":"not_required",'
+  printf '"start_command_status":%s,' "$(json_string "$dock_start_status")"
+  printf '"requirement_status":"reference_requirements_known",'
+  printf '"missing_requirements":["external_display_discovery_required","lease_receiver_not_wired"],'
   printf '"mutating":false,'
   printf '"start_command_available":false,'
   printf '"evidence_captured":true,'
-  printf '"operator_gated":true,'
+  printf '"operator_required":true,'
   printf '"safe_mode":%s,' "$(json_bool "$dock_safe")"
   printf '"external_display_only":true,'
   printf '"internal_panel_allowed":false,'
@@ -1207,8 +1724,105 @@ display_lanes_json() {
   display_dock_preflight_payload
   printf '},{'
   display_anland_preflight_payload
-  printf '},{"id":"compatibility","title":"Compatibility Mode","status":"not_wired","available":false,"mutating":false,"source":"Nebula compatibility fallback design","errors":["NOT_WIRED_BY_DESIGN"]},{"id":"recovery_safe","title":"Recovery / Safe Mode","status":"always_available","available":true,"mutating":false,"source":"Nebula Core safe mode","errors":[]}'
+  printf '},{"id":"compatibility","method_id":"compatibility_software","title":"Compatibility Mode","status":"not_wired","available":false,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"not_wired","runtime_status":"runtime_missing","start_command_status":"not_available","requirement_status":"not_wired","missing_requirements":["implementation_not_wired"],"mutating":false,"source":"Nebula compatibility fallback design","errors":["NOT_WIRED_BY_DESIGN"]},{"id":"recovery_safe","method_id":"recovery_safe","title":"Recovery / Safe Mode","status":"always_available","available":true,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"safe","runtime_status":"not_required","start_command_status":"safe_mode_control","requirement_status":"complete","missing_requirements":[],"mutating":false,"source":"Nebula Core safe mode","errors":[]}'
   printf '],"selection_rules":["prefer_phone_app_for_internal_display","prefer_dock_lease_for_external_monitor_when_wired","use_anland_surface_as_compatibility_fallback","safe_mode_blocks_mutating_lane_start","no_lane_silently_replaces_another"]}\n'
+}
+
+display_method_containers_json() {
+  anland_collect
+  anland_selected_recommended=0
+  if [ "$anland_selected_container" = "$ANLAND_RECOMMENDED_CONTAINER" ]; then
+    anland_selected_recommended=1
+  fi
+  droidspaces_native_status=source_available
+  if [ "$anland_bin" = "1" ]; then
+    droidspaces_native_status=runtime_binary_visible
+  fi
+  printf '{"protocol_version":%s,"command":"display method-containers","containers":[' "$PROTOCOL_VERSION"
+  printf '{"method_id":"phone_app_bridge","container_ref":"waylandie_app_imagefs","container_kind":"app_proot","owner":"WayLandIE companion APK","status":"display_proven","recommended_for":"internal_display","requirements":["WayLandIE package installed","imagefs present","pinned local ICD and Vulkan driver","Gamescope and Xwayland sidecars"],"current_limit":"game_client_runtime_proof_not_promoted_39bit_va","source":%s},' \
+    "$(json_string "$DISPLAY_PHONE_SOURCE")"
+  printf '{"method_id":"anland_surface","container_ref":%s,"container_kind":"droidspaces","owner":"DroidSpaces plus Anland","status":%s,"runtime_ready":%s,"display_ready":%s,"recommended_container":%s,"selected_is_recommended":%s,"required_config":' \
+    "$(json_string "$anland_selected_container")" \
+    "$(json_string "$anland_status")" \
+    "$(json_bool "$anland_runtime_ready")" \
+    "$(json_bool "$anland_ready")" \
+    "$(json_string "$ANLAND_RECOMMENDED_CONTAINER")" \
+    "$(json_bool "$anland_selected_recommended")"
+  anland_required_config_json
+  printf ',"required_env":'
+  anland_required_env_json
+  printf ',"setup_commands":'
+  anland_setup_commands_json
+  printf ',"selected_paths":{"container_config":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_mode":%s,"display_socket_host":%s,"display_socket_guest":%s},"checks":{"display_daemon_socket":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_image":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s,"anland_producer":%s},"missing_requirements":[%s],"source":%s},' \
+    "$(json_string "$anland_selected_config")" \
+    "$(json_string "$anland_selected_env")" \
+    "$(json_string "$anland_selected_rootfs")" \
+    "$(json_string "$anland_selected_rootfs_mode")" \
+    "$(json_string "$ANLAND_SOCKET_HOST")" \
+    "$(json_string "$ANLAND_SOCKET_GUEST")" \
+    "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_env")" \
+    "$(json_bool "$anland_rootfs")" \
+    "$(json_bool "$anland_rootfs_image")" \
+    "$(json_bool "$anland_config_bind")" \
+    "$(json_bool "$anland_env_socket")" \
+    "$(json_bool "$anland_env_kgsl")" \
+	    "$(json_bool "$anland_producer")" \
+	    "$anland_errors" \
+	    "$(json_string "$ANLAND_REPAIR_SOURCE")"
+  printf '{"method_id":"droidspaces_rootfs_image","container_ref":"rootfs.img","container_kind":"droidspaces_rootfs_image","owner":"DroidSpaces","status":%s,"recommended_for":"stable_android_container_storage","requirements":["--name=<container>","--rootfs-img=<path>","optional --rootfs-arc=<archive> create","container.config rootfs_path=<rootfs.img>"],"setup_commands":{"create_from_archive":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<archive.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/<container>/rootfs.img --size=<size> create","start_image":"/data/local/Droidspaces/bin/droidspaces --name=<container> --rootfs-img=/data/local/Droidspaces/Containers/<container>/rootfs.img start"},"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_ROOTFS_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_rootfs_directory","container_ref":"rootfs_directory","container_kind":"droidspaces_rootfs_directory","owner":"DroidSpaces","status":%s,"recommended_for":"simple_unpacked_rootfs_testing","requirements":["--name=<container>","--rootfs=<path>","container.config rootfs_path=<directory>"],"setup_commands":{"start_directory":"/data/local/Droidspaces/bin/droidspaces --name=<container> --rootfs=/data/local/Droidspaces/Containers/<container>/rootfs start"},"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_ROOTFS_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_termux_x11","container_ref":"droidspaces_container_enable_termux_x11","container_kind":"droidspaces_native_x11","owner":"DroidSpaces","status":%s,"recommended_for":"x11_gui_apps","required_config":["enable_termux_x11=1"],"required_env":["DISPLAY=:0"],"runtime_artifacts":["/run/droidspaces.env","Termux:X11 socket"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_virgl","container_ref":"droidspaces_container_enable_virgl","container_kind":"droidspaces_native_gpu","owner":"DroidSpaces","status":%s,"recommended_for":"virpipe_3d_acceleration","required_config":["enable_virgl=1","virgl_extra_flags=<optional>"],"required_env":["GALLIUM_DRIVER=virpipe"],"runtime_artifacts":["/run/droidspaces.env","/tmp/.virgl_test"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_turnip_kgsl","container_ref":"droidspaces_container_enable_gpu_mode","container_kind":"droidspaces_native_gpu","owner":"DroidSpaces","status":%s,"recommended_for":"qualcomm_adreno_turnip_kgsl","required_config":["enable_gpu_mode=1","enable_hw_access=1"],"required_env":["device_specific_turnip_kgsl_env"],"runtime_artifacts":["/dev/dri/renderD128 when exposed","Mesa Turnip/KGSL userspace inside rootfs"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_llvmpipe","container_ref":"droidspaces_container_software_gl","container_kind":"droidspaces_native_software","owner":"DroidSpaces","status":%s,"recommended_for":"software_rendering_fallback","required_config":["enable_virgl=0","enable_gpu_mode=0"],"required_env":["LIBGL_ALWAYS_SOFTWARE=1 optional"],"runtime_artifacts":["Mesa llvmpipe inside rootfs"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"droidspaces_pulseaudio","container_ref":"droidspaces_container_enable_pulseaudio","container_kind":"droidspaces_native_audio","owner":"DroidSpaces","status":%s,"recommended_for":"container_audio","required_config":["enable_pulseaudio=1"],"required_env":["PULSE_SERVER=unix:/tmp/.pulse-socket"],"runtime_artifacts":["/run/droidspaces.env","/tmp/.pulse-socket"],"source":%s},' \
+    "$(json_string "$droidspaces_native_status")" \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"method_id":"dock_drm_lease_external","container_ref":"none","container_kind":"none","owner":"future external-display lease receiver","status":"reference_only","recommended_for":"external_monitor","requirements":["external display discovery","lease receiver","explicit stop/revoke path"],"source":%s},' \
+    "$(json_string "$DRM_LEASE_SOURCE")"
+  printf '{"method_id":"compatibility_software","container_ref":"compatibility-software","container_kind":"future_droidspaces_or_app_proot","owner":"Nebula compatibility fallback","status":"not_wired","recommended_for":"software_fallback","requirements":["dedicated compatibility rootfs/profile","software GL/Vulkan policy","bounded start command"],"source":"Nebula compatibility fallback design"},'
+  printf '{"method_id":"recovery_safe","container_ref":"none","container_kind":"none","owner":"Nebula Core","status":"always_available","recommended_for":"recovery","requirements":[],"source":"Nebula Core safe mode"}'
+  printf '],"rule":"each display method keeps its own container reference; DroidSpaces native X11, VirGL, Turnip/KGSL, llvmpipe, PulseAudio, rootfs image, and rootfs directory methods stay explicit; Anland uses a dedicated Ubuntu26/KDE/anland_kde producer rootfs, not the daily Alpine runtime test container"}\n'
+}
+
+display_method_profiles_json() {
+  printf '{"protocol_version":%s,"command":"display method-profiles","mutating":false,' "$PROTOCOL_VERSION"
+  printf '"rootfs_policy":"use one writable rootfs image or directory per profile; do not start multiple active writable profiles against the same rootfs.img",'
+  printf '"config_materialization":"write /data/local/Droidspaces/Containers/<name>/container.config atomically from a temp file; chmod 0644; start later with droidspaces --config=<container.config> start",'
+  printf '"profiles":['
+  printf '{"profile_id":"anland_wayland_kde","method_id":"anland_surface","container_name":%s,"rootfs_mode":"image","rootfs_image":%s,"rootfs_archive":%s,"env_file":%s,"config_path":"/data/local/Droidspaces/Containers/anland-ubuntu26-kde/container.config",' \
+    "$(json_string "$ANLAND_RECOMMENDED_CONTAINER")" \
+    "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_IMG")" \
+    "$(json_string "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE")" \
+    "$(json_string "$ANLAND_RECOMMENDED_ENV")"
+  printf '"config_lines":["name=anland-ubuntu26-kde","hostname=anland-ubuntu26-kde","rootfs_path=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=0","enable_hw_access=1","enable_gpu_mode=1","enable_virgl=0","enable_pulseaudio=1","selinux_permissive=1","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","privileged=nocaps,noseccomp","foreground=0","net_mode=host","env_file=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/anland.env","bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],'
+  printf '"env_lines":["ANLAND=1","ANLAND_SOCKET=/run/display.sock","ANLAND_DRM_DEVICE=/dev/dri/renderD128","WAYLAND_DISPLAY=wayland-0","XDG_SESSION_TYPE=wayland","QT_QPA_PLATFORM=wayland","MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform","PULSE_SERVER=unix:/tmp/.pulse-socket"],'
+  printf '"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=/sdcard/Download/anland-ubuntu26-kde.tar.xz --rootfs-img=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --name=anland-ubuntu26-kde --rootfs-img=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img --net=host --hw-access --gpu --selinux-permissive --privileged=nocaps,noseccomp --env=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/anland.env --bind=/data/local/tmp/display_daemon.sock:/run/display.sock start","producer_verify":"/data/local/Droidspaces/bin/droidspaces --name=anland-ubuntu26-kde run sh -lc '\''test -x /usr/local/bin/startanland-kde.sh'\''","producer_start":"/data/local/Droidspaces/bin/droidspaces --name=anland-ubuntu26-kde run sh -lc '\''nohup /usr/local/bin/startanland-kde.sh >/tmp/anland-kde.log 2>&1 &'\''"},"source":%s},' \
+    "$(json_string "$ANLAND_REPAIR_SOURCE")"
+  printf '{"profile_id":"termux_x11_desktop","method_id":"droidspaces_termux_x11","container_name":"rm11-termux-x11","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-termux-x11/rootfs.img","config_path":"/data/local/Droidspaces/Containers/rm11-termux-x11/container.config","config_lines":["name=rm11-termux-x11","hostname=rm11-termux-x11","rootfs_path=/data/local/Droidspaces/Containers/rm11-termux-x11/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"expected_env":["DISPLAY=:0","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-termux-x11/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-termux-x11/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"virgl_desktop","method_id":"droidspaces_virgl","container_name":"rm11-virgl","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-virgl/rootfs.img","config_path":"/data/local/Droidspaces/Containers/rm11-virgl/container.config","config_lines":["name=rm11-virgl","hostname=rm11-virgl","rootfs_path=/data/local/Droidspaces/Containers/rm11-virgl/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=1","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"expected_env":["DISPLAY=:0","GALLIUM_DRIVER=virpipe","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-virgl/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-virgl/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"turnip_kgsl_desktop","method_id":"droidspaces_turnip_kgsl","container_name":"rm11-turnip-kgsl","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-turnip-kgsl/rootfs.img","env_file":"/data/local/Droidspaces/Containers/rm11-turnip-kgsl/turnip-kgsl.env","config_path":"/data/local/Droidspaces/Containers/rm11-turnip-kgsl/container.config","config_lines":["name=rm11-turnip-kgsl","hostname=rm11-turnip-kgsl","rootfs_path=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=1","enable_gpu_mode=1","selinux_permissive=1","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","env_file=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/turnip-kgsl.env","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"env_lines":["MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-turnip-kgsl/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"llvmpipe_software","method_id":"droidspaces_llvmpipe","container_name":"rm11-llvmpipe","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-llvmpipe/rootfs.img","env_file":"/data/local/Droidspaces/Containers/rm11-llvmpipe/llvmpipe.env","config_path":"/data/local/Droidspaces/Containers/rm11-llvmpipe/container.config","config_lines":["name=rm11-llvmpipe","hostname=rm11-llvmpipe","rootfs_path=/data/local/Droidspaces/Containers/rm11-llvmpipe/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=1","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","env_file=/data/local/Droidspaces/Containers/rm11-llvmpipe/llvmpipe.env","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"env_lines":["LIBGL_ALWAYS_SOFTWARE=1","GALLIUM_DRIVER=llvmpipe","PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-llvmpipe/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-llvmpipe/container.config start"},"source":%s},' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '{"profile_id":"pulse_audio","method_id":"droidspaces_pulseaudio","container_name":"rm11-pulseaudio","rootfs_mode":"image","rootfs_image":"/data/local/Droidspaces/Containers/rm11-pulseaudio/rootfs.img","config_path":"/data/local/Droidspaces/Containers/rm11-pulseaudio/container.config","config_lines":["name=rm11-pulseaudio","hostname=rm11-pulseaudio","rootfs_path=/data/local/Droidspaces/Containers/rm11-pulseaudio/rootfs.img","disable_ipv6=0","enable_android_storage=0","enable_termux_x11=0","enable_virgl=0","enable_pulseaudio=1","enable_hw_access=0","enable_gpu_mode=0","selinux_permissive=0","volatile_mode=0","force_cgroupv1=0","block_nested_ns=0","foreground=0","net_mode=host","run_at_boot=0","use_sparse_image=1","sparse_image_size_gb=32"],"expected_env":["PULSE_SERVER=unix:/tmp/.pulse-socket"],"commands":{"create_image":"/data/local/Droidspaces/bin/droidspaces --rootfs-arc=<rootfs.tar.xz> --rootfs-img=/data/local/Droidspaces/Containers/rm11-pulseaudio/rootfs.img --size=32G create","start":"/data/local/Droidspaces/bin/droidspaces --config=/data/local/Droidspaces/Containers/rm11-pulseaudio/container.config start"},"source":%s}' \
+    "$(json_string "$DROIDSPACES_NATIVE_METHOD_SOURCE")"
+  printf '],"materialization_rules":["templates are read-only and safe to inspect","safe config-only materialization is direct atomic file creation, not a DroidSpaces CLI command","write container.config.tmp then move to container.config and chmod 0644","create only creates the image; start persists or mirrors the profile config","start later with droidspaces --config=<container.config> start","never share one writable rootfs.img across active profiles","prefer copying or rebuilding a rootfs image per profile before live testing"]}\n'
 }
 
 is_test_denied_path() {
@@ -1710,6 +2324,284 @@ legacy_modules_json() {
   printf '],"guardrails":["do_not_disable_both","do_not_delete_until_reboot_verified","nebula_core_does_not_start_targets_by_default"]}\n'
 }
 
+module_installed_value() {
+  if [ -d "$MODULES_ROOT/$1" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+module_disabled_value() {
+  if [ -f "$MODULES_ROOT/$1/disable" ]; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+package_visible_value() {
+  if package_visible "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+path_present_value() {
+  if path_present "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+fixed_path_executable_value() {
+  if fixed_path_executable "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+fixed_path_exists_value() {
+  if fixed_path_exists "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+fixed_path_socket_value() {
+  if fixed_path_socket "$1"; then
+    printf '%s' 1
+  else
+    printf '%s' 0
+  fi
+}
+
+integrations_baseline_json() {
+  ensure_dirs
+  waylandie_collect
+
+  droidspaces_package=$(package_visible_value "$DROIDSPACES_PACKAGE")
+  droidspaces_module=$(module_installed_value droidspaces)
+  droidspaces_module_disabled=$(module_disabled_value droidspaces)
+  droidspaces_bridge_module=$(module_installed_value rm11-droidspace-bridge-fd)
+  anland_collect
+  droidspaces_installed=0
+  if [ "$droidspaces_package" = "1" ] || [ "$droidspaces_module" = "1" ] || [ "$anland_bin" = "1" ]; then
+    droidspaces_installed=1
+  fi
+  droidspaces_status=$anland_status
+  droidspaces_ready=$anland_runtime_ready
+  if [ "$droidspaces_installed" = "0" ]; then
+    droidspaces_status=missing
+    droidspaces_ready=0
+	  elif [ "$anland_runtime_ready" != "1" ] && [ "$droidspaces_installed" = "1" ] && [ "$anland_status" = "missing" ]; then
+	    droidspaces_status=partial
+	  fi
+	  wl_integration_status=missing
+	  wl_container_status=missing
+	  wl_display_status=display_missing
+	  wl_runtime_status=runtime_missing
+	  if [ "$wl_display_ready" = "1" ]; then
+	    wl_integration_status=display_ready
+	    wl_display_status=display_proven
+	  elif [ "$wl_installed" = "1" ]; then
+	    wl_integration_status=partial
+	  fi
+	  if [ "$wl_ready" = "1" ]; then
+	    wl_container_status=ready
+	    wl_runtime_status=runtime_ready
+	  elif [ "$wl_installed" = "1" ]; then
+	    wl_container_status=partial
+	  fi
+	  droidspaces_container_status=missing
+	  droidspaces_display_status=display_missing
+	  droidspaces_runtime_status=runtime_missing
+	  droidspaces_requirement_status=missing_requirements
+	  if [ "$droidspaces_installed" = "0" ]; then
+	    droidspaces_requirement_status=droidspaces_missing
+	  elif [ "$anland_selection_ambiguous" = "1" ]; then
+	    droidspaces_container_status=ambiguous
+	    droidspaces_requirement_status=ambiguous_selection
+	  elif [ -z "$anland_selected_container" ]; then
+	    droidspaces_requirement_status=invalid_selection
+	  elif [ "$anland_container_active" = "1" ]; then
+	    droidspaces_container_status=active
+	  elif [ "$anland_runtime_ready" = "1" ]; then
+	    droidspaces_container_status=ready
+	  elif [ "$anland_config" = "1" ]; then
+	    droidspaces_container_status=idle
+	  fi
+	  if [ "$anland_runtime_ready" = "1" ]; then
+	    droidspaces_runtime_status=runtime_ready
+	  fi
+	  if [ "$anland_ready" = "1" ]; then
+	    droidspaces_display_status=display_ready
+	    droidspaces_requirement_status=complete
+	  elif [ "$droidspaces_requirement_status" = "ambiguous_selection" ] || [ "$droidspaces_requirement_status" = "invalid_selection" ] || [ "$droidspaces_requirement_status" = "droidspaces_missing" ]; then
+	    true
+	  elif [ "$anland_rootfs_allowed" != "1" ]; then
+	    droidspaces_requirement_status=invalid_rootfs_path
+	  elif [ "$anland_rootfs" != "1" ]; then
+	    droidspaces_requirement_status=missing_requirements
+	  elif [ "$anland_socket" != "1" ] && [ "$anland_env" != "1" ]; then
+	    droidspaces_requirement_status=missing_requirements
+    elif [ "$anland_socket" != "1" ]; then
+      droidspaces_requirement_status=missing_requirements
+    elif [ "$anland_socket_writable" != "1" ]; then
+      droidspaces_requirement_status=missing_requirements
+    elif [ "$anland_env" != "1" ]; then
+      droidspaces_requirement_status=missing_requirements
+	  fi
+
+  vector_installed=$(module_installed_value zygisk_vector)
+  vector_enabled=0
+  if [ "$vector_installed" = "1" ] && [ "$(module_disabled_value zygisk_vector)" = "0" ]; then
+    vector_enabled=1
+  fi
+  nubia_game_assist=$(package_visible_value "$NUBIA_GAME_ASSIST_PACKAGE")
+  nubia_game_launcher=$(package_visible_value "$NUBIA_GAME_LAUNCHER_PACKAGE")
+  nubia_toolkit_reference=$(package_visible_value "$NUBIA_TOOLKIT_PACKAGE")
+  nubia_status=hook_lane_deferred
+  nubia_installed=0
+  nubia_ready=0
+  if [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ] || [ "$nubia_toolkit_reference" = "1" ]; then
+    nubia_installed=1
+  fi
+  if [ "$vector_enabled" = "1" ] && { [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ]; }; then
+    nubia_status=hook_framework_ready_scope_deferred
+    nubia_ready=1
+  elif [ "$vector_installed" = "1" ] || [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ]; then
+    nubia_status=partial
+  fi
+
+  redmagic_control_package=$(package_visible_value "$REDMAGIC_CONTROL_PACKAGE")
+  redmagic_fan=$(path_present_value /sys/kernel/fan/fan_enable)
+  redmagic_fan_level=$(path_present_value /sys/kernel/fan/fan_speed_level)
+  redmagic_pump=$(path_present_value /proc/driver/micropump/enable)
+  redmagic_led=$(path_present_value /sys/class/leds/aw22xxx_led/effect)
+  redmagic_triggers=0
+  if path_present /sys/class/leds/sar0/mode_operation || path_present /sys/class/leds/sar1/mode_operation; then
+    redmagic_triggers=1
+  fi
+  redmagic_status=nodes_missing
+  redmagic_ready=0
+  if [ "$redmagic_fan" = "1" ] || [ "$redmagic_fan_level" = "1" ] || [ "$redmagic_pump" = "1" ]; then
+    redmagic_status=read_only_nodes_visible
+    redmagic_ready=1
+  elif [ "$redmagic_control_package" = "1" ]; then
+    redmagic_status=reference_apk_visible
+  fi
+
+  powerdeck_module=$(module_installed_value "$POWERDECK_MODULE_ID")
+  powerdeck_disabled=$(module_disabled_value "$POWERDECK_MODULE_ID")
+  powerdeck_tmp_apply=$(fixed_path_executable_value /data/local/tmp/redmagic_powerdeck/rm-powerdeck-apply.sh)
+  powerdeck_status=nebula_preview_ready
+  if [ "$powerdeck_module" = "1" ]; then
+    powerdeck_status=external_module_detected_dry_run_required
+  fi
+
+  overall_status=baseline_partial
+  if [ "$wl_display_ready" = "1" ] \
+    && { [ "$droidspaces_ready" = "1" ] || [ "$droidspaces_module" = "1" ] || [ "$droidspaces_package" = "1" ]; } \
+    && { [ "$redmagic_fan" = "1" ] || [ "$redmagic_pump" = "1" ]; }; then
+    overall_status=baseline_ready_read_only
+  elif [ "$wl_installed" != "1" ] && [ "$droidspaces_package" != "1" ] && [ "$droidspaces_module" != "1" ]; then
+    overall_status=baseline_bootstrap
+  fi
+
+  printf '{"protocol_version":%s,"command":"integrations baseline",' "$PROTOCOL_VERSION"
+  printf '"baseline_id":"nebula_rm11pro_baseline","overall_status":%s,' "$(json_string "$overall_status")"
+  printf '"apk_package":"io.droidspaces.nebula","module_id":"%s","safe_default":true,"mutating_controls_enabled":false,' "$MODULE_ID"
+  printf '"requirements":["Root with KernelSU/Magisk-compatible module support","Nebula Core module installed for root-side status","WayLandIE companion APK for Phone/App display lane","DroidSpaces/Anland files for container surface fallback","RM11 Pro/NX809J hardware for RedMagic fan, pump, LED, and trigger nodes","Vector/LSPosed only when hook lanes are intentionally enabled"],'
+  printf '"integrations":['
+  printf '{"id":"nebula_core","title":"Nebula Core module","owner":"Nebula","role":"fixed_root_contract","status":"ready","installed":true,"ready":true,"mutating":false,"version":%s,"source":"nebula-core-module"},' \
+    "$(json_string "$(module_version)")"
+	  printf '{"id":"waylandie","method_id":"phone_app_bridge","title":"WayLandIE display/runtime","owner":"WayLandIE companion APK","role":"phone_app_bridge","status":%s,"installed":%s,"ready":%s,"display_ready":%s,"runtime_ready":%s,"container_ref":"waylandie_app_imagefs","container_kind":"app_proot","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":"display_requirements_met","missing_requirements":["game_client_runtime_proof_not_promoted_39bit_va"],"mutating":false,"package":%s,"evidence":%s,"source":%s,"errors":[%s]},' \
+	    "$(json_string "$wl_integration_status")" \
+	    "$(json_bool "$wl_installed")" \
+	    "$(json_bool "$wl_display_ready")" \
+	    "$(json_bool "$wl_display_ready")" \
+	    "$(json_bool "$wl_ready")" \
+	    "$(json_string "$wl_container_status")" \
+	    "$(json_string "$wl_display_status")" \
+	    "$(json_string "$wl_runtime_status")" \
+	    "$(json_string "$WAYLANDIE_PACKAGE")" \
+	    "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")" \
+	    "$(json_string "$DISPLAY_PHONE_SOURCE")" \
+	    "$wl_display_errors"
+	  printf '{"id":"droidspaces","method_id":"anland_surface","title":"DroidSpaces / Anland runtime","owner":"DroidSpaces ecosystem","role":"container_surface_fallback","status":%s,"installed":%s,"ready":%s,"runtime_ready":%s,"display_socket_ready":%s,"container_ref":%s,"container_kind":"droidspaces","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":%s,"missing_requirements":[%s],"mutating":false,"package":%s,"module_installed":%s,"module_disabled":%s,"bridge_module_installed":%s,"selected_container":%s,"container_selection_source":%s,"container_active":%s,"container_pid":%s,"checks":{"droidspaces_binary":%s,"container_selected":%s,"container_config":%s,"active_container_pidfile":%s,"rootfs_path":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"anland_producer":%s},"selected_paths":{"containers_dir":%s,"pids_dir":%s,"pidfile":%s,"container_config":%s,"anland_env":%s,"rootfs_path":%s},"source":%s,"errors":[%s]},' \
+	    "$(json_string "$droidspaces_status")" \
+	    "$(json_bool "$droidspaces_installed")" \
+	    "$(json_bool "$droidspaces_ready")" \
+	    "$(json_bool "$anland_runtime_ready")" \
+	    "$(json_bool "$anland_socket_writable")" \
+	    "$(json_string "$anland_selected_container")" \
+	    "$(json_string "$droidspaces_container_status")" \
+	    "$(json_string "$droidspaces_display_status")" \
+	    "$(json_string "$droidspaces_runtime_status")" \
+	    "$(json_string "$droidspaces_requirement_status")" \
+	    "$anland_errors" \
+	    "$(json_string "$DROIDSPACES_PACKAGE")" \
+	    "$(json_bool "$droidspaces_module")" \
+	    "$(json_bool "$droidspaces_module_disabled")" \
+    "$(json_bool "$droidspaces_bridge_module")" \
+    "$(json_string "$anland_selected_container")" \
+    "$(json_string "$anland_selection_source")" \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_int_or_null "$anland_container_pid")" \
+    "$(json_bool "$anland_bin")" \
+    "$(json_bool "$([ -n "$anland_selected_container" ] && printf 1 || printf 0)")" \
+    "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_bool "$anland_rootfs")" \
+	    "$(json_bool "$anland_env")" \
+	    "$(json_bool "$anland_socket")" \
+	    "$(json_bool "$anland_socket_writable")" \
+	    "$(json_bool "$anland_render")" \
+	    "$(json_bool "$anland_producer")" \
+    "$(json_string "$ANLAND_CONTAINERS_DIR")" \
+    "$(json_string "$ANLAND_PIDS_DIR")" \
+    "$(json_string_or_null "$anland_selected_pidfile")" \
+	    "$(json_string "$anland_selected_config")" \
+	    "$(json_string "$anland_selected_env")" \
+	    "$(json_string "$anland_selected_rootfs")" \
+	    "$(json_string "$ANLAND_REPAIR_SOURCE")" \
+	    "$anland_errors"
+  printf '{"id":"nubia_toolkit","title":"Nubia Toolkit hook lane","owner":"Nebula status port plus optional Vector/LSPosed","role":"gamehub_hooks_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"hooks_active":false,"old_toolkit_required":false,"packages":{"game_assist":%s,"game_launcher":%s,"toolkit_reference":%s},"hook_framework":{"id":"zygisk_vector","installed":%s,"enabled":%s},"source":%s},' \
+    "$(json_string "$nubia_status")" \
+    "$(json_bool "$nubia_installed")" \
+    "$(json_bool "$nubia_ready")" \
+    "$(json_bool "$nubia_game_assist")" \
+    "$(json_bool "$nubia_game_launcher")" \
+    "$(json_bool "$nubia_toolkit_reference")" \
+    "$(json_bool "$vector_installed")" \
+    "$(json_bool "$vector_enabled")" \
+    "$(json_string "$NUBIA_TOOLKIT_SOURCE")"
+  printf '{"id":"redmagic_control_center","title":"RedMagic Control Center lane","owner":"Nebula read-only probe plus optional standalone APK","role":"hardware_status_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"writes_enabled":false,"package":%s,"checks":{"fan_enable":%s,"fan_level":%s,"pump_enable":%s,"led_effect":%s,"triggers":%s},"source":%s},' \
+    "$(json_string "$redmagic_status")" \
+    "$(json_bool "$redmagic_control_package")" \
+    "$(json_bool "$redmagic_ready")" \
+    "$(json_string "$REDMAGIC_CONTROL_PACKAGE")" \
+    "$(json_bool "$redmagic_fan")" \
+    "$(json_bool "$redmagic_fan_level")" \
+    "$(json_bool "$redmagic_pump")" \
+    "$(json_bool "$redmagic_led")" \
+    "$(json_bool "$redmagic_triggers")" \
+    "$(json_string "$REDMAGIC_SOURCE_FAN; $REDMAGIC_SOURCE_PUMP")"
+  printf '{"id":"powerdeck","title":"RedMagic PowerDeck automation","owner":"Nebula Core preview contract","role":"dry_run_profile_automation","status":%s,"installed":%s,"ready":true,"mutating":false,"writes_enabled":false,"dry_run_required":true,"module_id":%s,"module_disabled":%s,"local_apply_script_visible":%s,"source":"RedMagicPowerDeck dry-run/snapshot design; Nebula cooling policy and snapshot commands"}' \
+    "$(json_string "$powerdeck_status")" \
+    "$(json_bool "$powerdeck_module")" \
+    "$(json_string "$POWERDECK_MODULE_ID")" \
+    "$(json_bool "$powerdeck_disabled")" \
+    "$(json_bool "$powerdeck_tmp_apply")"
+	  printf '],"guardrails":["single_baseline_apk_module_contract","status_before_mutation","no_hook_activation_from_baseline_status","no_device_node_writes_from_baseline_status","no_droidspaces_replacement_without_reboot_verified_migration","wayland_display_proven_game_client_runtime_not_promoted"],'
+	  printf '"next_step":"bounded_game_client_runtime"}\n'
+}
+
 cooling_snapshot_payload() {
   snap_errors=
   snap_fan_present=0
@@ -2209,6 +3101,15 @@ main() {
         return 2
       fi
       ;;
+    integrations)
+      if [ "${2:-}" = "baseline" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "integrations_baseline"
+        integrations_baseline_json
+      else
+        usage_json
+        return 2
+      fi
+      ;;
     nubia)
       if [ "${2:-}" = "toolkit" ] && [ "${3:-}" = "status" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
         log_command "nubia_toolkit_status"
@@ -2254,6 +3155,12 @@ main() {
       if [ "${2:-}" = "lanes" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
         log_command "display_lanes"
         display_lanes_json
+      elif [ "${2:-}" = "method-containers" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "display_method_containers"
+        display_method_containers_json
+      elif [ "${2:-}" = "method-profiles" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "display_method_profiles"
+        display_method_profiles_json
       elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "phone" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
         log_command "display_lane_phone_preflight"
         display_phone_preflight_json

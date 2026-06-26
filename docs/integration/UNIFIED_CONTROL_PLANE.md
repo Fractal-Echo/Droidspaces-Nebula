@@ -47,13 +47,14 @@ Allowed fixed commands:
 | `snapshot cooling get --json` | Returns the stored cooling snapshot. |
 | `snapshot cooling rollback --dry-run --json` | Returns a rollback plan with `applied=false`; no hardware writes. |
 | `legacy modules --json` | Reports protected old Droidspaces module status from fixed module IDs. |
+| `integrations baseline --json` | Reports the one baseline APK/module contract across WayLandIE, DroidSpaces/Anland, Nubia Toolkit, RedMagic Control Center, and PowerDeck without enabling mutating behavior. |
 | `nubia toolkit status --json` | Reports audited Nubia Toolkit/Vector readiness without enabling hooks. |
 | `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, and linker readiness. |
 | `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
 | `display lanes --json` | Read-only multi-lane selector status for Phone/App, Dock Lease, Anland, Compatibility, and Recovery lanes. |
 | `display lane phone preflight --json` | Read-only WayLandIE/Gamescope/Xwayland lane preflight and active blocker status. |
-| `display lane anland preflight --json` | Read-only fixed-path Anland/Droidspaces/socket/render-node preflight. |
-| `display lane dock preflight --json` | Read-only Dock lease evidence and operator-gated start requirements. |
+| `display lane anland preflight --json` | Read-only selected DroidSpaces container, Anland env/socket, and render-node preflight. |
+| `display lane dock preflight --json` | Read-only Dock lease evidence and operator approval requirements. |
 
 Blocked pass 01 activations:
 
@@ -101,6 +102,9 @@ Pass 01 defaults:
 - The auto cooling policy is preview-only in pass 04: it returns fan/pump intents with `applied=false`, reads thresholds only from `nebula-core-module/config/defaults.json`, and performs no hardware writes.
 - Pass 05 snapshot commands write only Nebula Core state, never device control nodes. Rollback remains dry-run.
 - Pass 05 legacy module migration is staged only. Nebula Core does not disable, delete, replace, or launch the protected Droidspaces modules.
+- The baseline integration report is read-only. It can mark an integration ready,
+  partial, missing, or deferred, but it does not activate LSPosed hooks, write
+  RedMagic nodes, start DroidSpaces containers, or launch WayLandIE targets.
 - Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane. Nebula Core reports its module state, but hook scoping and mutating Nubia Toolkit behavior remain deferred.
 - The WayLandIE Proton smoke command accepts no arbitrary path, package, or shell input and is blocked by Nebula safe mode.
 - The DRM Control package and Bob Dilian evidence are treated as confirmed Dock
@@ -125,11 +129,11 @@ silently replace another working lane.
 
 Initial lane model:
 
-| Lane | Purpose | Current ownership | Risk gate |
+| Lane | Purpose | Current ownership | Current requirements |
 | --- | --- | --- | --- |
-| Phone/App Mode | Run through the known WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Keep using known-good sidecar evidence; current blocker is GLX visual/fbconfig exposure. Sidecar-13 force-composition is exposed only as a promotion candidate until a bounded Wine GUI smoke promotes it. |
-| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven reference, operator-gated; external-display-only; explicit stop/revoke; no boot auto-launch. |
-| Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Snapshot config before any repair; fixed commands only; no raw helper-script execution. |
+| Phone/App Mode | Run through the proven WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Current display proof is `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS` when the pinned local ICD/driver and exact Gamescope/Xwayland sidecars are staged. Steam/Proton remains unpromoted until a bounded game-client proof promotes it. |
+| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven reference, operator approval required; external-display-only; explicit stop/revoke; no boot auto-launch. |
+| Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Select by explicit override or one live active PID file; reject stale PID files and rootfs paths outside the selected container; require `anland.env` plus `/data/local/tmp/display_daemon.sock` before display-ready; fixed commands only; no raw helper-script execution. |
 | Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
 | Recovery/Safe Mode | Preserve rollback, ADB visibility, module safe mode, and phone usability. | Nebula Core and protected old modules until replacement is proven. | Always available; blocks target launches and risky display mutation. |
 
@@ -142,26 +146,28 @@ Runtime constraints:
   live-confirmed as a 39-bit kernel VA environment through `/proc/config.gz`.
   Nebula surfaces this in display-lane status and must avoid assuming 45-bit
   userspace/runtime behavior.
-- Sidecar-13's `--force-composition` result is a concrete Phone/App lead, not a
-  Dock Lease result. It should be promoted by minimal Wine GUI smoke before
-  Steam or larger Proton targets.
-- Existing Wine GUI attempts identify the current runtime blocker as ARM64EC
-  Wine `winex11.drv` process-attach failure with SEH invalid-frame/c0000005
-  evidence under 39-bit VA. Treat this as a Wine runtime blocker, not a
-  Gamescope force-composition regression.
+- R6 Wayland proof 03 promotes the Phone/App display lane: dmabuf-present,
+  real-buffer commits greater than zero, zero `vkGetMemoryFdKHR` failures,
+  Gamescope exit `0`, bridge exit `0`, and Xwayland ready.
+- Steam, Proton, and Wine were not run in that proof. Treat the remaining blocker
+  as a game-client runtime requirement under 39-bit VA, not as a Wayland/Gamescope
+  display blocker.
 
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
 See `LEGACY_MODULE_MIGRATION.md` for the protected module audit and migration guardrails.
 
 See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be
-promoted only in a separate operator-gated pass.
+promoted only in a separate operator-approved pass.
 
-See `REVERSA_FINDINGS_ASSESSMENT.md` for the contradiction assessment that keeps
-Sidecar-11 canonical while surfacing Sidecar-13 as a promotion candidate.
+See `REVERSA_FINDINGS_ASSESSMENT.md` for the contradiction assessment and the
+2026-06-26 update that promotes the R6 Wayland display proof.
 
 See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the preserved sidecar chain and the
 ARM64EC/39-bit Wine GUI blocker audit.
+
+See `REDMAGIC_GAMEHUB_CONTROL_DECK.md` for the Control Deck UI direction and the
+private RM11/China-ROM asset-pack lane.
 
 Online references checked for future work:
 

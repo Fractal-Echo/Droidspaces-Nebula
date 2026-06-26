@@ -10,6 +10,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.graphics.Typeface;
+import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
@@ -51,9 +53,9 @@ import io.droidspaces.nebula.features.redmagic.RedMagicButtonAdapter;
 import io.droidspaces.nebula.features.redmagic.RedMagicPerformanceAdapter;
 
 public final class MainActivity extends Activity {
-    private static final int BG = 0xFF111417;
-    private static final int PANEL = 0xFF1B2026;
-    private static final int PANEL_ALT = 0xFF202A33;
+    private static final int BG = 0xFF04070A;
+    private static final int PANEL = 0xE8070B0F;
+    private static final int PANEL_ALT = 0xDF0B1218;
     private static final int TEXT = 0xFFF3F6F8;
     private static final int MUTED = 0xFFA8B3BD;
     private static final int BLUE = 0xFF5AA6FF;
@@ -64,6 +66,7 @@ public final class MainActivity extends Activity {
     private static final int CYAN = 0xFF00D9E8;
     private static final int HOT = 0xFFFF2E4F;
     private static final int LINE = 0xFF303A44;
+    private static final int CLEAR = 0x00000000;
 
     private static final String SIGNER_TERMUX =
             "228fb2cfe90831c1499ec3ccaf61e96e8e1ce70766b9474672ce427334d41c42";
@@ -92,7 +95,7 @@ public final class MainActivity extends Activity {
                     "waylandie",
                     "app_surface",
                     true,
-                    "WayLandIE bridge profile. Selection is UI-only until backend wiring lands.",
+                    "WayLandIE bridge profile. Display proof is landed; game-client launch is not promoted.",
                     Arrays.asList("boot_completed", "SurfaceFlinger PID", "composer PID"),
                     Arrays.asList("CREATE_LEASE", "composer fd probing", "wlroots DRM backend")),
             new TargetProfile(
@@ -103,7 +106,7 @@ public final class MainActivity extends Activity {
                     "external_display",
                     false,
                     "Blocked after RM11 crashdump triage. Needs receiver-only safety design first.",
-                    Arrays.asList("crashdump gate", "old helper quarantine", "live safe DRM discovery", "explicit approval"),
+                    Arrays.asList("crashdump triage", "old helper quarantine", "live safe DRM discovery", "explicit approval"),
                     Arrays.asList("composer fd probing", "SET_CLIENT_CAP on composer fd", "blind CREATE_LEASE",
                             "hard-coded connector/CRTC/plane IDs")),
             new TargetProfile(
@@ -131,7 +134,7 @@ public final class MainActivity extends Activity {
                     "Zero-copy display",
                     "WayLandIE proof",
                     "dmabuf/fd-passing display target for Linux apps and games.",
-                    "Expected proof: bridge fd test and dmabuf metadata test pass before replacing anything.",
+                    "Current proof: R6 Wayland real-buffer pass with pinned ICD, Gamescope, and Xwayland sidecars.",
                     Arrays.asList(
                             new Target("WayLandIE Display", "io.droidspaces.nebula.waylandie",
                                     "0.2.0-no-root-nebula13-rootfs-vulkan-smoke",
@@ -184,6 +187,7 @@ public final class MainActivity extends Activity {
     private LinearLayout coreContainer;
     private LinearLayout autoCoolingContainer;
     private LinearLayout systemTargetContainer;
+    private LinearLayout deckModeContainer;
     private LinearLayout statusRailContainer;
     private LinearLayout deviceToolsContainer;
     private LinearLayout performanceContainer;
@@ -197,9 +201,11 @@ public final class MainActivity extends Activity {
     private NebulaCoreStatus coreStatus = NebulaCoreStatus.absent("Not refreshed");
     private RedMagicProbe redMagicProbe = RedMagicProbe.unavailable("Not refreshed");
     private JSONObject adbWifiModuleStatus;
+    private JSONObject baselineIntegrationsStatus;
     private JSONObject nubiaToolkitStatus;
     private JSONObject waylandieRuntimeStatus;
     private JSONObject displayLanesStatus;
+    private JSONObject displayMethodContainersStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -225,6 +231,7 @@ public final class MainActivity extends Activity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
+        applyScrollBackplane(root);
         final int horizontalPadding = dp(14);
         final int topPadding = dp(18);
         final int bottomPadding = dp(24);
@@ -247,6 +254,10 @@ public final class MainActivity extends Activity {
         root.addView(systemTargetContainer);
 
         root.addView(buildHeroPanel());
+
+        deckModeContainer = new LinearLayout(this);
+        deckModeContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(deckModeContainer);
 
         statusRailContainer = new LinearLayout(this);
         statusRailContainer.setOrientation(LinearLayout.VERTICAL);
@@ -322,7 +333,7 @@ public final class MainActivity extends Activity {
         reportView.setTypeface(Typeface.MONOSPACE);
         reportView.setTextIsSelectable(true);
         reportView.setPadding(dp(12), dp(12), dp(12), dp(12));
-        reportView.setBackground(round(PANEL_ALT, dp(8), LINE));
+        reportView.setBackground(round(PANEL_ALT, dp(6), LINE));
         LinearLayout.LayoutParams reportParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -336,18 +347,24 @@ public final class MainActivity extends Activity {
         coreStatus = coreClient.loadStatus();
         redMagicProbe = loadRedMagicProbe(coreStatus);
         adbWifiModuleStatus = loadAdbWifiModuleStatus();
+        baselineIntegrationsStatus = loadBaselineIntegrationsStatus();
         nubiaToolkitStatus = loadNubiaToolkitStatus();
         waylandieRuntimeStatus = loadWaylandieRuntimeStatus();
         displayLanesStatus = loadDisplayLanesStatus();
+        displayMethodContainersStatus = loadDisplayMethodContainersStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
+
+        deckModeContainer.removeAllViews();
+        deckModeContainer.addView(buildDeckModeStrip());
 
         statusRailContainer.removeAllViews();
         statusRailContainer.addView(buildStatusRail());
 
         coreContainer.removeAllViews();
         coreContainer.addView(buildCoreCard(coreStatus));
+        coreContainer.addView(buildBaselineIntegrationsCard());
 
         autoCoolingContainer.removeAllViews();
         autoCoolingContainer.addView(buildAutoCoolingCard(redMagicProbe));
@@ -419,19 +436,73 @@ public final class MainActivity extends Activity {
         hero.setBackground(round(0xFF05080A, dp(4), 0xFF163027));
 
         ImageView art = new ImageView(this);
-        art.setImageResource(R.drawable.nebula_logo_hero_v2);
+        art.setImageResource(R.drawable.nebula_hero_emblem_wide);
         art.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        art.setAlpha(0.94f);
+        art.setAlpha(0.98f);
         hero.addView(art, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(360));
+                dp(heroHeightDp()));
         params.bottomMargin = dp(12);
         hero.setLayoutParams(params);
         return hero;
+    }
+
+    private int heroHeightDp() {
+        return getResources().getDisplayMetrics().widthPixels
+                > getResources().getDisplayMetrics().heightPixels ? 112 : 300;
+    }
+
+    private View buildDeckModeStrip() {
+        LinearLayout strip = new LinearLayout(this);
+        strip.setOrientation(LinearLayout.HORIZONTAL);
+        strip.setPadding(0, 0, 0, dp(12));
+
+        strip.addView(deckTile("GAMING MODE", coreStatus.safeMode ? "safe mode" : "armed",
+                coreStatus.safeMode ? BLUE : NEON), weightedButtonParams());
+        strip.addView(deckTile("DISPLAY ENGINE", displayDeckLabel(), CYAN), weightedButtonParams());
+        strip.addView(deckTile("PERFORMANCE", coolingPolicyLabel(redMagicProbe),
+                coolingPolicyColor(redMagicProbe)), weightedButtonParams());
+        return strip;
+    }
+
+    private View deckTile(String title, String detail, int color) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setPadding(dp(10), dp(11), dp(10), dp(11));
+        tile.setMinimumHeight(dp(72));
+        tile.setBackground(round(0xE2080D10, dp(4), color));
+
+        TextView titleView = text(title, 10, color, Typeface.BOLD);
+        titleView.setLetterSpacing(0.06f);
+        titleView.setSingleLine(false);
+        tile.addView(titleView);
+
+        TextView detailView = text(detail, 11, MUTED, Typeface.NORMAL);
+        detailView.setPadding(0, dp(7), 0, 0);
+        detailView.setSingleLine(false);
+        tile.addView(detailView);
+        return tile;
+    }
+
+    private String displayDeckLabel() {
+        if (displayLanesStatus == null) return "read only";
+        JSONArray lanes = displayLanesStatus.optJSONArray("lanes");
+        if (lanes == null) return "read only";
+        for (int i = 0; i < lanes.length(); i++) {
+            JSONObject lane = lanes.optJSONObject(i);
+            if (lane == null) continue;
+            if ("phone_app_bridge".equals(lane.optString("id"))) {
+                String lead = lane.optString("lead_status", "");
+                if ("display_proven".equals(lead)) return "wayland pass";
+                if ("promotion_candidate".equals(lead)) return "legacy lead";
+                return displayStatusLabel(lane.optString("status", "read_only"));
+            }
+        }
+        return "read only";
     }
 
     private View buildSystemTargetBar() {
@@ -439,7 +510,7 @@ public final class MainActivity extends Activity {
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         bar.setPadding(dp(12), dp(12), dp(12), dp(12));
-        bar.setBackground(round(0xFF0A0E13, dp(4), 0xFF29313B));
+        bar.setBackground(round(0xE80A0E13, dp(4), 0xFF29313B));
 
         bar.addView(identityBlock("SYSTEM LAYER", "NEBULA CORE",
                 coreStatus.installed ? "ONLINE" : "READ-ONLY", NEON),
@@ -488,14 +559,26 @@ public final class MainActivity extends Activity {
 
     private View buildStatusRail() {
         LinearLayout rail = new LinearLayout(this);
-        rail.setOrientation(LinearLayout.HORIZONTAL);
+        rail.setOrientation(LinearLayout.VERTICAL);
         rail.setPadding(0, 0, 0, dp(12));
-        rail.addView(statusCell("DROIDSPACES", "runtime active", NEON), weightedButtonParams());
-        rail.addView(statusCell("WAYLANDIE", "bridge ready", CYAN), weightedButtonParams());
-        rail.addView(statusCell("ADRENO 840", "Turnip 26.2", TEXT), weightedButtonParams());
-        rail.addView(statusCell("NTSYNC", "kernel enabled", TEXT), weightedButtonParams());
-        rail.addView(statusCell("SELINUX", "enforcing", TEXT), weightedButtonParams());
-        rail.addView(statusCell("POWERDECK", coolingPolicyLabel(redMagicProbe),
+
+        LinearLayout rowOne = new LinearLayout(this);
+        rowOne.setOrientation(LinearLayout.HORIZONTAL);
+        rail.addView(rowOne);
+        rowOne.addView(statusCell("DROIDSPACES", "runtime active", NEON), weightedButtonParams());
+        rowOne.addView(statusCell("WAYLANDIE", "display proof", CYAN), weightedButtonParams());
+        rowOne.addView(statusCell("ADRENO 840", "Turnip 26.2", TEXT), weightedButtonParams());
+
+        LinearLayout rowTwo = new LinearLayout(this);
+        rowTwo.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams rowTwoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        rowTwoParams.topMargin = dp(6);
+        rail.addView(rowTwo, rowTwoParams);
+        rowTwo.addView(statusCell("NTSYNC", "kernel enabled", TEXT), weightedButtonParams());
+        rowTwo.addView(statusCell("SELINUX", "enforcing", TEXT), weightedButtonParams());
+        rowTwo.addView(statusCell("POWERDECK", coolingPolicyLabel(redMagicProbe),
                 coolingPolicyColor(redMagicProbe)), weightedButtonParams());
         return rail;
     }
@@ -504,14 +587,14 @@ public final class MainActivity extends Activity {
         LinearLayout cell = new LinearLayout(this);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setPadding(dp(5), dp(8), dp(5), dp(8));
-        cell.setBackground(round(0xFF0C1115, dp(2), 0xFF25313A));
+        cell.setBackground(round(0xDB0C1115, dp(2), 0xFF25313A));
 
         TextView label = text(title, 9, color, Typeface.BOLD);
-        label.setSingleLine(true);
+        label.setSingleLine(false);
         cell.addView(label);
 
-        TextView value = text(detail, 8, MUTED, Typeface.NORMAL);
-        value.setSingleLine(true);
+        TextView value = text(detail, 9, MUTED, Typeface.NORMAL);
+        value.setSingleLine(false);
         value.setPadding(0, dp(2), 0, 0);
         cell.addView(value);
         return cell;
@@ -585,6 +668,201 @@ public final class MainActivity extends Activity {
                 + "\ngitCommit=" + status.gitCommit
                 + "\nrootExecution=" + coreClient.executionModeLabel()
                 + "\nmoduleDispatch=" + coreClient.moduleDispatchLabel();
+    }
+
+    private JSONObject loadBaselineIntegrationsStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.baselineIntegrations();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
+    private View buildBaselineIntegrationsCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("Baseline APK / Module", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(baselineSummary(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(baselineStatusLabel(), baselineStatusColor()));
+
+        JSONArray integrations = baselineIntegrationsStatus == null
+                ? null : baselineIntegrationsStatus.optJSONArray("integrations");
+        if (integrations == null || integrations.length() == 0) {
+            TextView unavailable = text("moduleStatus=unavailable", 12, MUTED, Typeface.NORMAL);
+            unavailable.setTypeface(Typeface.MONOSPACE);
+            unavailable.setPadding(0, dp(12), 0, 0);
+            card.addView(unavailable);
+            return card;
+        }
+
+        for (int i = 0; i < integrations.length(); i++) {
+            JSONObject integration = integrations.optJSONObject(i);
+            if (integration != null) {
+                card.addView(buildBaselineIntegrationRow(integration));
+            }
+        }
+        return card;
+    }
+
+    private View buildBaselineIntegrationRow(JSONObject integration) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(4));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(top);
+
+        TextView label = text(integration.optString("title", integration.optString("id", "Integration")),
+                15, TEXT, Typeface.BOLD);
+        top.addView(label, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        String status = integration.optString("status", "unknown");
+        top.addView(chip(baselineIntegrationLabel(status), baselineIntegrationColor(integration)));
+
+        TextView detail = text(baselineIntegrationDetail(integration),
+                12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(6), 0, 0);
+        row.addView(detail);
+        return row;
+    }
+
+    private String baselineSummary() {
+        if (baselineIntegrationsStatus == null) {
+            return "baseline=module_unavailable\nmutatingControls=false";
+        }
+        return "baseline=" + baselineIntegrationsStatus.optString("baseline_id", "unknown")
+                + "\noverall=" + baselineIntegrationsStatus.optString("overall_status", "unknown")
+                + "\nsafeDefault=" + baselineIntegrationsStatus.optBoolean("safe_default", true)
+                + "\nmutatingControls="
+                + baselineIntegrationsStatus.optBoolean("mutating_controls_enabled", false);
+    }
+
+    private String baselineStatusLabel() {
+        if (baselineIntegrationsStatus == null) return "Unknown";
+        String status = baselineIntegrationsStatus.optString("overall_status", "");
+        if ("baseline_ready_read_only".equals(status)) return "Ready";
+        if ("baseline_bootstrap".equals(status)) return "Bootstrap";
+        if ("baseline_partial".equals(status)) return "Partial";
+        return "Baseline";
+    }
+
+    private int baselineStatusColor() {
+        if (baselineIntegrationsStatus == null) return BLUE;
+        String status = baselineIntegrationsStatus.optString("overall_status", "");
+        if ("baseline_ready_read_only".equals(status)) return GREEN;
+        if ("baseline_bootstrap".equals(status)) return YELLOW;
+        if ("baseline_partial".equals(status)) return CYAN;
+        return BLUE;
+    }
+
+    private String baselineIntegrationLabel(String status) {
+        if (status == null || status.isEmpty()) return "Unknown";
+        if ("display_ready".equals(status)) return "Display";
+        if ("container_runtime_ready".equals(status)) return "Runtime";
+        if ("runtime_preflight_ready".equals(status)) return "Runtime";
+        if ("hook_framework_ready_scope_deferred".equals(status)) return "Vector";
+        if ("read_only_nodes_visible".equals(status)) return "Nodes";
+        if ("nebula_preview_ready".equals(status)) return "Preview";
+        if ("external_module_detected_dry_run_required".equals(status)) return "Module";
+        if ("partial".equals(status)) return "Partial";
+        if ("missing".equals(status) || "nodes_missing".equals(status)) return "Missing";
+        return status.length() > 14 ? status.substring(0, 14) : status;
+    }
+
+    private int baselineIntegrationColor(JSONObject integration) {
+        if (integration.optBoolean("ready", false)) return GREEN;
+        String status = integration.optString("status", "");
+        if (status.contains("preview") || status.contains("reference")) return CYAN;
+        if (status.contains("partial") || status.contains("deferred")) return YELLOW;
+        if (status.contains("missing")) return RED;
+        return BLUE;
+    }
+
+    private String baselineIntegrationDetail(JSONObject integration) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("id=").append(integration.optString("id", "unknown"));
+        builder.append("\nrole=").append(integration.optString("role", "unknown"));
+        builder.append("\nowner=").append(integration.optString("owner", "unknown"));
+        if (integration.has("method_id")) {
+            builder.append("\nmethod=").append(integration.optString("method_id", "unknown"));
+        }
+        if (integration.has("container_ref")) {
+            builder.append("  container=").append(integration.optString("container_ref", "unknown"));
+        }
+        if (integration.has("container_kind")) {
+            builder.append("  kind=").append(integration.optString("container_kind", "unknown"));
+        }
+        if (integration.has("container_status")) {
+            builder.append("\ncontainerStatus=").append(integration.optString("container_status", "unknown"));
+        }
+        if (integration.has("display_status")) {
+            builder.append("  displayStatus=").append(integration.optString("display_status", "unknown"));
+        }
+        if (integration.has("runtime_status")) {
+            builder.append("\nruntimeStatus=").append(integration.optString("runtime_status", "unknown"));
+        }
+        if (integration.has("requirement_status")) {
+            builder.append("  requirements=").append(integration.optString("requirement_status", "unknown"));
+        }
+        JSONArray missingRequirements = integration.optJSONArray("missing_requirements");
+        if (missingRequirements != null && missingRequirements.length() > 0) {
+            builder.append("\nmissingRequirements=").append(missingRequirements);
+        }
+        builder.append("\ninstalled=").append(integration.optBoolean("installed", false));
+        builder.append("  ready=").append(integration.optBoolean("ready", false));
+        builder.append("  mutating=").append(integration.optBoolean("mutating", false));
+        if (integration.has("writes_enabled")) {
+            builder.append("\nwritesEnabled=").append(integration.optBoolean("writes_enabled", false));
+        }
+        if (integration.has("dry_run_required")) {
+            builder.append("  dryRunRequired=").append(integration.optBoolean("dry_run_required", true));
+        }
+        if (integration.has("selected_container")) {
+            builder.append("\nselectedContainer=").append(integration.optString("selected_container", "unknown"));
+        }
+        if (integration.has("container_selection_source")) {
+            builder.append("  source=").append(integration.optString("container_selection_source", "unknown"));
+        }
+        if (integration.has("container_active")) {
+            builder.append("\ncontainerActive=").append(integration.optBoolean("container_active", false));
+            if (integration.has("container_pid") && !integration.isNull("container_pid")) {
+                builder.append("  pid=").append(integration.optInt("container_pid"));
+            }
+        }
+        JSONObject checks = integration.optJSONObject("checks");
+        if (checks != null) {
+            builder.append("\nchecks=").append(checkSummary(checks));
+        }
+        JSONArray errors = integration.optJSONArray("errors");
+        if (errors != null && errors.length() > 0) {
+            builder.append("\nerrors=").append(errors);
+        }
+        builder.append("\nsource=").append(integration.optString("source", "unknown"));
+        return builder.toString();
     }
 
     private View buildAutoCoolingCard(RedMagicProbe probe) {
@@ -733,7 +1011,7 @@ public final class MainActivity extends Activity {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setPadding(dp(10), dp(10), dp(10), dp(10));
-        tile.setBackground(round(0xFF0B1014, dp(2), 0xFF25313A));
+        tile.setBackground(round(0xDB0B1014, dp(2), 0xFF25313A));
 
         TextView valueView = text(value, 14, TEXT, Typeface.BOLD);
         valueView.setMinHeight(dp(42));
@@ -762,7 +1040,7 @@ public final class MainActivity extends Activity {
 
         LinearLayout track = new LinearLayout(this);
         track.setOrientation(LinearLayout.HORIZONTAL);
-        track.setBackground(round(0xFF121A20, dp(1), 0xFF121A20));
+        track.setBackground(round(0xD9121A20, dp(1), 0xFF121A20));
         LinearLayout.LayoutParams trackParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(10));
         trackParams.topMargin = dp(6);
@@ -1165,6 +1443,21 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private JSONObject loadDisplayMethodContainersStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.displayMethodContainers();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
     private View buildDisplayLanesCard() {
         LinearLayout card = baseCard();
 
@@ -1201,6 +1494,10 @@ public final class MainActivity extends Activity {
                 card.addView(buildDisplayLaneRow(lane));
             }
         }
+        TextView methodContainers = text(displayMethodContainersSummary(), 12, MUTED, Typeface.NORMAL);
+        methodContainers.setTypeface(Typeface.MONOSPACE);
+        methodContainers.setPadding(0, dp(10), 0, 0);
+        card.addView(methodContainers);
         return card;
     }
 
@@ -1212,6 +1509,31 @@ public final class MainActivity extends Activity {
                 + "\nmode=read_only"
                 + "\nprofile=" + coreStatus.profile.wireName
                 + "\nsafeMode=" + coreStatus.safeMode;
+    }
+
+    private String displayMethodContainersSummary() {
+        if (displayMethodContainersStatus == null) {
+            return "methodContainers=unavailable";
+        }
+        JSONArray containers = displayMethodContainersStatus.optJSONArray("containers");
+        if (containers == null || containers.length() == 0) {
+            return "methodContainers=empty";
+        }
+        StringBuilder builder = new StringBuilder("methodContainers=");
+        for (int i = 0; i < containers.length(); i++) {
+            JSONObject container = containers.optJSONObject(i);
+            if (container == null) continue;
+            if (i > 0) builder.append("\n  ");
+            builder.append(container.optString("method_id", "unknown"))
+                    .append(" -> ")
+                    .append(container.optString("container_ref", "unknown"));
+            if (container.has("recommended_container")) {
+                builder.append(" recommended=")
+                        .append(container.optString("recommended_container", "unknown"));
+            }
+            builder.append(" status=").append(container.optString("status", "unknown"));
+        }
+        return builder.toString();
     }
 
     private String displayLaneTopLabel() {
@@ -1249,7 +1571,10 @@ public final class MainActivity extends Activity {
 
     private String displayStatusLabel(String status) {
         if (status == null || status.isEmpty()) return "Unknown";
-        if ("ready_for_glx_fix".equals(status)) return "Ready";
+        if ("wayland_display_pass".equals(status)) return "Wayland";
+        if ("display_preflight_incomplete".equals(status)) return "Partial";
+        if ("ready_for_glx_fix".equals(status)) return "Legacy";
+        if ("container_runtime_ready".equals(status)) return "Runtime";
         if ("preflight_ready".equals(status)) return "Preflight";
         if ("proven_reference_not_wired".equals(status)) return "Proven";
         if ("safe_mode_blocks_start".equals(status)) return "Safe";
@@ -1260,7 +1585,8 @@ public final class MainActivity extends Activity {
 
     private int displayLaneColor(String status) {
         if (status == null) return BLUE;
-        if (status.contains("ready") || status.contains("always_available")) return GREEN;
+        if (status.contains("ready") || status.contains("pass")
+                || status.contains("always_available")) return GREEN;
         if (status.contains("proven")) return CYAN;
         if (status.contains("safe")) return BLUE;
         if (status.contains("partial") || status.contains("not_wired")) return YELLOW;
@@ -1285,8 +1611,15 @@ public final class MainActivity extends Activity {
         if (lane.has("active_blocker")) {
             builder.append("\nblocker=").append(lane.optString("active_blocker"));
         }
+        if (lane.has("proof_classification")) {
+            builder.append("\nproof=").append(lane.optString("proof_classification"));
+        }
         if (lane.has("unpromoted_lead")) {
             builder.append("\nlead=").append(lane.optString("unpromoted_lead"));
+            builder.append("  status=").append(lane.optString("lead_status", "unknown"));
+        }
+        if (lane.has("proven_trick")) {
+            builder.append("\ntrick=").append(lane.optString("proven_trick"));
             builder.append("  status=").append(lane.optString("lead_status", "unknown"));
         }
         if (lane.has("trick")) {
@@ -1474,7 +1807,7 @@ public final class MainActivity extends Activity {
         forbidden.setPadding(0, 0, 0, dp(10));
         card.addView(forbidden);
 
-        Button select = smallButton(profile.enabled ? "Select" : "Blocked",
+        Button select = smallButton(profile.enabled ? "Preview" : "Blocked",
                 profile.enabled ? BLUE : PANEL_ALT);
         select.setEnabled(profile.enabled);
         select.setAlpha(profile.enabled ? 1f : 0.45f);
@@ -1492,12 +1825,12 @@ public final class MainActivity extends Activity {
             return;
         }
         selectedTargetProfileId = profile.id;
-        toast(profile.label + " selected");
+        toast(profile.label + " previewed");
         refresh();
     }
 
     private String profileStatusLabel(TargetProfile profile) {
-        if (profile.id.equals(selectedTargetProfileId)) return "Selected";
+        if (profile.id.equals(selectedTargetProfileId)) return "Preview";
         return profile.enabled ? "Ready" : "Blocked";
     }
 
@@ -1721,6 +2054,8 @@ public final class MainActivity extends Activity {
         sb.append("  coolingPumpIntent=").append(redMagicProbe.coolingPolicy.pumpIntent).append('\n');
         sb.append('\n');
 
+        appendBaselineIntegrationsReport(sb);
+
         sb.append("[Display Lanes]\n");
         if (displayLanesStatus == null) {
             sb.append("  status=unavailable\n\n");
@@ -1739,8 +2074,16 @@ public final class MainActivity extends Activity {
                     if (lane.has("active_blocker")) {
                         sb.append("    blocker=").append(lane.optString("active_blocker")).append('\n');
                     }
+                    if (lane.has("proof_classification")) {
+                        sb.append("    proof=")
+                                .append(lane.optString("proof_classification")).append('\n');
+                    }
                     if (lane.has("unpromoted_lead")) {
                         sb.append("    lead=").append(lane.optString("unpromoted_lead")).append('\n');
+                        sb.append("    leadStatus=").append(lane.optString("lead_status", "unknown")).append('\n');
+                    }
+                    if (lane.has("proven_trick")) {
+                        sb.append("    trick=").append(lane.optString("proven_trick")).append('\n');
                         sb.append("    leadStatus=").append(lane.optString("lead_status", "unknown")).append('\n');
                     }
                     if (lane.has("next_reversa_action")) {
@@ -1758,6 +2101,33 @@ public final class MainActivity extends Activity {
                         sb.append("    evidenceCaptured=").append(lane.optBoolean("evidence_captured", false)).append('\n');
                     }
                     sb.append("    source=").append(lane.optString("source", "unknown")).append('\n');
+                }
+            }
+            sb.append('\n');
+        }
+
+        sb.append("[Method Containers]\n");
+        if (displayMethodContainersStatus == null) {
+            sb.append("  status=unavailable\n\n");
+        } else {
+            JSONArray containers = displayMethodContainersStatus.optJSONArray("containers");
+            if (containers != null) {
+                for (int i = 0; i < containers.length(); i++) {
+                    JSONObject container = containers.optJSONObject(i);
+                    if (container == null) continue;
+                    sb.append("  ").append(container.optString("method_id", "unknown"))
+                            .append(": ").append(container.optString("container_ref", "unknown"))
+                            .append('\n');
+                    sb.append("    kind=").append(container.optString("container_kind", "unknown")).append('\n');
+                    sb.append("    status=").append(container.optString("status", "unknown")).append('\n');
+                    if (container.has("recommended_container")) {
+                        sb.append("    recommended=")
+                                .append(container.optString("recommended_container", "unknown")).append('\n');
+                    }
+                    JSONArray missing = container.optJSONArray("missing_requirements");
+                    if (missing != null && missing.length() > 0) {
+                        sb.append("    missing=").append(missing).append('\n');
+                    }
                 }
             }
             sb.append('\n');
@@ -1814,6 +2184,45 @@ public final class MainActivity extends Activity {
         return sb.toString();
     }
 
+    private void appendBaselineIntegrationsReport(StringBuilder sb) {
+        sb.append("[Baseline Integrations]\n");
+        if (baselineIntegrationsStatus == null) {
+            sb.append("  status=unavailable\n\n");
+            return;
+        }
+        sb.append("  baseline=").append(baselineIntegrationsStatus.optString("baseline_id", "unknown")).append('\n');
+        sb.append("  overall=").append(baselineIntegrationsStatus.optString("overall_status", "unknown")).append('\n');
+        sb.append("  safeDefault=").append(baselineIntegrationsStatus.optBoolean("safe_default", true)).append('\n');
+        sb.append("  mutatingControls=")
+                .append(baselineIntegrationsStatus.optBoolean("mutating_controls_enabled", false))
+                .append('\n');
+        JSONArray integrations = baselineIntegrationsStatus.optJSONArray("integrations");
+        if (integrations != null) {
+            for (int i = 0; i < integrations.length(); i++) {
+                JSONObject integration = integrations.optJSONObject(i);
+                if (integration == null) continue;
+                sb.append("  ").append(integration.optString("id", "unknown"))
+                        .append(": ").append(integration.optString("status", "unknown")).append('\n');
+                sb.append("    installed=").append(integration.optBoolean("installed", false)).append('\n');
+                sb.append("    ready=").append(integration.optBoolean("ready", false)).append('\n');
+                sb.append("    mutating=").append(integration.optBoolean("mutating", false)).append('\n');
+                sb.append("    role=").append(integration.optString("role", "unknown")).append('\n');
+                if (integration.has("selected_container")) {
+                    sb.append("    selectedContainer=")
+                            .append(integration.optString("selected_container", "unknown"))
+                            .append('\n');
+                }
+                if (integration.has("container_selection_source")) {
+                    sb.append("    containerSelection=")
+                            .append(integration.optString("container_selection_source", "unknown"))
+                            .append('\n');
+                }
+                sb.append("    source=").append(integration.optString("source", "unknown")).append('\n');
+            }
+        }
+        sb.append("  nextStep=").append(baselineIntegrationsStatus.optString("next_step", "unknown")).append("\n\n");
+    }
+
     private void appendCapabilities(StringBuilder sb, String title, List<NebulaCapability> capabilities) {
         sb.append("[").append(title).append("]\n");
         for (NebulaCapability capability : capabilities) {
@@ -1868,6 +2277,7 @@ public final class MainActivity extends Activity {
         view.setTextColor(color);
         view.setTypeface(Typeface.DEFAULT, style);
         view.setLineSpacing(dp(2), 1.0f);
+        view.setShadowLayer(dp(2), 0, dp(1), 0xF0000000);
         return view;
     }
 
@@ -1880,11 +2290,21 @@ public final class MainActivity extends Activity {
         return view;
     }
 
+    @SuppressWarnings("deprecation")
+    private void applyScrollBackplane(View view) {
+        BitmapDrawable drawable = (BitmapDrawable) getResources()
+                .getDrawable(R.drawable.nebula_scroll_backplane);
+        drawable.setTileModeX(Shader.TileMode.CLAMP);
+        drawable.setTileModeY(Shader.TileMode.CLAMP);
+        drawable.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        view.setBackground(drawable);
+    }
+
     private LinearLayout baseCard() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        card.setBackground(round(PANEL, dp(8), LINE));
+        card.setBackground(round(PANEL, dp(6), LINE));
 
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1897,19 +2317,18 @@ public final class MainActivity extends Activity {
     private Button actionButton(String label, int color) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextColor(BG);
+        button.setTextColor(color == PANEL_ALT ? TEXT : color);
         button.setTextSize(13);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         button.setAllCaps(false);
         button.setMinHeight(dp(42));
         button.setPadding(dp(6), 0, dp(6), 0);
-        button.setBackground(round(color, dp(8), color));
+        button.setBackground(round(0xE80A0E13, dp(6), color));
         return button;
     }
 
     private Button smallButton(String label, int color) {
         Button button = actionButton(label, color);
-        button.setTextColor(color == PANEL_ALT ? TEXT : BG);
         button.setMinHeight(dp(36));
         return button;
     }

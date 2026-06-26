@@ -30,6 +30,12 @@ grep -q 'namespace = "io.droidspaces.nebula"' app/build.gradle.kts
 grep -q 'applicationId = "io.droidspaces.nebula"' app/build.gradle.kts
 grep -q 'android:name=".MainActivity"' app/src/main/AndroidManifest.xml
 grep -q 'android.intent.action.MAIN' app/src/main/AndroidManifest.xml
+grep -q 'io.droidspaces.nebula.waylandie' app/src/main/AndroidManifest.xml
+grep -q 'io.droidspaces.nebula.waylandie' app/src/main/java/io/droidspaces/nebula/MainActivity.java
+grep -q '0.2.0-no-root-nebula13-rootfs-vulkan-smoke' app/src/main/java/io/droidspaces/nebula/MainActivity.java
+grep -q 'WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie' nebula-core-module/bin/nebula-core
+grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' nebula-core-module/bin/nebula-core
+grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' docs/integration/REVERSA_FINDINGS_ASSESSMENT.md
 
 for pattern in \
   'out/' \

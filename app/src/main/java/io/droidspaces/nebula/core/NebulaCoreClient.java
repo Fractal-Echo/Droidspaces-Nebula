@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 public final class NebulaCoreClient {
     private static final String ROOT_SHELL = "/system/bin/su";
+    private static final String ROOT_MOUNT_MASTER_ARG = "-mm";
     private static final String ACTIVE_MODULE_CLI =
             "/data/adb/modules/nebula_core/bin/nebula-core";
     private static final String PENDING_MODULE_CLI =
@@ -42,10 +43,12 @@ public final class NebulaCoreClient {
             "cooling policy --json",
             "redmagic probe --json",
             "redmagic pump probe --json",
+            "integrations baseline --json",
             "nubia toolkit status --json",
             "runtime waylandie status --json",
             "runtime waylandie proton-smoke --json",
             "display lanes --json",
+            "display method-containers --json",
             "display lane phone preflight --json",
             "display lane anland preflight --json",
             "display lane dock preflight --json"
@@ -111,6 +114,10 @@ public final class NebulaCoreClient {
         return runFixed("redmagic", "pump", "probe", "--json");
     }
 
+    public CommandResult baselineIntegrations() {
+        return runFixed("integrations", "baseline", "--json");
+    }
+
     public CommandResult nubiaToolkitStatus() {
         return runFixed("nubia", "toolkit", "status", "--json");
     }
@@ -127,6 +134,10 @@ public final class NebulaCoreClient {
         return runFixed("display", "lanes", "--json");
     }
 
+    public CommandResult displayMethodContainers() {
+        return runFixed("display", "method-containers", "--json");
+    }
+
     public CommandResult displayLanePhonePreflight() {
         return runFixed("display", "lane", "phone", "preflight", "--json");
     }
@@ -140,7 +151,7 @@ public final class NebulaCoreClient {
     }
 
     public String executionModeLabel() {
-        return "app_uid:/system/bin/su";
+        return "app_uid:/system/bin/su telemetry:-mm";
     }
 
     public String moduleDispatchLabel() {
@@ -153,7 +164,8 @@ public final class NebulaCoreClient {
             return new CommandResult(2, "", "command not allowlisted", false);
         }
         long timeoutMs = timeoutFor(logical);
-        return runRoot(MODULE_CLI_DISPATCH + " " + logical, timeoutMs);
+        return runRoot(MODULE_CLI_DISPATCH + " " + logical, timeoutMs,
+                preferMountMaster(logical));
     }
 
     private long timeoutFor(String logical) {
@@ -162,10 +174,28 @@ public final class NebulaCoreClient {
         }
         if ("redmagic probe --json".equals(logical)
                 || "redmagic pump probe --json".equals(logical)
-                || "cooling policy --json".equals(logical)) {
+                || "cooling policy --json".equals(logical)
+                || "integrations baseline --json".equals(logical)
+                || "runtime waylandie status --json".equals(logical)
+                || "display lanes --json".equals(logical)
+                || "display method-containers --json".equals(logical)
+                || "display lane phone preflight --json".equals(logical)
+                || "display lane anland preflight --json".equals(logical)
+                || "display lane dock preflight --json".equals(logical)) {
             return TELEMETRY_TIMEOUT_MS;
         }
         return TIMEOUT_MS;
+    }
+
+    private boolean preferMountMaster(String logical) {
+        return "integrations baseline --json".equals(logical)
+                || "runtime waylandie status --json".equals(logical)
+                || "runtime waylandie proton-smoke --json".equals(logical)
+                || "display lanes --json".equals(logical)
+                || "display method-containers --json".equals(logical)
+                || "display lane phone preflight --json".equals(logical)
+                || "display lane anland preflight --json".equals(logical)
+                || "display lane dock preflight --json".equals(logical);
     }
 
     private boolean isAllowlisted(String logical) {
@@ -184,10 +214,32 @@ public final class NebulaCoreClient {
         return false;
     }
 
-    private CommandResult runRoot(String fixedCommand, long timeoutMs) {
+    private CommandResult runRoot(String fixedCommand, long timeoutMs, boolean preferMountMaster) {
+        CommandResult result = runRootOnce(fixedCommand, timeoutMs, preferMountMaster);
+        if (preferMountMaster && mountMasterUnsupported(result)) {
+            return runRootOnce(fixedCommand, timeoutMs, false);
+        }
+        return result;
+    }
+
+    private boolean mountMasterUnsupported(CommandResult result) {
+        if (result.ok()) {
+            return false;
+        }
+        String output = (result.stderr + "\n" + result.stdout).toLowerCase();
+        return output.contains("invalid option")
+                || output.contains("unknown option")
+                || output.contains("unrecognized option")
+                || output.contains("usage:");
+    }
+
+    private CommandResult runRootOnce(String fixedCommand, long timeoutMs, boolean mountMaster) {
         Process process = null;
         try {
-            process = new ProcessBuilder(ROOT_SHELL, "-c", fixedCommand).start();
+            ProcessBuilder builder = mountMaster
+                    ? new ProcessBuilder(ROOT_SHELL, ROOT_MOUNT_MASTER_ARG, "-c", fixedCommand)
+                    : new ProcessBuilder(ROOT_SHELL, "-c", fixedCommand);
+            process = builder.start();
             StreamReader stdout = new StreamReader(process.getInputStream());
             StreamReader stderr = new StreamReader(process.getErrorStream());
             Thread outThread = new Thread(stdout, "nebula-core-stdout");

@@ -71,14 +71,21 @@ shell argument and is never launched during boot.
 `display lanes --json` reports the multi-lane display selector state. The lane
 preflight commands are read-only:
 
-- Phone/App Mode reports the known WayLandIE/Gamescope/Xwayland state and the
-  current GLX visual/fbconfig blocker. It also exposes the Sidecar-13
-  `--force-composition` result as an unpromoted promotion candidate and reports
-  the live-confirmed 39-bit kernel VA constraint for runtime selection. Wine GUI
-  remains blocked by ARM64EC `winex11.drv` SEH invalid-frame/c0000005 evidence
-  until a runtime patch is proven.
-- Anland Surface Mode checks only fixed Droidspaces/Anland paths, env state,
-  display socket presence, and render-node visibility.
+- Phone/App Mode reports the WayLandIE R6 Wayland proof state. A pass requires
+  the bridge binary, pinned local Freedreno ICD, local Vulkan driver, and the
+  exact Gamescope/Xwayland sidecars used by
+  `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`. Steam/Proton remains unpromoted
+  until a separate game-client proof passes under the live-confirmed 39-bit
+  kernel VA constraint.
+- Anland Surface Mode selects an explicit or single live active DroidSpaces
+  container, then checks config, Anland env, display socket presence, rootfs
+  ownership, and render-node visibility. Stale PID files, unsafe `rootfs_path`
+  values outside the selected container, and invalid overrides fail closed.
 - Dock Lease Mode reports the proven external-display DRM lease reference and
-  required operator-gated start conditions. It does not probe composer fds,
+  required operator-approved start conditions. It does not probe composer fds,
   create leases, run wlroots, or mutate display state.
+
+Each display lane also reports `container_ref`, `container_kind`,
+`container_status`, `display_status`, `runtime_status`,
+`requirement_status`, and `missing_requirements` so runtime readiness and
+display readiness cannot be confused.
