@@ -28,6 +28,8 @@ Pass 01 exposes only a fixed JSON command protocol:
 - `runtime waylandie status --json`
 - `runtime waylandie proton-smoke --json`
 - `display lanes --json`
+- `display method-containers --json`
+- `display method-profiles --json`
 - `display lane phone preflight --json`
 - `display lane anland preflight --json`
 - `display lane dock preflight --json`
@@ -69,15 +71,19 @@ status display.
 fixed root-assisted proot Proton smoke command. It accepts no path, package, or
 shell argument and is never launched during boot.
 
-`display lanes --json` reports the multi-lane display selector state. The lane
-preflight commands are read-only:
+`display lanes --json` reports the multi-lane display selector state.
+`display method-containers --json` reports each display method's owning
+container/runtime. `display method-profiles --json` reports read-only
+DroidSpaces/Anland profile templates for separate rootfs image, rootfs
+directory, Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio methods.
+The lane preflight commands are read-only:
 
-- Phone/App Mode reports the WayLandIE lane status. The app/native bridge is
-  solved and the pinned local Freedreno ICD/local Vulkan driver loader path is
-  confirmed, but full runtime success remains blocked on the Vulkan
-  export/real-buffer gate: `vkGetMemoryFdKHR` failures and `0` real-buffer
-  commits. Steam/Proton remains unpromoted until a separate game-client proof
-  passes under the live-confirmed 39-bit kernel VA constraint.
+- Phone/App Mode reports the WayLandIE lane status. The app/native bridge,
+  pinned local Freedreno ICD/local Vulkan driver loader path, dmabuf-present
+  display path, `vkGetMemoryFdKHR=0`, and `real_buffer_commits=2` are promoted
+  as the R6 Wayland working 03 display proof. Steam/Proton remains unpromoted
+  until a separate bounded game-client runtime proof passes under the
+  live-confirmed 39-bit kernel VA constraint.
 - Anland Surface Mode selects an explicit or single live active DroidSpaces
   container, then checks config, Anland env, display socket presence, rootfs
   ownership, and render-node visibility. Stale PID files, unsafe `rootfs_path`
@@ -90,3 +96,9 @@ Each display lane also reports `container_ref`, `container_kind`,
 `container_status`, `display_status`, `runtime_status`,
 `requirement_status`, and `missing_requirements` so runtime readiness and
 display readiness cannot be confused.
+
+The APK dispatches only fixed commands and uses the active module first:
+`/data/adb/modules/nebula_core/bin/nebula-core`. A pending
+`/data/adb/modules_update/nebula_core/bin/nebula-core` is only a fallback when
+the active module is missing, or an explicit guarded debug/probe override after
+the pending CLI passes the anti-regression check.

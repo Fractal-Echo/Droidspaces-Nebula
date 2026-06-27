@@ -52,7 +52,7 @@ be ready while display is still blocked.
 
 | Method id | Container ref | Container kind | Display status meaning | Current start posture |
 | --- | --- | --- | --- | --- |
-| `phone_app_bridge` | `waylandie_app_imagefs` | `app_proot` | App/native bridge solved and pinned local ICD/driver loader path confirmed; full runtime remains blocked on Vulkan export/real-buffer evidence: `vkGetMemoryFdKHR` failures and `0` real-buffer commits. | No start command; game-client runtime proof is not promoted yet. |
+| `phone_app_bridge` | `waylandie_app_imagefs` | `app_proot` | Phone active module proves WayLandIE/Gamescope/Xwayland display with `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`, `NONE_WAYLAND_DISPLAY`, `vkGetMemoryFdKHR` failures `0`, and real-buffer commits `2`; game-client runtime proof is not promoted yet. | No start command; game-client runtime proof is the next bounded gate before Steam/Proton promotion. |
 | `anland_surface` | dedicated `anland-ubuntu26-kde` DroidSpaces profile/container | `droidspaces` | Ready only when the Anland consumer/daemon, env, socket bind, and producer rootfs are present. | Read-only preflight plus copyable source-backed setup commands. |
 | `droidspaces_rootfs_image` | `rootfs.img` | `droidspaces_rootfs_image` | Storage/startup method, not a display renderer by itself. | Use `--rootfs-img` or `--rootfs-arc ... create`. |
 | `droidspaces_rootfs_directory` | `rootfs_directory` | `droidspaces_rootfs_directory` | Storage/startup method for unpacked rootfs testing. | Use `--rootfs`. |

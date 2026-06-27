@@ -13,27 +13,23 @@ mutation was performed for this assessment.
 
 ## Current Update: 2026-06-27
 
-This documentation cleanup demotes stale real-buffer-pass wording from live
-control-plane status. The current confirmed state is loader-pin proof, not full
-A1 runtime/export success:
+This documentation cleanup corrects the stale loader-pin rollback that crept
+back into local source. The current confirmed display state is the R6 Wayland
+real-buffer pass, not the older A1 loader-pin-only proof:
 
 - final current classification:
-  `NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED`;
-- proven: ADB/app context worked in the prior bounded proof, the local pinned
-  Freedreno ICD was readable, the local pinned `libvulkan_freedreno.so` was
-  readable, `VK_ICD_FILENAMES` and `VK_DRIVER_FILES` could be pinned to the local
-  ICD, and `vulkaninfo --summary` returned `0`;
-- not proven: `vkGetMemoryFdKHR` improvement, bridge real-buffer commits greater
-  than `0`, full Gamescope readiness, full Xwayland readiness, child software GLX
-  survival in the full A1 export/runtime pass, or game-client readiness;
-- active blocker: Vulkan export/real-buffer runtime evidence, specifically
-  `vkGetMemoryFdKHR` failures and `0` bridge real-buffer commits.
+  `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`;
+- proven: pinned local Freedreno ICD and driver, dmabuf-present path,
+  Gamescope/Xwayland readiness, `vkGetMemoryFdKHR` failures at `0`, bridge exit
+  `0`, and real-buffer commits greater than `0`;
+- not proven: Steam, Proton, Wine, DXVK, FEX, or a game client running through
+  the display path under the live 39-bit VA constraint;
+- active blocker:
+  `GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA`.
 
-Decision: app/native bridge readiness and later software-GLX evidence must not
-reopen the old GLX visual/fbconfig inventory in this docs pass, but they also do
-not promote Steam, Proton, Wine, DXVK, FEX, or game clients. The next runtime
-gate is the bounded A1 export/runtime proof under the live-confirmed 39-bit VA
-constraint.
+Decision: the local control-plane source must not regress to loader-pin-only or
+blocked-export labels. The next runtime gate is a bounded game-client proof under
+the live-confirmed 39-bit VA constraint.
 
 ## Findings
 
@@ -76,7 +72,9 @@ the canonical chain:
 
 Decision: preserve Sidecar-13 as historical promotion evidence, not as solved
 default behavior. Do not launch Steam, Proton, Wine, DXVK, FEX, or game clients
-until the Vulkan export/real-buffer gate is promoted.
+from this historical lane. Phone/App display proof is promoted by the later R6
+Wayland working 03 sidecar-14/sidecar-06 real-buffer evidence; game-client
+runtime still needs a separate bounded proof.
 
 ### 3. Dock lease evidence
 
@@ -121,7 +119,8 @@ runtime fails during `winex11.drv` process attach with SEH `invalid frame` and
 attempts.
 
 Decision: this remains historical runtime evidence. The next live gate is not a
-Wine rerun; it is the bounded Vulkan export/real-buffer proof.
+Wine rerun and not another display-proof promotion; it is bounded game-client
+runtime proof under the live-confirmed 39-bit VA constraint.
 
 See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the sidecar-by-sidecar evidence chain
 and rejected interpretations.

@@ -45,7 +45,7 @@ Runtime lanes are separate. A proof in one lane does not silently promote anothe
 
 | Lane | Owner | Current policy |
 | --- | --- | --- |
-| Phone/App Mode | WayLandIE plus Nebula status/preflight | App/native bridge is solved and the pinned local ICD/driver loader path is confirmed. The active blocker is Vulkan export/real-buffer runtime evidence: `vkGetMemoryFdKHR` failures and `0` real-buffer commits keep full runtime success unpromoted. |
+| Phone/App Mode | WayLandIE plus Nebula status/preflight | Phone active module proves the WayLandIE/Gamescope/Xwayland display path with `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`, `NONE_WAYLAND_DISPLAY`, `vkGetMemoryFdKHR` failures `0`, and real-buffer commits `2`. Full game-client runtime remains unpromoted until a bounded client proof runs. |
 | Dock Lease Mode | Future Nebula Core lease broker plus receiver | Advisory and paused/crash-gated. No active DRM lease, composer-fd probing, `CREATE_LEASE`, wlroots DRM backend launch, or display mutation is implied. |
 | Anland Surface Mode | DroidSpaces/Anland profile/container | Preflight-only until the selected container, `anland.env`, `/data/local/tmp/display_daemon.sock`, render node, and rootfs ownership are present together. |
 | Compatibility Mode | Future conservative fallback | Blocked until implemented with reversible fixed commands. It is not Steam, Proton, Wine, DXVK, or game-client ready. |

@@ -76,9 +76,9 @@ proof:
 | Local KGSL driver | Present at `/data/user/0/io.droidspaces.nebula.waylandie/files/imagefs/usr/local/lib/libvulkan_freedreno.so` |
 | Gamescope sidecar | `xwayland-gamescope-14-exportable-fence-guard-a4-473ba531` |
 | Xwayland sidecar | `xwayland-gamescope-06-xwayland-9f1a3d62` |
-| Loader-pin result | `NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED` |
-| Software GLX result | `NEBULA_R6_SOFTWARE_GLX_REPRODUCED` with `llvmpipe` |
-| Active blocker | `vulkan_export_real_buffer`: `vkGetMemoryFdKHR` failures, 0 real-buffer commits, 8 no-buffer commits |
+| Display proof result | `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS` |
+| Vulkan export health | `vkGetMemoryFdKHR` failures `0`, real-buffer commits `2`, bridge exit `0` |
+| Active blocker | `GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA`: display is proven, but Proton/Wine/Steam clients are not promoted yet |
 
-Next single action: rerun only the bounded A1 export/runtime proof after ADB is
-live and the staged runner path is verified.
+Next single action: run only a bounded game-client runtime proof before any
+Steam/Proton/Wine promotion.

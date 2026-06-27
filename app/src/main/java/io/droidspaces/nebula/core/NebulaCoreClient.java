@@ -17,11 +17,28 @@ public final class NebulaCoreClient {
     private static final String PENDING_MODULE_CLI =
             "/data/adb/modules_update/nebula_core/bin/nebula-core";
     private static final String MODULE_CLI_DISPATCH =
-            "NEBULA_CORE_CLI=''; "
-                    + "if [ -x " + ACTIVE_MODULE_CLI + " ]; then NEBULA_CORE_CLI="
-                    + ACTIVE_MODULE_CLI + "; "
-                    + "elif [ -x " + PENDING_MODULE_CLI + " ]; then NEBULA_CORE_CLI="
-                    + PENDING_MODULE_CLI + "; "
+            "NEBULA_CORE_ACTIVE='" + ACTIVE_MODULE_CLI + "'; "
+                    + "NEBULA_CORE_PENDING='" + PENDING_MODULE_CLI + "'; "
+                    + "NEBULA_CORE_CLI=''; "
+                    + "nebula_core_good_phone_proof() { "
+                    + "NEBULA_CORE_PROBE_OUT=$(\"$1\" display lane phone preflight --json 2>/dev/null) || return 1; "
+                    + "printf '%s' \"$NEBULA_CORE_PROBE_OUT\" | grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' || return 1; "
+                    + "printf '%s' \"$NEBULA_CORE_PROBE_OUT\" | grep -q 'NONE_WAYLAND_DISPLAY' || return 1; "
+                    + "printf '%s' \"$NEBULA_CORE_PROBE_OUT\" | grep -Eq 'vkGetMemoryFdKHR_failures[^0-9]*0|vk_get_memory_fd_failures[^0-9]*0' || return 1; "
+                    + "printf '%s' \"$NEBULA_CORE_PROBE_OUT\" | grep -q 'real_buffer_commits[^0-9]*2'; "
+                    + "}; "
+                    + "nebula_core_stale_pending_proof() { "
+                    + "NEBULA_CORE_PROBE_OUT=$(\"$1\" display lane phone preflight --json 2>/dev/null) || return 1; "
+                    + "printf '%s' \"$NEBULA_CORE_PROBE_OUT\" | grep -Eq 'blocked_export|blocked_real_buffer|NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED|vkGetMemoryFdKHR[^0-9]*1199|real_buffer_commits[^0-9]*0'; "
+                    + "}; "
+                    + "if [ -x \"$NEBULA_CORE_ACTIVE\" ]; then "
+                    + "if [ \"${NEBULA_CORE_DEBUG_PENDING:-0}\" = 1 ] && [ -x \"$NEBULA_CORE_PENDING\" ]; then "
+                    + "if nebula_core_good_phone_proof \"$NEBULA_CORE_ACTIVE\" && nebula_core_stale_pending_proof \"$NEBULA_CORE_PENDING\"; then "
+                    + "echo 'Nebula Core pending module rejected by anti-regression guard; using active module' >&2; "
+                    + "NEBULA_CORE_CLI=\"$NEBULA_CORE_ACTIVE\"; "
+                    + "else NEBULA_CORE_CLI=\"$NEBULA_CORE_PENDING\"; fi; "
+                    + "else NEBULA_CORE_CLI=\"$NEBULA_CORE_ACTIVE\"; fi; "
+                    + "elif [ -x \"$NEBULA_CORE_PENDING\" ]; then NEBULA_CORE_CLI=\"$NEBULA_CORE_PENDING\"; "
                     + "else echo 'Nebula Core module path is not visible' >&2; exit 127; fi; "
                     + "exec \"$NEBULA_CORE_CLI\"";
     private static final long TIMEOUT_MS = 2500L;
@@ -49,6 +66,7 @@ public final class NebulaCoreClient {
             "runtime waylandie proton-smoke --json",
             "display lanes --json",
             "display method-containers --json",
+            "display method-profiles --json",
             "display lane phone preflight --json",
             "display lane anland preflight --json",
             "display lane dock preflight --json"
@@ -138,6 +156,10 @@ public final class NebulaCoreClient {
         return runFixed("display", "method-containers", "--json");
     }
 
+    public CommandResult displayMethodProfiles() {
+        return runFixed("display", "method-profiles", "--json");
+    }
+
     public CommandResult displayLanePhonePreflight() {
         return runFixed("display", "lane", "phone", "preflight", "--json");
     }
@@ -155,7 +177,7 @@ public final class NebulaCoreClient {
     }
 
     public String moduleDispatchLabel() {
-        return "fixed_active_or_pending_nebula_core_cli";
+        return "fixed_active_first_nebula_core_cli";
     }
 
     private CommandResult runFixed(String... args) {
@@ -179,6 +201,7 @@ public final class NebulaCoreClient {
                 || "runtime waylandie status --json".equals(logical)
                 || "display lanes --json".equals(logical)
                 || "display method-containers --json".equals(logical)
+                || "display method-profiles --json".equals(logical)
                 || "display lane phone preflight --json".equals(logical)
                 || "display lane anland preflight --json".equals(logical)
                 || "display lane dock preflight --json".equals(logical)) {
@@ -193,6 +216,7 @@ public final class NebulaCoreClient {
                 || "runtime waylandie proton-smoke --json".equals(logical)
                 || "display lanes --json".equals(logical)
                 || "display method-containers --json".equals(logical)
+                || "display method-profiles --json".equals(logical)
                 || "display lane phone preflight --json".equals(logical)
                 || "display lane anland preflight --json".equals(logical)
                 || "display lane dock preflight --json".equals(logical);

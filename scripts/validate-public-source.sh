@@ -35,9 +35,53 @@ grep -q 'io.droidspaces.nebula.waylandie' app/src/main/AndroidManifest.xml
 grep -q 'io.droidspaces.nebula.waylandie' app/src/main/java/io/droidspaces/nebula/MainActivity.java
 grep -q '0.2.0-no-root-nebula13-rootfs-vulkan-smoke' app/src/main/java/io/droidspaces/nebula/MainActivity.java
 grep -q 'WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie' nebula-core-module/bin/nebula-core
-grep -q 'NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED' nebula-core-module/bin/nebula-core
-grep -q 'NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED' docs/integration/REVERSA_FINDINGS_ASSESSMENT.md
-grep -q 'vulkan_export_real_buffer' docs/integration/STATUS_MODEL.md
+grep -q 'fixed_active_first_nebula_core_cli' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'NEBULA_CORE_DEBUG_PENDING' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'pending module rejected by anti-regression guard' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'display method-profiles --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'display method-profiles --json' nebula-core-module/README.md
+grep -q 'display method-profiles --json' docs/integration/UNIFIED_CONTROL_PLANE.md
+grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' nebula-core-module/bin/nebula-core
+grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' docs/integration/REVERSA_FINDINGS_ASSESSMENT.md
+grep -q 'NONE_WAYLAND_DISPLAY' docs/integration/STATUS_MODEL.md
+
+python3 - <<'PY'
+from pathlib import Path
+
+client = Path("app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java").read_text()
+active_first = r'if [ -x \"$NEBULA_CORE_ACTIVE\" ]; then'
+pending_fallback = r'elif [ -x \"$NEBULA_CORE_PENDING\" ]; then NEBULA_CORE_CLI=\"$NEBULA_CORE_PENDING\";'
+if active_first not in client or pending_fallback not in client:
+    raise SystemExit("NebulaCoreClient missing active-first dispatch/fallback markers")
+if client.index(active_first) > client.index(pending_fallback):
+    raise SystemExit("NebulaCoreClient must check active module before pending fallback")
+if "fixed_pending_or_active_nebula_core_cli" in client:
+    raise SystemExit("NebulaCoreClient regressed to pending-first label")
+
+for path in [
+    "README.md",
+    "docs/integration/UNIFIED_CONTROL_PLANE.md",
+    "docs/integration/BASELINE_INTEGRATIONS.md",
+    "docs/integration/CONTROL_PLANE_POLICY.md",
+    "nebula-core-module/README.md",
+    "app/src/main/java/io/droidspaces/nebula/MainActivity.java",
+    "nebula-core-module/bin/nebula-core",
+]:
+    text = Path(path).read_text()
+    forbidden = [
+        "NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED",
+        "vkGetMemoryFdKHR failures and zero real-buffer commits",
+        "vkGetMemoryFdKHR failures, 0 real-buffer commits",
+        "prefers that pending CLI before",
+        "prefers that fixed pending CLI before",
+        "hardware GLX and real-buffer pass are not proven",
+        "Current blocker: " + "Vulkan export / " + "real-buffer path",
+        "loader-pin confirmed, not a full A1",
+    ]
+    for marker in forbidden:
+        if marker in text:
+            raise SystemExit(f"{path} still contains stale regression marker: {marker}")
+PY
 
 for pattern in \
   'out/' \

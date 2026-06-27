@@ -18,6 +18,22 @@ export NEBULA_MODULE_DIR="$repo_root/nebula-core-module"
 export NEBULA_MODULE_PROP="$repo_root/nebula-core-module/module.prop"
 export NEBULA_GIT_COMMIT="host-test"
 
+python3 - "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java" <<'PY'
+from pathlib import Path
+import sys
+
+text = Path(sys.argv[1]).read_text()
+active_first = r'if [ -x \"$NEBULA_CORE_ACTIVE\" ]; then'
+pending_fallback = r'elif [ -x \"$NEBULA_CORE_PENDING\" ]; then NEBULA_CORE_CLI=\"$NEBULA_CORE_PENDING\";'
+assert 'fixed_active_first_nebula_core_cli' in text
+assert 'NEBULA_CORE_DEBUG_PENDING' in text
+assert 'pending module rejected by anti-regression guard' in text
+assert active_first in text
+assert pending_fallback in text
+assert text.index(active_first) < text.index(pending_fallback)
+assert 'fixed_pending_or_active_nebula_core_cli' not in text
+PY
+
 json_field() {
   python3 - "$1" "$2" <<'PY'
 import json, sys
@@ -105,16 +121,14 @@ obj = json.loads(sys.argv[1])
 model = obj["status_model"]
 assert model["source"] == "evidence_snapshot"
 phone = model["phone_app"]
-assert phone["real_buffer_pass"] is False
+assert phone["real_buffer_pass"] is True
 assert phone["hardware_glx_pass"] is False
 assert phone["software_glx_reproduced"] is True
-assert phone["gl_renderer"] == "llvmpipe"
-assert phone["active_blocker"] == "vulkan_export_real_buffer"
-assert phone["vk_get_memory_fd_failures"] == 1199
-assert phone["real_buffer_commits"] == 0
-assert phone["no_buffer_commits"] == 8
-assert phone["a1_fasttest_env_status"] == "staged_not_run_adb_offline"
-assert model["dock"]["dock_lease_state"] == "paused_crash_gated"
+assert phone["active_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert phone["vk_get_memory_fd_failures"] == 0
+assert phone["real_buffer_commits"] == 2
+assert phone["runtime_blocker"] == "GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA"
+assert model["dock"]["dock_lease_state"] == "proven_reference_not_wired"
 assert model["hook_lane"]["rezygisk_provider_state"] == "documented_not_installed"
 assert model["hook_lane"]["hook_ready"] is False
 assert model["cooling"]["cooling_policy_state"] == "preview_only"
@@ -270,6 +284,11 @@ assert obj["protocol_version"] == 1
 assert obj["command"] == "runtime waylandie status"
 assert obj["package"] == "io.droidspaces.nebula.waylandie"
 assert obj["method"] == "root_assisted_proot"
+assert obj["path_policy"] == "live_package_path_first_stable_app_data"
+assert obj["package_path"].endswith("/io.droidspaces.nebula.waylandie/base.apk")
+assert obj["native_lib_dir"].endswith("/waylandie-lib")
+assert obj["glibc_loader"].endswith("/libld_glibc.so")
+assert obj["proot_path"].endswith("/libproot.so")
 assert obj["installed"] is True
 assert obj["imagefs_present"] is True
 assert obj["proot_present"] is True
@@ -285,6 +304,9 @@ assert obj["selected_icd"].endswith("/files/imagefs/usr/local/etc/vulkan/icd.d/f
 assert obj["selected_vulkan_driver"].endswith("/files/imagefs/usr/local/lib/libvulkan_freedreno.so")
 assert obj["loader_pin"]["VK_ICD_FILENAMES"] == obj["selected_icd"]
 assert obj["loader_pin"]["VK_DRIVER_FILES"] == obj["selected_icd"]
+assert obj["bridge_path"].endswith("/files/imagefs/usr/local/bin/waylandie-wayland-bridge")
+assert obj["gamescope_path"].endswith("/xwayland-gamescope-14-exportable-fence-guard-a4-473ba531/usr/local/bin/gamescope")
+assert obj["xwayland_path"].endswith("/xwayland-gamescope-06-xwayland-9f1a3d62/usr/bin/Xwayland")
 assert obj["gamescope_sidecar_present"] is True
 assert obj["xwayland_sidecar_present"] is True
 assert obj["errors"] == []
@@ -409,52 +431,52 @@ assert obj["protocol_version"] == 1
 assert obj["command"] == "display lanes"
 assert obj["selector"] == "multi_lane"
 lanes = {item["id"]: item for item in obj["lanes"]}
-assert lanes["phone_app_bridge"]["status"] == "blocked_export"
-assert lanes["phone_app_bridge"]["state"] == "blocked_export"
+assert lanes["phone_app_bridge"]["status"] == "wayland_display_pass"
+assert lanes["phone_app_bridge"]["state"] == "wayland_display_pass"
 assert lanes["phone_app_bridge"]["method_id"] == "phone_app_bridge"
-assert lanes["phone_app_bridge"]["available"] is False
+assert lanes["phone_app_bridge"]["available"] is True
 assert lanes["phone_app_bridge"]["container_ref"] == "waylandie_app_imagefs"
 assert lanes["phone_app_bridge"]["container_kind"] == "app_proot"
 assert lanes["phone_app_bridge"]["container_status"] == "ready"
-assert lanes["phone_app_bridge"]["display_status"] == "export_blocked"
-assert lanes["phone_app_bridge"]["runtime_status"] == "runtime_export_blocked"
-assert lanes["phone_app_bridge"]["requirement_status"] == "blocked_export"
-assert "vulkan_export_real_buffer" in lanes["phone_app_bridge"]["missing_requirements"]
-assert "a1_fasttest_env_not_run_adb_offline" in lanes["phone_app_bridge"]["missing_requirements"]
+assert lanes["phone_app_bridge"]["display_status"] == "display_proven"
+assert lanes["phone_app_bridge"]["runtime_status"] == "runtime_ready"
+assert lanes["phone_app_bridge"]["requirement_status"] == "display_requirements_met"
+assert "vulkan_export_real_buffer" not in lanes["phone_app_bridge"]["missing_requirements"]
+assert "a1_fasttest_env_not_run_adb_offline" not in lanes["phone_app_bridge"]["missing_requirements"]
 assert "game_client_runtime_proof_not_promoted_39bit_va" in lanes["phone_app_bridge"]["missing_requirements"]
 assert lanes["phone_app_bridge"]["mutating"] is False
 assert lanes["phone_app_bridge"]["launch_command_available"] is False
-assert lanes["phone_app_bridge"]["active_blocker"] == "vulkan_export_real_buffer"
-assert lanes["phone_app_bridge"]["canonical_blocker"] == "vulkan_export_real_buffer"
-assert lanes["phone_app_bridge"]["proof_classification"] == "NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED"
-assert lanes["phone_app_bridge"]["proof_metrics"]["summary_failures"] == 1199
-assert lanes["phone_app_bridge"]["proof_metrics"]["vkGetMemoryFdKHR_failures"] == 1199
-assert lanes["phone_app_bridge"]["proof_metrics"]["vk_get_memory_fd_failures"] == 1199
-assert lanes["phone_app_bridge"]["proof_metrics"]["real_buffer_commits"] == 0
-assert lanes["phone_app_bridge"]["proof_metrics"]["no_buffer_commits"] == 8
-assert lanes["phone_app_bridge"]["lead_status"] == "blocked_export"
-assert lanes["phone_app_bridge"]["next_reversa_action"] == "bounded_a1_export_runtime_after_adb_live"
+assert lanes["phone_app_bridge"]["active_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert lanes["phone_app_bridge"]["canonical_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert lanes["phone_app_bridge"]["proof_classification"] == "NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS"
+assert lanes["phone_app_bridge"]["proof_metrics"]["summary_failures"] == 0
+assert lanes["phone_app_bridge"]["proof_metrics"]["vkGetMemoryFdKHR_failures"] == 0
+assert lanes["phone_app_bridge"]["proof_metrics"]["vk_get_memory_fd_failures"] == 0
+assert lanes["phone_app_bridge"]["proof_metrics"]["real_buffer_commits"] == 2
+assert lanes["phone_app_bridge"]["lead_status"] == "display_proven"
+assert lanes["phone_app_bridge"]["proven_trick"] == "gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf"
+assert lanes["phone_app_bridge"]["next_reversa_action"] == "bounded_game_client_runtime_before_steam"
 assert lanes["phone_app_bridge"]["steam_allowed"] is False
-assert lanes["phone_app_bridge"]["proton_ready"] is False
-assert lanes["phone_app_bridge"]["steam_ready"] is False
-assert lanes["phone_app_bridge"]["wine_ready"] is False
 assert lanes["phone_app_bridge"]["kernel_va_bits_constraint"] == 39
 assert lanes["phone_app_bridge"]["kernel_va_bits_evidence"] == "live_proc_config_gz"
-assert lanes["phone_app_bridge"]["runtime_blocker"] == "vulkan_export_real_buffer"
-assert lanes["phone_app_bridge"]["real_buffer_pass"] is False
+assert lanes["phone_app_bridge"]["runtime_blocker"] == "GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA"
+assert lanes["phone_app_bridge"]["real_buffer_pass"] is True
 assert lanes["phone_app_bridge"]["hardware_glx_pass"] is False
 assert lanes["phone_app_bridge"]["software_glx_reproduced"] is True
-assert lanes["phone_app_bridge"]["gl_renderer"] == "llvmpipe"
-assert lanes["phone_app_bridge"]["vk_get_memory_fd_failures"] == 1199
-assert lanes["phone_app_bridge"]["real_buffer_commits"] == 0
-assert lanes["phone_app_bridge"]["no_buffer_commits"] == 8
-assert lanes["phone_app_bridge"]["a1_fasttest_env_status"] == "staged_not_run_adb_offline"
+assert lanes["phone_app_bridge"]["vk_get_memory_fd_failures"] == 0
+assert lanes["phone_app_bridge"]["real_buffer_commits"] == 2
+assert lanes["phone_app_bridge"]["path_policy"] == "live_package_path_first_stable_app_data"
+assert lanes["phone_app_bridge"]["package_path"].endswith("/io.droidspaces.nebula.waylandie/base.apk")
+assert lanes["phone_app_bridge"]["native_lib_dir"].endswith("/waylandie-lib")
+assert lanes["phone_app_bridge"]["glibc_loader"].endswith("/libld_glibc.so")
 assert lanes["phone_app_bridge"]["selected_icd"].endswith("/files/imagefs/usr/local/etc/vulkan/icd.d/freedreno_icd.json")
 assert lanes["phone_app_bridge"]["selected_vulkan_driver"].endswith("/files/imagefs/usr/local/lib/libvulkan_freedreno.so")
 assert lanes["phone_app_bridge"]["loader_pin"]["VK_ICD_FILENAMES"] == lanes["phone_app_bridge"]["selected_icd"]
 assert lanes["phone_app_bridge"]["loader_pin"]["VK_DRIVER_FILES"] == lanes["phone_app_bridge"]["selected_icd"]
 assert lanes["phone_app_bridge"]["checks"]["display_ready"] is True
 assert lanes["phone_app_bridge"]["checks"]["runtime_ready"] is True
+assert lanes["phone_app_bridge"]["checks"]["native_lib_dir_present"] is True
+assert lanes["phone_app_bridge"]["checks"]["glibc_loader_present"] is True
 assert lanes["phone_app_bridge"]["checks"]["local_icd_present"] is True
 assert lanes["phone_app_bridge"]["checks"]["local_vulkan_driver_present"] is True
 assert lanes["phone_app_bridge"]["checks"]["gamescope_sidecar_present"] is True
@@ -479,16 +501,15 @@ assert lanes["anland_surface"]["checks"]["display_daemon_socket"] is True
 assert lanes["anland_surface"]["checks"]["display_daemon_socket_writable"] is True
 assert lanes["anland_surface"]["checks"]["anland_producer"] is True
 assert lanes["anland_surface"]["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
-assert lanes["dock_drm_lease_external"]["status"] == "paused_crash_gated"
-assert lanes["dock_drm_lease_external"]["state"] == "paused_crash_gated"
-assert lanes["dock_drm_lease_external"]["dock_lease_state"] == "paused_crash_gated"
+assert lanes["dock_drm_lease_external"]["status"] == "proven_reference_not_wired"
+assert lanes["dock_drm_lease_external"]["state"] == "proven_reference_not_wired"
+assert lanes["dock_drm_lease_external"]["dock_lease_state"] == "proven_reference_not_wired"
 assert lanes["dock_drm_lease_external"]["method_id"] == "dock_drm_lease_external"
 assert lanes["dock_drm_lease_external"]["container_ref"] == "none"
 assert lanes["dock_drm_lease_external"]["container_kind"] == "none"
-assert lanes["dock_drm_lease_external"]["display_status"] == "paused_crash_gated"
+assert lanes["dock_drm_lease_external"]["display_status"] == "reference_only"
 assert lanes["dock_drm_lease_external"]["runtime_status"] == "not_required"
-assert lanes["dock_drm_lease_external"]["requirement_status"] == "crashdump_gated_resume_required"
-assert "crashdump_gated_resume_required" in lanes["dock_drm_lease_external"]["missing_requirements"]
+assert lanes["dock_drm_lease_external"]["requirement_status"] == "reference_requirements_known"
 assert "external_display_discovery_required" in lanes["dock_drm_lease_external"]["missing_requirements"]
 assert lanes["dock_drm_lease_external"]["evidence_captured"] is True
 assert lanes["dock_drm_lease_external"]["operator_required"] is True
@@ -496,14 +517,10 @@ assert lanes["dock_drm_lease_external"]["external_display_only"] is True
 assert lanes["dock_drm_lease_external"]["start_command_available"] is False
 assert lanes["dock_drm_lease_external"]["reported_objects"]["hardcoded_forbidden"] is True
 assert lanes["compatibility"]["method_id"] == "compatibility_software"
-assert lanes["compatibility"]["status"] == "blocked_real_buffer"
-assert lanes["compatibility"]["state"] == "blocked_real_buffer"
-assert lanes["compatibility"]["requirement_status"] == "blocked_real_buffer"
-assert "real_buffer_commits_missing" in lanes["compatibility"]["missing_requirements"]
-assert lanes["compatibility"]["real_buffer_pass"] is False
-assert lanes["compatibility"]["hardware_glx_pass"] is False
-assert lanes["compatibility"]["software_glx_reproduced"] is True
-assert lanes["compatibility"]["gl_renderer"] == "llvmpipe"
+assert lanes["compatibility"]["status"] == "not_wired"
+assert lanes["compatibility"]["state"] == "not_wired"
+assert lanes["compatibility"]["requirement_status"] == "not_wired"
+assert "implementation_not_wired" in lanes["compatibility"]["missing_requirements"]
 assert lanes["recovery_safe"]["method_id"] == "recovery_safe"
 assert lanes["recovery_safe"]["requirement_status"] == "complete"
 assert "no_lane_silently_replaces_another" in obj["selection_rules"]
@@ -521,16 +538,14 @@ assert obj["command"] == "display method-containers"
 containers = {item["method_id"]: item for item in obj["containers"]}
 assert containers["phone_app_bridge"]["container_ref"] == "waylandie_app_imagefs"
 assert containers["phone_app_bridge"]["container_kind"] == "app_proot"
-assert containers["phone_app_bridge"]["status"] == "blocked_export"
-assert containers["phone_app_bridge"]["state"] == "blocked_export"
-assert containers["phone_app_bridge"]["current_limit"] == "vulkan_export_real_buffer"
-assert containers["phone_app_bridge"]["real_buffer_pass"] is False
+assert containers["phone_app_bridge"]["status"] == "display_proven"
+assert containers["phone_app_bridge"]["state"] == "wayland_display_pass"
+assert containers["phone_app_bridge"]["current_limit"] == "game_client_runtime_proof_not_promoted_39bit_va"
+assert containers["phone_app_bridge"]["real_buffer_pass"] is True
 assert containers["phone_app_bridge"]["hardware_glx_pass"] is False
 assert containers["phone_app_bridge"]["software_glx_reproduced"] is True
-assert containers["phone_app_bridge"]["gl_renderer"] == "llvmpipe"
-assert containers["phone_app_bridge"]["vk_get_memory_fd_failures"] == 1199
-assert containers["phone_app_bridge"]["real_buffer_commits"] == 0
-assert containers["phone_app_bridge"]["no_buffer_commits"] == 8
+assert containers["phone_app_bridge"]["vk_get_memory_fd_failures"] == 0
+assert containers["phone_app_bridge"]["real_buffer_commits"] == 2
 anland = containers["anland_surface"]
 assert anland["container_kind"] == "droidspaces"
 assert anland["container_ref"] == "ubuntu"
@@ -634,32 +649,35 @@ obj = json.loads(sys.argv[1])
 assert obj["protocol_version"] == 1
 assert obj["command"] == "display lane phone preflight"
 assert obj["id"] == "phone_app_bridge"
-assert obj["status"] == "blocked_export"
-assert obj["state"] == "blocked_export"
-assert obj["available"] is False
+assert obj["status"] == "wayland_display_pass"
+assert obj["state"] == "wayland_display_pass"
+assert obj["available"] is True
 assert obj["mutating"] is False
 assert obj["launch_command_available"] is False
-assert obj["active_blocker"] == "vulkan_export_real_buffer"
-assert obj["proof_classification"] == "NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED"
-assert obj["lead_status"] == "blocked_export"
-assert obj["next_reversa_action"] == "bounded_a1_export_runtime_after_adb_live"
+assert obj["active_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert obj["proof_classification"] == "NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS"
+assert obj["lead_status"] == "display_proven"
+assert obj["next_reversa_action"] == "bounded_game_client_runtime_before_steam"
 assert obj["steam_allowed"] is False
-assert obj["proton_ready"] is False
-assert obj["steam_ready"] is False
-assert obj["wine_ready"] is False
 assert obj["kernel_va_bits_constraint"] == 39
 assert obj["kernel_va_bits_evidence"] == "live_proc_config_gz"
-assert obj["runtime_blocker"] == "vulkan_export_real_buffer"
-assert obj["real_buffer_pass"] is False
+assert obj["runtime_blocker"] == "GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA"
+assert obj["real_buffer_pass"] is True
 assert obj["hardware_glx_pass"] is False
 assert obj["software_glx_reproduced"] is True
-assert obj["gl_renderer"] == "llvmpipe"
-assert obj["vk_get_memory_fd_failures"] == 1199
-assert obj["real_buffer_commits"] == 0
-assert obj["no_buffer_commits"] == 8
-assert obj["a1_fasttest_env_status"] == "staged_not_run_adb_offline"
+assert obj["vk_get_memory_fd_failures"] == 0
+assert obj["real_buffer_commits"] == 2
+assert obj["path_policy"] == "live_package_path_first_stable_app_data"
+assert obj["package_path"].endswith("/io.droidspaces.nebula.waylandie/base.apk")
+assert obj["native_lib_dir"].endswith("/waylandie-lib")
+assert obj["glibc_loader"].endswith("/libld_glibc.so")
+assert obj["bridge_path"].endswith("/files/imagefs/usr/local/bin/waylandie-wayland-bridge")
+assert obj["gamescope_path"].endswith("/xwayland-gamescope-14-exportable-fence-guard-a4-473ba531/usr/local/bin/gamescope")
+assert obj["xwayland_path"].endswith("/xwayland-gamescope-06-xwayland-9f1a3d62/usr/bin/Xwayland")
 assert obj["checks"]["display_ready"] is True
 assert obj["checks"]["runtime_ready"] is True
+assert obj["checks"]["native_lib_dir_present"] is True
+assert obj["checks"]["glibc_loader_present"] is True
 assert obj["checks"]["gamescope_sidecar_present"] is True
 assert obj["checks"]["xwayland_sidecar_present"] is True
 PY
@@ -1011,9 +1029,9 @@ obj = json.loads(sys.argv[1])
 assert obj["protocol_version"] == 1
 assert obj["command"] == "display lane dock preflight"
 assert obj["id"] == "dock_drm_lease_external"
-assert obj["status"] == "paused_crash_gated"
-assert obj["state"] == "paused_crash_gated"
-assert obj["dock_lease_state"] == "paused_crash_gated"
+assert obj["status"] == "proven_reference_not_wired"
+assert obj["state"] == "proven_reference_not_wired"
+assert obj["dock_lease_state"] == "proven_reference_not_wired"
 assert obj["available"] is False
 assert obj["mutating"] is False
 assert obj["start_command_available"] is False
@@ -1022,6 +1040,10 @@ assert obj["operator_required"] is True
 assert obj["external_display_only"] is True
 assert obj["internal_panel_allowed"] is False
 assert obj["whole_card_takeover"] is False
+assert obj["display_status"] == "reference_only"
+assert obj["requirement_status"] == "reference_requirements_known"
+assert "external_display_discovery_required" in obj["missing_requirements"]
+assert "lease_receiver_not_wired" in obj["missing_requirements"]
 assert obj["reported_objects"]["connector"] == 89
 assert obj["reported_objects"]["hardcoded_forbidden"] is True
 PY
@@ -1321,35 +1343,40 @@ obj = json.loads(sys.argv[1])
 assert obj["protocol_version"] == 1
 assert obj["command"] == "integrations baseline"
 assert obj["baseline_id"] == "nebula_rm11pro_baseline"
-assert obj["overall_status"] == "baseline_export_blocked_read_only"
+assert obj["overall_status"] == "baseline_ready_read_only"
 assert obj["safe_default"] is True
 assert obj["mutating_controls_enabled"] is False
 items = {item["id"]: item for item in obj["integrations"]}
 assert items["nebula_core"]["ready"] is True
-assert items["waylandie"]["status"] == "blocked_export"
-assert items["waylandie"]["state"] == "blocked_export"
+assert items["waylandie"]["status"] == "display_ready"
+assert items["waylandie"]["state"] == "wayland_display_pass"
 assert items["waylandie"]["method_id"] == "phone_app_bridge"
+assert items["waylandie"]["path_policy"] == "live_package_path_first_stable_app_data"
+assert items["waylandie"]["package_path"].endswith("/io.droidspaces.nebula.waylandie/base.apk")
+assert items["waylandie"]["native_lib_dir"].endswith("/waylandie-lib")
+assert items["waylandie"]["glibc_loader"].endswith("/libld_glibc.so")
+assert items["waylandie"]["selected_icd"].endswith("/files/imagefs/usr/local/etc/vulkan/icd.d/freedreno_icd.json")
+assert items["waylandie"]["selected_vulkan_driver"].endswith("/files/imagefs/usr/local/lib/libvulkan_freedreno.so")
+assert items["waylandie"]["loader_pin"]["VK_ICD_FILENAMES"] == items["waylandie"]["selected_icd"]
+assert items["waylandie"]["loader_pin"]["VK_DRIVER_FILES"] == items["waylandie"]["selected_icd"]
 assert items["waylandie"]["container_ref"] == "waylandie_app_imagefs"
 assert items["waylandie"]["container_kind"] == "app_proot"
 assert items["waylandie"]["container_status"] == "ready"
-assert items["waylandie"]["display_status"] == "export_blocked"
-assert items["waylandie"]["runtime_status"] == "runtime_export_blocked"
-assert items["waylandie"]["requirement_status"] == "blocked_export"
-assert "vulkan_export_real_buffer" in items["waylandie"]["missing_requirements"]
-assert "a1_fasttest_env_not_run_adb_offline" in items["waylandie"]["missing_requirements"]
+assert items["waylandie"]["display_status"] == "display_proven"
+assert items["waylandie"]["runtime_status"] == "runtime_ready"
+assert items["waylandie"]["requirement_status"] == "display_requirements_met"
+assert "vulkan_export_real_buffer" not in items["waylandie"]["missing_requirements"]
+assert "a1_fasttest_env_not_run_adb_offline" not in items["waylandie"]["missing_requirements"]
 assert "game_client_runtime_proof_not_promoted_39bit_va" in items["waylandie"]["missing_requirements"]
-assert items["waylandie"]["ready"] is False
-assert items["waylandie"]["display_ready"] is False
-assert items["waylandie"]["runtime_ready"] is False
-assert items["waylandie"]["active_blocker"] == "vulkan_export_real_buffer"
-assert items["waylandie"]["real_buffer_pass"] is False
+assert items["waylandie"]["ready"] is True
+assert items["waylandie"]["display_ready"] is True
+assert items["waylandie"]["runtime_ready"] is True
+assert items["waylandie"]["active_blocker"] == "NONE_WAYLAND_DISPLAY"
+assert items["waylandie"]["real_buffer_pass"] is True
 assert items["waylandie"]["hardware_glx_pass"] is False
 assert items["waylandie"]["software_glx_reproduced"] is True
-assert items["waylandie"]["gl_renderer"] == "llvmpipe"
-assert items["waylandie"]["vk_get_memory_fd_failures"] == 1199
-assert items["waylandie"]["real_buffer_commits"] == 0
-assert items["waylandie"]["no_buffer_commits"] == 8
-assert items["waylandie"]["a1_fasttest_env_status"] == "staged_not_run_adb_offline"
+assert items["waylandie"]["vk_get_memory_fd_failures"] == 0
+assert items["waylandie"]["real_buffer_commits"] == 2
 assert items["waylandie"]["mutating"] is False
 assert items["droidspaces"]["status"] == "preflight_ready"
 assert items["droidspaces"]["method_id"] == "anland_surface"
@@ -1392,8 +1419,8 @@ assert items["powerdeck"]["status"] == "external_module_detected_dry_run_require
 assert items["powerdeck"]["ready"] is True
 assert items["powerdeck"]["dry_run_required"] is True
 assert "status_before_mutation" in obj["guardrails"]
-assert "wayland_export_blocker_not_glx_visuals" in obj["guardrails"]
-assert obj["next_step"] == "bounded_a1_export_runtime_after_adb_live"
+assert "preserve_wayland_real_buffer_pass" in obj["guardrails"]
+assert obj["next_step"] == "bounded_game_client_runtime_before_steam"
 PY
 
 rm -f "$active_root/data/local/Droidspaces/Pids/rm11-second.pid"
@@ -1410,7 +1437,7 @@ active_baseline="$(
 python3 - "$active_baseline" <<'PY'
 import json, sys
 obj = json.loads(sys.argv[1])
-assert obj["overall_status"] == "baseline_export_blocked_read_only"
+assert obj["overall_status"] == "baseline_ready_read_only"
 items = {item["id"]: item for item in obj["integrations"]}
 ds = items["droidspaces"]
 assert ds["status"] == "container_runtime_ready"

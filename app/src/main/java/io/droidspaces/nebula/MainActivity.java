@@ -95,7 +95,7 @@ public final class MainActivity extends Activity {
                     "waylandie",
                     "app_surface",
                     true,
-                    "WayLandIE bridge profile. App/native bridge is solved; Vulkan export and real-buffer runtime proof are still blocked.",
+                    "WayLandIE bridge profile. Display proof is solved with real-buffer commits; game-client runtime remains unpromoted under the 39-bit VA constraint.",
                     Arrays.asList("boot_completed", "SurfaceFlinger PID", "composer PID"),
                     Arrays.asList("CREATE_LEASE", "composer fd probing", "wlroots DRM backend")),
             new TargetProfile(
@@ -134,7 +134,7 @@ public final class MainActivity extends Activity {
                     "Zero-copy display",
                     "WayLandIE proof",
                     "dmabuf/fd-passing display target for Linux apps and games.",
-                    "Current state: software GLX reproduced with llvmpipe; pinned ICD/driver path confirmed; vkGetMemoryFdKHR failures and zero real-buffer commits still block full runtime proof.",
+                    "Current state: phone active module proves WayLandIE/Gamescope/Xwayland display, zero vkGetMemoryFdKHR failures, and two real-buffer commits; game-client runtime remains the next bounded proof.",
                     Arrays.asList(
                             new Target("WayLandIE Display", "io.droidspaces.nebula.waylandie",
                                     "0.2.0-no-root-nebula13-rootfs-vulkan-smoke",
@@ -206,6 +206,7 @@ public final class MainActivity extends Activity {
     private JSONObject waylandieRuntimeStatus;
     private JSONObject displayLanesStatus;
     private JSONObject displayMethodContainersStatus;
+    private JSONObject displayMethodProfilesStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -352,6 +353,7 @@ public final class MainActivity extends Activity {
         waylandieRuntimeStatus = loadWaylandieRuntimeStatus();
         displayLanesStatus = loadDisplayLanesStatus();
         displayMethodContainersStatus = loadDisplayMethodContainersStatus();
+        displayMethodProfilesStatus = loadDisplayMethodProfilesStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
@@ -835,6 +837,18 @@ public final class MainActivity extends Activity {
         }
         if (integration.has("active_blocker")) {
             builder.append("\nblocker=").append(integration.optString("active_blocker", "unknown"));
+        }
+        if (integration.has("path_policy")) {
+            builder.append("\npathPolicy=").append(integration.optString("path_policy", "unknown"));
+        }
+        if (integration.has("package_path")) {
+            builder.append("\npackagePath=").append(integration.optString("package_path", "unknown"));
+        }
+        if (integration.has("native_lib_dir")) {
+            builder.append("\nnativeLibDir=").append(integration.optString("native_lib_dir", "unknown"));
+        }
+        if (integration.has("glibc_loader")) {
+            builder.append("\nglibcLoader=").append(integration.optString("glibc_loader", "unknown"));
         }
         if (integration.has("software_glx_reproduced")) {
             builder.append("\nsoftwareGlx=")
@@ -1524,6 +1538,21 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private JSONObject loadDisplayMethodProfilesStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.displayMethodProfiles();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
     private View buildDisplayLanesCard() {
         LinearLayout card = baseCard();
 
@@ -1564,6 +1593,10 @@ public final class MainActivity extends Activity {
         methodContainers.setTypeface(Typeface.MONOSPACE);
         methodContainers.setPadding(0, dp(10), 0, 0);
         card.addView(methodContainers);
+        TextView methodProfiles = text(displayMethodProfilesSummary(), 12, MUTED, Typeface.NORMAL);
+        methodProfiles.setTypeface(Typeface.MONOSPACE);
+        methodProfiles.setPadding(0, dp(10), 0, 0);
+        card.addView(methodProfiles);
         return card;
     }
 
@@ -1598,6 +1631,34 @@ public final class MainActivity extends Activity {
                         .append(container.optString("recommended_container", "unknown"));
             }
             builder.append(" status=").append(container.optString("status", "unknown"));
+        }
+        return builder.toString();
+    }
+
+    private String displayMethodProfilesSummary() {
+        if (displayMethodProfilesStatus == null) {
+            return "methodProfiles=unavailable";
+        }
+        JSONArray profiles = displayMethodProfilesStatus.optJSONArray("profiles");
+        if (profiles == null || profiles.length() == 0) {
+            return "methodProfiles=empty";
+        }
+        StringBuilder builder = new StringBuilder("methodProfiles=");
+        for (int i = 0; i < profiles.length(); i++) {
+            JSONObject profile = profiles.optJSONObject(i);
+            if (profile == null) continue;
+            if (i > 0) builder.append("\n  ");
+            builder.append(profile.optString("profile_id", "unknown"))
+                    .append(" -> ")
+                    .append(profile.optString("method_id", "unknown"));
+            if (profile.has("container_name")) {
+                builder.append(" container=")
+                        .append(profile.optString("container_name", "unknown"));
+            }
+            if (profile.has("rootfs_mode")) {
+                builder.append(" rootfs=")
+                        .append(profile.optString("rootfs_mode", "unknown"));
+            }
         }
         return builder.toString();
     }
@@ -1641,7 +1702,7 @@ public final class MainActivity extends Activity {
         if ("blocked_real_buffer".equals(status)) return "Real buffer";
         if ("paused_crash_gated".equals(status)) return "Crash-gated";
         if ("reference_only".equals(status)) return "Reference";
-        if (status.contains("wayland") && status.contains("pass")) return "Legacy";
+        if (status.contains("wayland") && status.contains("pass")) return "Wayland";
         if ("display_preflight_incomplete".equals(status)) return "Partial";
         if ("ready_for_glx_fix".equals(status)) return "Legacy";
         if ("container_runtime_ready".equals(status)) return "Runtime";
@@ -1752,13 +1813,25 @@ public final class MainActivity extends Activity {
 	        if (lane.has("selected_icd")) {
 	            builder.append("\nselectedIcd=").append(lane.optString("selected_icd"));
 	        }
-	        if (lane.has("selected_vulkan_driver")) {
-	            builder.append("\nselectedDriver=").append(lane.optString("selected_vulkan_driver"));
-	        }
-	        builder.append(loaderPinLines(lane));
-	        if (lane.has("runtime_constraint")) {
-	            builder.append("\nruntimeConstraint=").append(lane.optString("runtime_constraint"));
-	        }
+        if (lane.has("selected_vulkan_driver")) {
+            builder.append("\nselectedDriver=").append(lane.optString("selected_vulkan_driver"));
+        }
+        if (lane.has("path_policy")) {
+            builder.append("\npathPolicy=").append(lane.optString("path_policy"));
+        }
+        if (lane.has("package_path")) {
+            builder.append("\npackagePath=").append(lane.optString("package_path"));
+        }
+        if (lane.has("native_lib_dir")) {
+            builder.append("\nnativeLibDir=").append(lane.optString("native_lib_dir"));
+        }
+        if (lane.has("glibc_loader")) {
+            builder.append("\nglibcLoader=").append(lane.optString("glibc_loader"));
+        }
+	    builder.append(loaderPinLines(lane));
+	    if (lane.has("runtime_constraint")) {
+	        builder.append("\nruntimeConstraint=").append(lane.optString("runtime_constraint"));
+	    }
         if (lane.has("evidence_captured")) {
             builder.append("\nevidenceCaptured=").append(lane.optBoolean("evidence_captured", false));
             builder.append("  externalOnly=").append(lane.optBoolean("external_display_only", false));
@@ -1827,6 +1900,10 @@ public final class MainActivity extends Activity {
         }
 	        return "package=" + object.optString("package", "unknown")
 	                + "\nmethod=" + object.optString("method", "unknown")
+	                + "\npathPolicy=" + object.optString("path_policy", "unknown")
+	                + "\npackagePath=" + object.optString("package_path", "unknown")
+	                + "\nnativeLibDir=" + object.optString("native_lib_dir", "unknown")
+	                + "\nglibcLoader=" + object.optString("glibc_loader", "unknown")
 	                + "\nready=" + object.optBoolean("ready", false)
 	                + "\nsafeMode=" + object.optBoolean("safe_mode", false)
 	                + "\nimagefs=" + jsonBoolLabel(object, "imagefs_present")
@@ -2271,6 +2348,22 @@ public final class MainActivity extends Activity {
 	                        sb.append("    selectedDriver=")
 	                                .append(lane.optString("selected_vulkan_driver")).append('\n');
 	                    }
+	                    if (lane.has("path_policy")) {
+	                        sb.append("    pathPolicy=")
+	                                .append(lane.optString("path_policy")).append('\n');
+	                    }
+	                    if (lane.has("package_path")) {
+	                        sb.append("    packagePath=")
+	                                .append(lane.optString("package_path")).append('\n');
+	                    }
+	                    if (lane.has("native_lib_dir")) {
+	                        sb.append("    nativeLibDir=")
+	                                .append(lane.optString("native_lib_dir")).append('\n');
+	                    }
+	                    if (lane.has("glibc_loader")) {
+	                        sb.append("    glibcLoader=")
+	                                .append(lane.optString("glibc_loader")).append('\n');
+	                    }
 	                    JSONObject loaderPin = lane.optJSONObject("loader_pin");
 	                    if (loaderPin != null) {
 	                        sb.append("    VK_ICD_FILENAMES=")
@@ -2310,6 +2403,41 @@ public final class MainActivity extends Activity {
                     JSONArray missing = container.optJSONArray("missing_requirements");
                     if (missing != null && missing.length() > 0) {
                         sb.append("    missing=").append(missing).append('\n');
+                    }
+                }
+            }
+            sb.append('\n');
+        }
+
+        sb.append("[Method Profiles]\n");
+        if (displayMethodProfilesStatus == null) {
+            sb.append("  status=unavailable\n\n");
+        } else {
+            sb.append("  rootfsPolicy=")
+                    .append(displayMethodProfilesStatus.optString("rootfs_policy", "unknown"))
+                    .append('\n');
+            JSONArray profiles = displayMethodProfilesStatus.optJSONArray("profiles");
+            if (profiles != null) {
+                for (int i = 0; i < profiles.length(); i++) {
+                    JSONObject profile = profiles.optJSONObject(i);
+                    if (profile == null) continue;
+                    sb.append("  ").append(profile.optString("profile_id", "unknown"))
+                            .append(": ").append(profile.optString("method_id", "unknown"))
+                            .append('\n');
+                    if (profile.has("container_name")) {
+                        sb.append("    container=")
+                                .append(profile.optString("container_name", "unknown"))
+                                .append('\n');
+                    }
+                    if (profile.has("config_path")) {
+                        sb.append("    config=")
+                                .append(profile.optString("config_path", "unknown"))
+                                .append('\n');
+                    }
+                    if (profile.has("env_file")) {
+                        sb.append("    env=")
+                                .append(profile.optString("env_file", "unknown"))
+                                .append('\n');
                     }
                 }
             }

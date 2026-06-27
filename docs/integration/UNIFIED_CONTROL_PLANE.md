@@ -52,10 +52,12 @@ Allowed fixed commands:
 | `legacy modules --json` | Reports protected old Droidspaces module status from fixed module IDs. |
 | `integrations baseline --json` | Reports the one baseline APK/module contract across WayLandIE, DroidSpaces/Anland, Nubia Toolkit, RedMagic Control Center, and PowerDeck without enabling mutating behavior. |
 | `nubia toolkit status --json` | Reports audited Nubia Toolkit, ReZygisk provider, and Vector readiness without enabling hooks. |
-| `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, linker readiness, selected local Freedreno ICD/driver, and the `VK_ICD_FILENAMES` / `VK_DRIVER_FILES` loader pin. |
+| `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, live package/native/linker paths, selected local Freedreno ICD/driver, and the `VK_ICD_FILENAMES` / `VK_DRIVER_FILES` loader pin. |
 | `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
 | `display lanes --json` | Read-only multi-lane selector status for Phone/App, Dock Lease, Anland, Compatibility, and Recovery lanes. |
-| `display lane phone preflight --json` | Read-only WayLandIE/Gamescope/Xwayland lane preflight and active blocker status. |
+| `display method-containers --json` | Read-only display method ownership map for WayLandIE, DroidSpaces/Anland, native DroidSpaces methods, Dock reference, compatibility, and recovery lanes. |
+| `display method-profiles --json` | Read-only DroidSpaces/Anland profile templates for separate rootfs image, rootfs directory, Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio methods. |
+| `display lane phone preflight --json` | Read-only WayLandIE/Gamescope/Xwayland lane preflight, active blocker status, and reinstall-safe live `package_path` / `native_lib_dir` / `glibc_loader` evidence. |
 | `display lane anland preflight --json` | Read-only selected DroidSpaces container, Anland env/socket, and render-node preflight. |
 | `display lane dock preflight --json` | Read-only Dock lease evidence and operator approval requirements. |
 
@@ -65,6 +67,17 @@ Blocked pass 01 activations:
 - `profile set compatibility` returns `BLOCKED_NOT_READY`.
 
 No command accepts arbitrary shell text. The APK client exposes typed methods only.
+The APK dispatches to the active Nebula Core module first:
+`/data/adb/modules/nebula_core/bin/nebula-core`. A pending
+`/data/adb/modules_update/nebula_core/bin/nebula-core` is only a fallback when
+the active module is missing, or an explicit debug/probe override after the
+anti-regression guard rejects stale pending output. This prevents a staged
+module from masking the phone-proven active baseline.
+
+WayLandIE package paths are resolved live from Android package state. Archived
+proof paths under `/data/app/...` are evidence only; they must not be reused as
+fixed launch paths after reinstall because Android rotates the install-instance
+directory while keeping the stable app data directory and sidecar paths intact.
 
 ## Version Lock
 
@@ -150,7 +163,7 @@ Initial lane model:
 
 | Lane | Purpose | Current ownership | Current requirements |
 | --- | --- | --- | --- |
-| Phone/App Mode | Run through the WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | App/native bridge is solved and the pinned local ICD/driver loader path is confirmed. The active blocker is the Vulkan export/real-buffer gate: `vkGetMemoryFdKHR` failures and `0` real-buffer commits keep full runtime success unpromoted. Steam/Proton remains unpromoted until a bounded game-client proof promotes it. |
+| Phone/App Mode | Run through the WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Phone active module proves `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`, `NONE_WAYLAND_DISPLAY`, `vkGetMemoryFdKHR` failures `0`, and real-buffer commits `2`. Steam/Proton remains unpromoted until a bounded game-client proof promotes it. |
 | Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven advisory evidence, paused/crash-gated, operator approval required; external-display-only; explicit stop/revoke; no boot auto-launch. |
 | Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Select by explicit override or one live active PID file; reject stale PID files and rootfs paths outside the selected container; require `anland.env` plus `/data/local/tmp/display_daemon.sock` before display-ready; fixed commands only; no raw helper-script execution. |
 | Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
@@ -165,13 +178,14 @@ Runtime constraints:
   live-confirmed as a 39-bit kernel VA environment through `/proc/config.gz`.
   Nebula surfaces this in display-lane status and must avoid assuming 45-bit
   userspace/runtime behavior.
-- Current Phone/App control-plane status is loader-pin confirmed, not a full A1
-  runtime/export pass. The local Freedreno ICD/driver path can be pinned, but the
-  active blocker is Vulkan export/real-buffer evidence: `vkGetMemoryFdKHR`
-  failures and `0` bridge real-buffer commits.
+- Current Phone/App control-plane status is phone-proof aligned:
+  `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`, `NONE_WAYLAND_DISPLAY`,
+  `vkGetMemoryFdKHR` failures `0`, and bridge real-buffer commits `2`.
+  The remaining blocker is game-client runtime promotion under the
+  live-confirmed 39-bit VA constraint.
 - App/native bridge readiness and child software GLX reproduction should not
   reopen the older full GLX visual/fbconfig inventory. Steam, Proton, Wine, DXVK,
-  FEX, and game clients remain unpromoted until the export/real-buffer gate
+  FEX, and game clients remain unpromoted until a bounded game-client proof
   passes under the live-confirmed 39-bit VA constraint.
 
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
@@ -185,7 +199,9 @@ See `CONTROL_PLANE_POLICY.md` for the current control-plane policy split.
 
 See `REVERSA_FINDINGS_ASSESSMENT.md` for the contradiction assessment and the
 2026-06-27 update that demotes stale real-buffer-pass wording to historical
-evidence and keeps the Vulkan export/real-buffer gate active.
+evidence while preserving the R6 Wayland working 03 real-buffer display proof.
+The next gate is bounded game-client runtime proof under the live 39-bit VA
+constraint.
 
 See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the preserved sidecar chain and the
 ARM64EC/39-bit Wine GUI blocker audit.

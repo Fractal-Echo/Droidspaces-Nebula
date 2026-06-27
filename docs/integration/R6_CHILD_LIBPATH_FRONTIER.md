@@ -16,13 +16,15 @@ Current live control-plane status:
 - later software GLX evidence is treated as reproduced;
 - do not reopen full GLX visual/fbconfig inventory or run `glxgears` for this
   docs cleanup;
-- active blocker is Vulkan export/real-buffer evidence:
-  `vkGetMemoryFdKHR` failures and `0` bridge real-buffer commits.
+- active display blocker is clear:
+  `NONE_WAYLAND_DISPLAY`;
+- remaining promotion blocker:
+  `GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA`.
 
 Current classification:
 
 ```text
-NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED
+NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS
 ```
 
 ## Preserved 2026-06-25 Frontier

@@ -45,7 +45,7 @@ Keep compatibility lanes explicit:
 
 | Tier | Lane | Status |
 | --- | --- | --- |
-| 1 | RM11 Pro WayLandIE/Gamescope/Xwayland R6 sidecars | App/native bridge solved; local loader pin confirmed by `NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED`; software GLX reproduced with `llvmpipe`; current blocker is Vulkan export / real-buffer (`vkGetMemoryFdKHR` failures, 0 real-buffer commits). |
+| 1 | RM11 Pro WayLandIE/Gamescope/Xwayland R6 sidecars | Phone active module proof is the authority: `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`, `NONE_WAYLAND_DISPLAY`, `vkGetMemoryFdKHR` failures `0`, real-buffer commits `2`; next gate is bounded game-client runtime before Steam/Proton promotion. |
 | 2 | Anland + DroidSpaces Ubuntu26/KDE | Proven visible lane: `NEBULA_R6_ANLAND_DROIDSPACES_WAYLAND_VISIBLE`. |
 | 3 | DroidSpaces native profiles | Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio profiles exist; each needs its own proof. |
 | 4 | Vower WayLandIE latest | Compatibility candidate for non-RM11Pro/lower-spec devices; synced locally at `3ea02d5`, not promoted as the RM11 R6 baseline. |
@@ -130,7 +130,7 @@ must not share the same writable `rootfs.img`.
 
 | Method | Container ref | Current requirements |
 | --- | --- | --- |
-| Phone/App Mode | `waylandie_app_imagefs` | App/native bridge and local loader pin are proven; software GLX is reproduced via `llvmpipe`; hardware GLX and real-buffer pass are not proven. Current blocker: Vulkan export / real-buffer path. |
+| Phone/App Mode | `waylandie_app_imagefs` | Phone active module proves WayLandIE/Gamescope/Xwayland display with `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`, `NONE_WAYLAND_DISPLAY`, `vkGetMemoryFdKHR` failures `0`, and real-buffer commits `2`; game-client runtime remains unpromoted until the next bounded proof. |
 | Anland Surface Mode | dedicated DroidSpaces Anland container, recommended `anland-ubuntu26-kde` | Needs the Anland Android consumer APK, `virtual-drm-daemon` module, Ubuntu26 KDE rootfs with `anland_kde`, `anland.env`, socket bind, and `startanland-kde.sh`. |
 | DroidSpaces rootfs image | `rootfs.img` | Use `--rootfs-img` or import `--rootfs-arc` into a sparse image for stable Android container storage. |
 | DroidSpaces rootfs directory | `rootfs_directory` | Use `--rootfs` for simple unpacked rootfs testing. |
@@ -144,10 +144,13 @@ must not share the same writable `rootfs.img`.
 | Recovery/Safe Mode | `none` | Always available, blocks risky starts. |
 
 For Phone/App Mode, first check `runtime waylandie status --json` or
-`display lanes --json`. The read-only output now includes `selected_icd`,
+`display lanes --json`. The read-only output includes live reinstall-safe path
+fields (`package_path`, `native_lib_dir`, `glibc_loader`), plus `selected_icd`,
 `selected_vulkan_driver`, and `loader_pin`, where `VK_ICD_FILENAMES` and
 `VK_DRIVER_FILES` both point to the pinned local Freedreno ICD manifest inside
-the WayLandIE imagefs.
+the WayLandIE imagefs. The `/data/app/...` install instance is expected to
+change after reinstall; Nebula resolves it from the live package path instead
+of carrying forward archived proof paths.
 
 DroidSpaces already owns rootfs image/directory startup, Termux:X11, VirGL,
 Turnip/KGSL, llvmpipe, and PulseAudio wiring. Nebula reports them separately so
