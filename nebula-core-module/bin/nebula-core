@@ -39,14 +39,28 @@ POWERDECK_MODULE_ID=redmagic_powerdeck
 WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie
 WAYLANDIE_SOURCE_COMMIT=1526655a2470
 WAYLANDIE_SOURCE="WayLandIE root-assisted proot launch@$WAYLANDIE_SOURCE_COMMIT"
-DISPLAY_PHONE_PROOF_CLASSIFICATION=NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS
-DISPLAY_PHONE_PROOF_RESULT="/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-wayland-working-03/result.md"
+DISPLAY_PHONE_PROOF_CLASSIFICATION=NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED
+DISPLAY_PHONE_EXPORT_CLASSIFICATION=NEBULA_R6_EXPORT_ENV_MISMATCH_FOUND
+DISPLAY_PHONE_SOFTWARE_GLX_CLASSIFICATION=NEBULA_R6_SOFTWARE_GLX_REPRODUCED
+DISPLAY_PHONE_PROOF_RESULT="/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-vulkan-export-realbuffer-01/result.md"
+DISPLAY_PHONE_SOFTWARE_GLX_RESULT="/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-child-libpath-split-01/result.md"
+DISPLAY_PHONE_A1_FASTTEST_RESULT="/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-vulkan-export-a1-fasttest-env-01/result.md"
 DISPLAY_PHONE_GAMESCOPE_SIDECAR=xwayland-gamescope-14-exportable-fence-guard-a4-473ba531
 DISPLAY_PHONE_XWAYLAND_SIDECAR=xwayland-gamescope-06-xwayland-9f1a3d62
-DISPLAY_PHONE_SOURCE="R6 Wayland proof 03: dmabuf-present, real-buffer commits, zero vkGetMemoryFdKHR failures, Gamescope/Xwayland ready"
-DISPLAY_PHONE_PROMOTION_SOURCE="R6 proof sidecars: $DISPLAY_PHONE_GAMESCOPE_SIDECAR + $DISPLAY_PHONE_XWAYLAND_SIDECAR"
+DISPLAY_PHONE_SOURCE="Evidence snapshot: app/native bridge solved; local loader pin confirmed; software GLX reproduced with llvmpipe; Vulkan export/real-buffer blocked by vkGetMemoryFdKHR failures and 0 real-buffer commits"
+DISPLAY_PHONE_PROMOTION_SOURCE="R6 evidence snapshots: child-libpath split + Vulkan export real-buffer; sidecars $DISPLAY_PHONE_GAMESCOPE_SIDECAR + $DISPLAY_PHONE_XWAYLAND_SIDECAR"
 DISPLAY_PHONE_RUNTIME_CONSTRAINT="live-confirmed NX809J stock RedMagic ROM with OnePlus Wild kernel: CONFIG_ARM64_VA_BITS=39, 4K pages, PA_BITS=48, compat enabled; avoid 45-bit runtime assumptions"
-DISPLAY_PHONE_RUNTIME_BLOCKER="Wayland display is proven; game-client runtime is not promoted because Proton/Wine/Steam were not run in the proof. Earlier ARM64EC Wine GUI attempts hit winex11.drv SEH invalid-frame/c0000005 under 39-bit VA."
+DISPLAY_PHONE_RUNTIME_BLOCKER="Vulkan export/real-buffer path is blocked: vkGetMemoryFdKHR failed 1199 times; real-buffer commits 0; no-buffer commits 8; A1 Fasttest-02 KGSL/Turnip export env was staged but not run because ADB went offline."
+DISPLAY_PHONE_STATE=blocked_export
+DISPLAY_PHONE_ACTIVE_BLOCKER=vulkan_export_real_buffer
+DISPLAY_PHONE_GL_RENDERER=llvmpipe
+DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES=1199
+DISPLAY_PHONE_REAL_BUFFER_COMMITS=0
+DISPLAY_PHONE_NO_BUFFER_COMMITS=8
+DISPLAY_PHONE_A1_FASTTEST_ENV_STATUS=staged_not_run_adb_offline
+DISPLAY_DOCK_LEASE_STATE=paused_crash_gated
+DISPLAY_REZGISK_PROVIDER_STATE=documented_not_installed
+DISPLAY_COOLING_POLICY_STATE=preview_only
 ANLAND_REPAIR_SOURCE="Droidspaces-OSS CLI --env/--bind; Droidspaces-rootfs-KDE-builder Ubuntu26 anland_kde; Anland daemon/consumer"
 DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
 ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
@@ -254,12 +268,49 @@ log_command() {
   fi
 }
 
+status_model_payload() {
+  printf '"source":"evidence_snapshot",'
+  printf '"phone_app":{'
+  printf '"lane":"phone_app_bridge",'
+  printf '"state":%s,' "$(json_string "$DISPLAY_PHONE_STATE")"
+  printf '"real_buffer_pass":false,'
+  printf '"hardware_glx_pass":false,'
+  printf '"software_glx_reproduced":true,'
+  printf '"gl_renderer":%s,' "$(json_string "$DISPLAY_PHONE_GL_RENDERER")"
+  printf '"active_blocker":%s,' "$(json_string "$DISPLAY_PHONE_ACTIVE_BLOCKER")"
+  printf '"vk_get_memory_fd_failures":%s,' "$DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES"
+  printf '"real_buffer_commits":%s,' "$DISPLAY_PHONE_REAL_BUFFER_COMMITS"
+  printf '"no_buffer_commits":%s,' "$DISPLAY_PHONE_NO_BUFFER_COMMITS"
+  printf '"a1_fasttest_env_status":%s,' "$(json_string "$DISPLAY_PHONE_A1_FASTTEST_ENV_STATUS")"
+  printf '"known_good":["app_bridge","native_bridge","loader_pin","software_glx","gamescope_xwayland_ready_in_bounded_export_run"],'
+  printf '"classification":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")"
+  printf '"export_classification":%s,' "$(json_string "$DISPLAY_PHONE_EXPORT_CLASSIFICATION")"
+  printf '"software_glx_classification":%s' "$(json_string "$DISPLAY_PHONE_SOFTWARE_GLX_CLASSIFICATION")"
+  printf '},'
+  printf '"dock":{'
+  printf '"lane":"dock_drm_lease_external",'
+  printf '"dock_lease_state":%s,' "$(json_string "$DISPLAY_DOCK_LEASE_STATE")"
+  printf '"state":%s,' "$(json_string "$DISPLAY_DOCK_LEASE_STATE")"
+  printf '"available":false,'
+  printf '"mutating":false'
+  printf '},'
+  printf '"hook_lane":{'
+  printf '"rezygisk_provider_state":%s,' "$(json_string "$DISPLAY_REZGISK_PROVIDER_STATE")"
+  printf '"hook_ready":false'
+  printf '},'
+  printf '"cooling":{'
+  printf '"cooling_policy_state":%s,' "$(json_string "$DISPLAY_COOLING_POLICY_STATE")"
+  printf '"preview_only":true,'
+  printf '"applied":false'
+  printf '}'
+}
+
 status_json() {
   ensure_dirs
   safe=$(safe_mode_value)
   daemon=$(daemon_running_value)
   profile=$(current_profile)
-  printf '{"protocol_version":%s,"module_id":"%s","module_version":"%s","module_version_code":%s,"git_commit":"%s","safe_mode":%s,"profile":"%s","daemon_running":%s,"service_status":"%s"}\n' \
+  printf '{"protocol_version":%s,"module_id":"%s","module_version":"%s","module_version_code":%s,"git_commit":"%s","safe_mode":%s,"profile":"%s","daemon_running":%s,"service_status":"%s","status_model":{' \
     "$PROTOCOL_VERSION" \
     "$MODULE_ID" \
     "$(json_escape "$(module_version)")" \
@@ -269,6 +320,8 @@ status_json() {
     "$profile" \
     "$(json_bool "$daemon")" \
     "$(service_status)"
+  status_model_payload
+  printf '}}\n'
 }
 
 capabilities_json() {
@@ -291,9 +344,9 @@ capabilities_json() {
   printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"display.lanes","title":"Display lane selector status","status":"available_read_only","mutating":false,"source":"nebula-core lane registry"},'
   printf '{"id":"display.method-containers","title":"Display method container map","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method container registry"},'
-  printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DISPLAY_PHONE_SOURCE")"
+  printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"blocked_export_read_only","mutating":false,"source":"evidence_snapshot"},'
   printf '{"id":"display.lane.anland.preflight","title":"Anland surface lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_REPAIR_SOURCE")"
-  printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"proven_reference_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DRM_LEASE_SOURCE")"
+  printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"paused_crash_gated_read_only","mutating":false,"source":"evidence_snapshot"},'
   printf '{"id":"adb.wifi","title":"ADB Wi-Fi guardrail","status":"available_opt_in","mutating":true,"source":"Android Settings.Global adb_wifi_enabled,enable_wireless_switch"}'
   printf ']}\n'
 }
@@ -793,13 +846,15 @@ nubia_toolkit_status_json() {
   printf '"source_project":"NubiaToolkit","source_commit":%s,"license":"Apache-2.0",' \
     "$(json_string "$NUBIA_TOOLKIT_SOURCE_COMMIT")"
   printf '"integration":"ported_status_only","old_toolkit_required":false,'
-  printf '"lsposed_required_for_hooks":true,"lsposed_hooks_active":false,'
+  printf '"lsposed_required_for_hooks":true,"lsposed_hooks_active":false,"hook_ready":false,'
+  printf '"rezygisk_provider_state":%s,' "$(json_string "$DISPLAY_REZGISK_PROVIDER_STATE")"
   printf '"hook_framework":{"id":"zygisk_vector","name":"Vector","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"android_16_compatible":true},' \
     "$(json_bool "$vector_installed")" \
     "$(json_bool "$vector_enabled")" \
     "$(json_string "$vector_version")" \
     "$vector_version_code"
-  printf '"zygisk_provider":{"id":"rezygisk","name":"ReZygisk","role":"standalone_zygisk_provider","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"artifact_sha256":%s,"artifact_path":%s,"requires_magisk_builtin_zygisk_disabled":true},' \
+  printf '"zygisk_provider":{"id":"rezygisk","name":"ReZygisk","role":"standalone_zygisk_provider","provider_state":%s,"installed":%s,"enabled":%s,"version":%s,"version_code":%s,"artifact_sha256":%s,"artifact_path":%s,"requires_magisk_builtin_zygisk_disabled":true},' \
+    "$(json_string "$DISPLAY_REZGISK_PROVIDER_STATE")" \
     "$(json_bool "$rezygisk_installed")" \
     "$(json_bool "$rezygisk_enabled")" \
     "$(json_string "$rezygisk_version")" \
@@ -1521,22 +1576,34 @@ display_bool_source() {
 display_phone_preflight_payload() {
   waylandie_collect
   phone_status=missing
+  phone_state=missing
+  phone_available=0
   active_blocker=WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE
   canonical_blocker=WAYLAND_DISPLAY_PREFLIGHT_INCOMPLETE
   phone_container_status=missing
   phone_display_status=display_missing
   phone_runtime_status=runtime_missing
+  phone_requirement_status=missing_requirements
+  phone_missing_requirements='"wayland_display_preflight_incomplete"'
   if [ "$wl_display_ready" = "1" ]; then
-    phone_status=wayland_display_pass
-    active_blocker=NONE_WAYLAND_DISPLAY
-    canonical_blocker=NONE_WAYLAND_DISPLAY
-    phone_display_status=display_proven
+    phone_status=$DISPLAY_PHONE_STATE
+    phone_state=$DISPLAY_PHONE_STATE
+    active_blocker=$DISPLAY_PHONE_ACTIVE_BLOCKER
+    canonical_blocker=$DISPLAY_PHONE_ACTIVE_BLOCKER
+    phone_display_status=export_blocked
+    phone_runtime_status=runtime_export_blocked
+    phone_requirement_status=blocked_export
+    phone_missing_requirements='"vulkan_export_real_buffer","a1_fasttest_env_not_run_adb_offline","game_client_runtime_proof_not_promoted_39bit_va"'
   elif [ "$wl_installed" = "1" ]; then
     phone_status=partial
+    phone_state=partial
+    phone_missing_requirements='"wayland_display_preflight_incomplete"'
   fi
   if [ "$wl_ready" = "1" ]; then
     phone_container_status=ready
-    phone_runtime_status=runtime_ready
+    if [ "$wl_display_ready" != "1" ]; then
+      phone_runtime_status=runtime_ready
+    fi
   elif [ "$wl_installed" = "1" ]; then
     phone_container_status=partial
   fi
@@ -1544,33 +1611,52 @@ display_phone_preflight_payload() {
   printf '"method_id":"phone_app_bridge",'
   printf '"title":"Phone / App Mode",'
   printf '"status":%s,' "$(json_string "$phone_status")"
-  printf '"available":%s,' "$(json_bool "$wl_display_ready")"
+  printf '"state":%s,' "$(json_string "$phone_state")"
+  printf '"available":%s,' "$(json_bool "$phone_available")"
   printf '"container_ref":"waylandie_app_imagefs",'
   printf '"container_kind":"app_proot",'
   printf '"container_status":%s,' "$(json_string "$phone_container_status")"
   printf '"display_status":%s,' "$(json_string "$phone_display_status")"
   printf '"runtime_status":%s,' "$(json_string "$phone_runtime_status")"
   printf '"start_command_status":"not_available",'
-  printf '"requirement_status":"display_requirements_met",'
-  printf '"missing_requirements":["game_client_runtime_proof_not_promoted_39bit_va"],'
+  printf '"requirement_status":%s,' "$(json_string "$phone_requirement_status")"
+  printf '"missing_requirements":[%s],' "$phone_missing_requirements"
   printf '"mutating":false,'
   printf '"launch_command_available":false,'
   printf '"active_blocker":%s,' "$(json_string "$active_blocker")"
   printf '"canonical_blocker":%s,' "$(json_string "$canonical_blocker")"
-  printf '"current_endpoint":"SurfaceControl Vulkan native dmabuf-present via WayLandIE bridge, Gamescope, and Xwayland",'
+  printf '"current_endpoint":"WayLandIE app/native bridge with pinned local Turnip/Freedreno loader path; real-buffer export still blocked",'
   printf '"proof_classification":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")"
   printf '"proof_result":%s,' "$(json_string "$DISPLAY_PHONE_PROOF_RESULT")"
-  printf '"proof_metrics":{"summary_commits":7189,"summary_failures":0,"vkGetMemoryFdKHR_failures":0,"real_buffer_commits":2,"xwayland_ready":true,"gamescope_exit":0,"bridge_exit":0},'
-  printf '"lead_status":"display_proven",'
-  printf '"proven_trick":"gamescope_force_composition_full_size_ar24_parent_xdg_dmabuf",'
-  printf '"next_reversa_action":"bounded_game_client_runtime_before_steam",'
+  printf '"proof_metrics":{"summary_commits":%s,"summary_failures":%s,"vkGetMemoryFdKHR_failures":%s,"vk_get_memory_fd_failures":%s,"real_buffer_commits":%s,"no_buffer_commits":%s,"xwayland_ready":true,"gamescope_exit":0,"bridge_exit":1},' \
+    "$DISPLAY_PHONE_NO_BUFFER_COMMITS" \
+    "$DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES" \
+    "$DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES" \
+    "$DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES" \
+    "$DISPLAY_PHONE_REAL_BUFFER_COMMITS" \
+    "$DISPLAY_PHONE_NO_BUFFER_COMMITS"
+  printf '"lead_status":"blocked_export",'
+  printf '"next_reversa_action":"bounded_a1_export_runtime_after_adb_live",'
   printf '"steam_allowed":false,'
+  printf '"proton_ready":false,'
+  printf '"steam_ready":false,'
+  printf '"wine_ready":false,'
   printf '"kernel_va_bits_constraint":39,'
   printf '"kernel_va_bits_evidence":"live_proc_config_gz",'
-  printf '"runtime_blocker":"GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA",'
+  printf '"runtime_blocker":%s,' "$(json_string "$DISPLAY_PHONE_ACTIVE_BLOCKER")"
   printf '"runtime_blocker_detail":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_BLOCKER")"
   printf '"runtime_constraint":%s,' "$(json_string "$DISPLAY_PHONE_RUNTIME_CONSTRAINT")"
   printf '"sidecar_source":%s,' "$(json_string "$DISPLAY_PHONE_PROMOTION_SOURCE")"
+  printf '"software_glx_reproduced":true,'
+  printf '"hardware_glx_pass":false,'
+  printf '"real_buffer_pass":false,'
+  printf '"gl_renderer":%s,' "$(json_string "$DISPLAY_PHONE_GL_RENDERER")"
+  printf '"vk_get_memory_fd_failures":%s,' "$DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES"
+  printf '"real_buffer_commits":%s,' "$DISPLAY_PHONE_REAL_BUFFER_COMMITS"
+  printf '"no_buffer_commits":%s,' "$DISPLAY_PHONE_NO_BUFFER_COMMITS"
+  printf '"a1_fasttest_env_status":%s,' "$(json_string "$DISPLAY_PHONE_A1_FASTTEST_ENV_STATUS")"
+  printf '"software_glx_result":%s,' "$(json_string "$DISPLAY_PHONE_SOFTWARE_GLX_RESULT")"
+  printf '"a1_fasttest_result":%s,' "$(json_string "$DISPLAY_PHONE_A1_FASTTEST_RESULT")"
   printf '"gamescope_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_GAMESCOPE_SIDECAR")"
   printf '"xwayland_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_XWAYLAND_SIDECAR")"
   printf '"selected_icd":%s,' "$(json_string "$wl_local_icd")"
@@ -1578,7 +1664,8 @@ display_phone_preflight_payload() {
   printf '"loader_pin":{"VK_ICD_FILENAMES":%s,"VK_DRIVER_FILES":%s},' \
     "$(json_string "$wl_local_icd")" \
     "$(json_string "$wl_local_icd")"
-  printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
+  printf '"source":"evidence_snapshot",'
+  printf '"evidence_source_detail":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
   printf '"checks":{"display_ready":%s,"runtime_ready":%s,"package_installed":%s,"imagefs_present":%s,"bridge_present":%s,"local_icd_present":%s,"local_vulkan_driver_present":%s,"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,"proton_present":%s,"wine_present":%s},' \
     "$(json_bool "$wl_display_ready")" \
     "$(json_bool "$wl_ready")" \
@@ -1645,6 +1732,7 @@ display_anland_preflight_payload() {
   printf '"method_id":"anland_surface",'
   printf '"title":"Anland Surface Mode",'
   printf '"status":%s,' "$(json_string "$anland_status")"
+  printf '"state":"preflight_only",'
   printf '"available":%s,' "$(json_bool "$anland_ready")"
   printf '"runtime_ready":%s,' "$(json_bool "$anland_runtime_ready")"
   printf '"container_ref":%s,' "$(json_string "$anland_selected_container")"
@@ -1710,8 +1798,8 @@ display_anland_preflight_json() {
 
 display_dock_preflight_payload() {
   dock_safe=$(safe_mode_value)
-  dock_status=proven_reference_not_wired
-  dock_start_status=operator_required
+  dock_status=$DISPLAY_DOCK_LEASE_STATE
+  dock_start_status=crash_gated
   if [ "$dock_safe" = "1" ]; then
     dock_status=safe_mode_blocks_start
     dock_start_status=safe_mode_blocked
@@ -1720,15 +1808,17 @@ display_dock_preflight_payload() {
   printf '"method_id":"dock_drm_lease_external",'
   printf '"title":"Dock Lease Mode",'
   printf '"status":%s,' "$(json_string "$dock_status")"
+  printf '"state":%s,' "$(json_string "$DISPLAY_DOCK_LEASE_STATE")"
+  printf '"dock_lease_state":%s,' "$(json_string "$DISPLAY_DOCK_LEASE_STATE")"
   printf '"available":false,'
   printf '"container_ref":"none",'
   printf '"container_kind":"none",'
   printf '"container_status":"none",'
-  printf '"display_status":"reference_only",'
+  printf '"display_status":"paused_crash_gated",'
   printf '"runtime_status":"not_required",'
   printf '"start_command_status":%s,' "$(json_string "$dock_start_status")"
-  printf '"requirement_status":"reference_requirements_known",'
-  printf '"missing_requirements":["external_display_discovery_required","lease_receiver_not_wired"],'
+  printf '"requirement_status":"crashdump_gated_resume_required",'
+  printf '"missing_requirements":["crashdump_gated_resume_required","external_display_discovery_required","lease_receiver_not_wired","operator_approval_required"],'
   printf '"mutating":false,'
   printf '"start_command_available":false,'
   printf '"evidence_captured":true,'
@@ -1740,7 +1830,8 @@ display_dock_preflight_payload() {
   printf '"dynamic_discovery_required":true,'
   printf '"reported_objects":{"connector":89,"crtc":285,"planes":[137,145],"rejected_encoder":86,"composer_fd_observed":11,"hardcoded_forbidden":true},'
   printf '"method":["composer_fd_duplicate","CREATE_LEASE_external_only","SCM_RIGHTS_fd_handoff","wlroots_drm_backend_lease_fd","explicit_stop_revoke"],'
-  printf '"source":%s,' "$(json_string "$DRM_LEASE_SOURCE")"
+  printf '"source":"evidence_snapshot",'
+  printf '"evidence_source_detail":%s,' "$(json_string "$DRM_LEASE_SOURCE")"
   printf '"errors":[]'
 }
 
@@ -1758,7 +1849,7 @@ display_lanes_json() {
   display_dock_preflight_payload
   printf '},{'
   display_anland_preflight_payload
-  printf '},{"id":"compatibility","method_id":"compatibility_software","title":"Compatibility Mode","status":"not_wired","available":false,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"not_wired","runtime_status":"runtime_missing","start_command_status":"not_available","requirement_status":"not_wired","missing_requirements":["implementation_not_wired"],"mutating":false,"source":"Nebula compatibility fallback design","errors":["NOT_WIRED_BY_DESIGN"]},{"id":"recovery_safe","method_id":"recovery_safe","title":"Recovery / Safe Mode","status":"always_available","available":true,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"safe","runtime_status":"not_required","start_command_status":"safe_mode_control","requirement_status":"complete","missing_requirements":[],"mutating":false,"source":"Nebula Core safe mode","errors":[]}'
+  printf '},{"id":"compatibility","method_id":"compatibility_software","title":"Compatibility Mode","status":"blocked_real_buffer","state":"blocked_real_buffer","available":false,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"blocked_real_buffer","runtime_status":"not_ready","start_command_status":"not_available","requirement_status":"blocked_real_buffer","missing_requirements":["real_buffer_commits_missing","vulkan_export_real_buffer"],"mutating":false,"real_buffer_pass":false,"hardware_glx_pass":false,"software_glx_reproduced":true,"gl_renderer":"llvmpipe","source":"evidence_snapshot","reason":"software_glx_reproduced_but_real_buffers_missing","errors":["REAL_BUFFER_EXPORT_BLOCKED"]},{"id":"recovery_safe","method_id":"recovery_safe","title":"Recovery / Safe Mode","status":"always_available","state":"safe","available":true,"container_ref":"none","container_kind":"none","container_status":"none","display_status":"safe","runtime_status":"not_required","start_command_status":"safe_mode_control","requirement_status":"complete","missing_requirements":[],"mutating":false,"source":"Nebula Core safe mode","errors":[]}'
   printf '],"selection_rules":["prefer_phone_app_for_internal_display","prefer_dock_lease_for_external_monitor_when_wired","use_anland_surface_as_compatibility_fallback","safe_mode_blocks_mutating_lane_start","no_lane_silently_replaces_another"]}\n'
 }
 
@@ -1773,7 +1864,7 @@ display_method_containers_json() {
     droidspaces_native_status=runtime_binary_visible
   fi
   printf '{"protocol_version":%s,"command":"display method-containers","containers":[' "$PROTOCOL_VERSION"
-  printf '{"method_id":"phone_app_bridge","container_ref":"waylandie_app_imagefs","container_kind":"app_proot","owner":"WayLandIE companion APK","status":"display_proven","recommended_for":"internal_display","requirements":["WayLandIE package installed","imagefs present","pinned local ICD and Vulkan driver","Gamescope and Xwayland sidecars"],"current_limit":"game_client_runtime_proof_not_promoted_39bit_va","source":%s},' \
+  printf '{"method_id":"phone_app_bridge","container_ref":"waylandie_app_imagefs","container_kind":"app_proot","owner":"WayLandIE companion APK","status":"blocked_export","state":"blocked_export","recommended_for":"internal_display","requirements":["WayLandIE package installed","imagefs present","pinned local ICD and Vulkan driver","Gamescope and Xwayland sidecars"],"current_limit":"vulkan_export_real_buffer","real_buffer_pass":false,"hardware_glx_pass":false,"software_glx_reproduced":true,"gl_renderer":"llvmpipe","vk_get_memory_fd_failures":1199,"real_buffer_commits":0,"no_buffer_commits":8,"source":"evidence_snapshot","evidence_source_detail":%s},' \
     "$(json_string "$DISPLAY_PHONE_SOURCE")"
   printf '{"method_id":"anland_surface","container_ref":%s,"container_kind":"droidspaces","owner":"DroidSpaces plus Anland","status":%s,"runtime_ready":%s,"display_ready":%s,"recommended_container":%s,"selected_is_recommended":%s,"required_config":' \
     "$(json_string "$anland_selected_container")" \
@@ -2269,7 +2360,9 @@ cooling_policy_fields() {
   if [ -z "$cp_sensor_name" ]; then cp_sensor_name_json=null; else cp_sensor_name_json=$(json_string "$cp_sensor_name"); fi
   if [ -z "$cp_sensor_source" ]; then cp_sensor_source_json=null; else cp_sensor_source_json=$(json_string "$cp_sensor_source"); fi
 
+  printf '"cooling_policy_state":%s,' "$(json_string "$DISPLAY_COOLING_POLICY_STATE")"
   printf '"preview_only":true,'
+  printf '"applied":false,'
   printf '"configured":%s,' "$(json_bool "$cp_configured")"
   printf '"safe_mode":%s,' "$(json_bool "$(safe_mode_value)")"
   printf '"state":%s,' "$(json_string "$cp_state")"
@@ -2435,22 +2528,30 @@ integrations_baseline_json() {
 	  elif [ "$anland_runtime_ready" != "1" ] && [ "$droidspaces_installed" = "1" ] && [ "$anland_status" = "missing" ]; then
 	    droidspaces_status=partial
 	  fi
-	  wl_integration_status=missing
-	  wl_container_status=missing
-	  wl_display_status=display_missing
-	  wl_runtime_status=runtime_missing
-	  if [ "$wl_display_ready" = "1" ]; then
-	    wl_integration_status=display_ready
-	    wl_display_status=display_proven
-	  elif [ "$wl_installed" = "1" ]; then
-	    wl_integration_status=partial
-	  fi
-	  if [ "$wl_ready" = "1" ]; then
-	    wl_container_status=ready
-	    wl_runtime_status=runtime_ready
-	  elif [ "$wl_installed" = "1" ]; then
-	    wl_container_status=partial
-	  fi
+		  wl_integration_status=missing
+		  wl_container_status=missing
+		  wl_display_status=display_missing
+		  wl_runtime_status=runtime_missing
+		  wl_requirement_status=missing_requirements
+		  wl_lane_ready=0
+		  wl_missing_requirements='"wayland_display_preflight_incomplete"'
+		  if [ "$wl_display_ready" = "1" ]; then
+		    wl_integration_status=$DISPLAY_PHONE_STATE
+		    wl_display_status=export_blocked
+		    wl_runtime_status=runtime_export_blocked
+		    wl_requirement_status=blocked_export
+		    wl_missing_requirements='"vulkan_export_real_buffer","a1_fasttest_env_not_run_adb_offline","game_client_runtime_proof_not_promoted_39bit_va"'
+		  elif [ "$wl_installed" = "1" ]; then
+		    wl_integration_status=partial
+		  fi
+		  if [ "$wl_ready" = "1" ]; then
+		    wl_container_status=ready
+		    if [ "$wl_display_ready" != "1" ]; then
+		      wl_runtime_status=runtime_ready
+		    fi
+		  elif [ "$wl_installed" = "1" ]; then
+		    wl_container_status=partial
+		  fi
 	  droidspaces_container_status=missing
 	  droidspaces_display_status=display_missing
 	  droidspaces_runtime_status=runtime_missing
@@ -2520,7 +2621,6 @@ integrations_baseline_json() {
   fi
   if [ "$vector_enabled" = "1" ] && { [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ]; }; then
     nubia_status=hook_framework_ready_scope_deferred
-    nubia_ready=1
   elif [ "$vector_installed" = "1" ] || [ "$nubia_game_assist" = "1" ] || [ "$nubia_game_launcher" = "1" ]; then
     nubia_status=partial
   fi
@@ -2555,7 +2655,7 @@ integrations_baseline_json() {
   if [ "$wl_display_ready" = "1" ] \
     && { [ "$droidspaces_ready" = "1" ] || [ "$droidspaces_module" = "1" ] || [ "$droidspaces_package" = "1" ]; } \
     && { [ "$redmagic_fan" = "1" ] || [ "$redmagic_pump" = "1" ]; }; then
-    overall_status=baseline_ready_read_only
+    overall_status=baseline_export_blocked_read_only
   elif [ "$wl_installed" != "1" ] && [ "$droidspaces_package" != "1" ] && [ "$droidspaces_module" != "1" ]; then
     overall_status=baseline_bootstrap
   fi
@@ -2567,19 +2667,26 @@ integrations_baseline_json() {
   printf '"integrations":['
   printf '{"id":"nebula_core","title":"Nebula Core module","owner":"Nebula","role":"fixed_root_contract","status":"ready","installed":true,"ready":true,"mutating":false,"version":%s,"source":"nebula-core-module"},' \
     "$(json_string "$(module_version)")"
-	  printf '{"id":"waylandie","method_id":"phone_app_bridge","title":"WayLandIE display/runtime","owner":"WayLandIE companion APK","role":"phone_app_bridge","status":%s,"installed":%s,"ready":%s,"display_ready":%s,"runtime_ready":%s,"container_ref":"waylandie_app_imagefs","container_kind":"app_proot","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":"display_requirements_met","missing_requirements":["game_client_runtime_proof_not_promoted_39bit_va"],"mutating":false,"package":%s,"evidence":%s,"source":%s,"errors":[%s]},' \
-	    "$(json_string "$wl_integration_status")" \
-	    "$(json_bool "$wl_installed")" \
-	    "$(json_bool "$wl_display_ready")" \
-	    "$(json_bool "$wl_display_ready")" \
-	    "$(json_bool "$wl_ready")" \
-	    "$(json_string "$wl_container_status")" \
-	    "$(json_string "$wl_display_status")" \
-	    "$(json_string "$wl_runtime_status")" \
-	    "$(json_string "$WAYLANDIE_PACKAGE")" \
-	    "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")" \
-	    "$(json_string "$DISPLAY_PHONE_SOURCE")" \
-	    "$wl_display_errors"
+		  printf '{"id":"waylandie","method_id":"phone_app_bridge","title":"WayLandIE display/runtime","owner":"WayLandIE companion APK","role":"phone_app_bridge","status":%s,"state":%s,"installed":%s,"ready":%s,"display_ready":false,"runtime_ready":false,"container_ref":"waylandie_app_imagefs","container_kind":"app_proot","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":%s,"missing_requirements":[%s],"mutating":false,"active_blocker":%s,"real_buffer_pass":false,"hardware_glx_pass":false,"software_glx_reproduced":true,"gl_renderer":%s,"vk_get_memory_fd_failures":%s,"real_buffer_commits":%s,"no_buffer_commits":%s,"a1_fasttest_env_status":%s,"package":%s,"evidence":%s,"source":"evidence_snapshot","evidence_source_detail":%s,"errors":[%s]},' \
+		    "$(json_string "$wl_integration_status")" \
+		    "$(json_string "$DISPLAY_PHONE_STATE")" \
+		    "$(json_bool "$wl_installed")" \
+		    "$(json_bool "$wl_lane_ready")" \
+		    "$(json_string "$wl_container_status")" \
+		    "$(json_string "$wl_display_status")" \
+		    "$(json_string "$wl_runtime_status")" \
+		    "$(json_string "$wl_requirement_status")" \
+		    "$wl_missing_requirements" \
+		    "$(json_string "$DISPLAY_PHONE_ACTIVE_BLOCKER")" \
+		    "$(json_string "$DISPLAY_PHONE_GL_RENDERER")" \
+		    "$DISPLAY_PHONE_VK_GET_MEMORY_FD_FAILURES" \
+		    "$DISPLAY_PHONE_REAL_BUFFER_COMMITS" \
+		    "$DISPLAY_PHONE_NO_BUFFER_COMMITS" \
+		    "$(json_string "$DISPLAY_PHONE_A1_FASTTEST_ENV_STATUS")" \
+		    "$(json_string "$WAYLANDIE_PACKAGE")" \
+		    "$(json_string "$DISPLAY_PHONE_PROOF_CLASSIFICATION")" \
+		    "$(json_string "$DISPLAY_PHONE_SOURCE")" \
+		    "$wl_display_errors"
 	  printf '{"id":"droidspaces","method_id":"anland_surface","title":"DroidSpaces / Anland runtime","owner":"DroidSpaces ecosystem","role":"container_surface_fallback","status":%s,"installed":%s,"ready":%s,"runtime_ready":%s,"display_socket_ready":%s,"container_ref":%s,"container_kind":"droidspaces","container_status":%s,"display_status":%s,"runtime_status":%s,"requirement_status":%s,"missing_requirements":[%s],"mutating":false,"package":%s,"module_installed":%s,"module_disabled":%s,"bridge_module_installed":%s,"selected_container":%s,"container_selection_source":%s,"container_active":%s,"container_pid":%s,"checks":{"droidspaces_binary":%s,"container_selected":%s,"container_config":%s,"active_container_pidfile":%s,"rootfs_path":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"anland_producer":%s},"selected_paths":{"containers_dir":%s,"pids_dir":%s,"pidfile":%s,"container_config":%s,"anland_env":%s,"rootfs_path":%s},"source":%s,"errors":[%s]},' \
 	    "$(json_string "$droidspaces_status")" \
 	    "$(json_bool "$droidspaces_installed")" \
@@ -2618,15 +2725,17 @@ integrations_baseline_json() {
 	    "$(json_string "$anland_selected_rootfs")" \
 	    "$(json_string "$ANLAND_REPAIR_SOURCE")" \
 	    "$anland_errors"
-  printf '{"id":"nubia_toolkit","title":"Nubia Toolkit hook lane","owner":"Nebula status port plus optional ReZygisk provider and Vector/LSPosed","role":"gamehub_hooks_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"hooks_active":false,"old_toolkit_required":false,"packages":{"game_assist":%s,"game_launcher":%s,"toolkit_reference":%s},"hook_framework":{"id":"zygisk_vector","installed":%s,"enabled":%s},"zygisk_provider":{"id":"rezygisk","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"artifact_sha256":%s,"requires_magisk_builtin_zygisk_disabled":true},"source":%s},' \
+  printf '{"id":"nubia_toolkit","title":"Nubia Toolkit hook lane","owner":"Nebula status port plus optional ReZygisk provider and Vector/LSPosed","role":"gamehub_hooks_reference","status":%s,"installed":%s,"ready":%s,"hook_ready":false,"mutating":false,"hooks_active":false,"old_toolkit_required":false,"rezygisk_provider_state":%s,"packages":{"game_assist":%s,"game_launcher":%s,"toolkit_reference":%s},"hook_framework":{"id":"zygisk_vector","installed":%s,"enabled":%s},"zygisk_provider":{"id":"rezygisk","provider_state":%s,"installed":%s,"enabled":%s,"version":%s,"version_code":%s,"artifact_sha256":%s,"requires_magisk_builtin_zygisk_disabled":true},"source":%s},' \
     "$(json_string "$nubia_status")" \
     "$(json_bool "$nubia_installed")" \
     "$(json_bool "$nubia_ready")" \
+    "$(json_string "$DISPLAY_REZGISK_PROVIDER_STATE")" \
     "$(json_bool "$nubia_game_assist")" \
     "$(json_bool "$nubia_game_launcher")" \
     "$(json_bool "$nubia_toolkit_reference")" \
     "$(json_bool "$vector_installed")" \
     "$(json_bool "$vector_enabled")" \
+    "$(json_string "$DISPLAY_REZGISK_PROVIDER_STATE")" \
     "$(json_bool "$rezygisk_installed")" \
     "$(json_bool "$rezygisk_enabled")" \
     "$(json_string "$rezygisk_version")" \
@@ -2650,8 +2759,8 @@ integrations_baseline_json() {
     "$(json_string "$POWERDECK_MODULE_ID")" \
     "$(json_bool "$powerdeck_disabled")" \
     "$(json_bool "$powerdeck_tmp_apply")"
-	  printf '],"guardrails":["single_baseline_apk_module_contract","status_before_mutation","no_hook_activation_from_baseline_status","no_device_node_writes_from_baseline_status","no_droidspaces_replacement_without_reboot_verified_migration","wayland_display_proven_game_client_runtime_not_promoted"],'
-	  printf '"next_step":"bounded_game_client_runtime"}\n'
+		  printf '],"guardrails":["single_baseline_apk_module_contract","status_before_mutation","no_hook_activation_from_baseline_status","no_device_node_writes_from_baseline_status","no_droidspaces_replacement_without_reboot_verified_migration","wayland_export_blocker_not_glx_visuals"],'
+		  printf '"next_step":"bounded_a1_export_runtime_after_adb_live"}\n'
 }
 
 cooling_snapshot_payload() {

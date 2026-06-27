@@ -16,6 +16,7 @@ required_files=(
   "docs/lanes.md"
   "docs/repo-map.md"
   "docs/workflow.md"
+  "docs/integration/STATUS_MODEL.md"
 )
 
 for file in "${required_files[@]}"; do
@@ -34,8 +35,9 @@ grep -q 'io.droidspaces.nebula.waylandie' app/src/main/AndroidManifest.xml
 grep -q 'io.droidspaces.nebula.waylandie' app/src/main/java/io/droidspaces/nebula/MainActivity.java
 grep -q '0.2.0-no-root-nebula13-rootfs-vulkan-smoke' app/src/main/java/io/droidspaces/nebula/MainActivity.java
 grep -q 'WAYLANDIE_PACKAGE=io.droidspaces.nebula.waylandie' nebula-core-module/bin/nebula-core
-grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' nebula-core-module/bin/nebula-core
+grep -q 'NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED' nebula-core-module/bin/nebula-core
 grep -q 'NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED' docs/integration/REVERSA_FINDINGS_ASSESSMENT.md
+grep -q 'vulkan_export_real_buffer' docs/integration/STATUS_MODEL.md
 
 for pattern in \
   'out/' \

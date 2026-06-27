@@ -134,7 +134,7 @@ public final class MainActivity extends Activity {
                     "Zero-copy display",
                     "WayLandIE proof",
                     "dmabuf/fd-passing display target for Linux apps and games.",
-                    "Current state: pinned ICD/driver path confirmed; vkGetMemoryFdKHR and zero real-buffer commits still block full runtime proof.",
+                    "Current state: software GLX reproduced with llvmpipe; pinned ICD/driver path confirmed; vkGetMemoryFdKHR failures and zero real-buffer commits still block full runtime proof.",
                     Arrays.asList(
                             new Target("WayLandIE Display", "io.droidspaces.nebula.waylandie",
                                     "0.2.0-no-root-nebula13-rootfs-vulkan-smoke",
@@ -497,7 +497,7 @@ public final class MainActivity extends Activity {
             if (lane == null) continue;
             if ("phone_app_bridge".equals(lane.optString("id"))) {
                 String lead = lane.optString("lead_status", "");
-                if ("display_proven".equals(lead)) return "wayland pass";
+                if (lead.contains("proven")) return "legacy proof";
                 if ("promotion_candidate".equals(lead)) return "legacy lead";
                 return displayStatusLabel(lane.optString("status", "read_only"));
             }
@@ -764,7 +764,8 @@ public final class MainActivity extends Activity {
     private String baselineStatusLabel() {
         if (baselineIntegrationsStatus == null) return "Unknown";
         String status = baselineIntegrationsStatus.optString("overall_status", "");
-        if ("baseline_ready_read_only".equals(status)) return "Ready";
+        if ("baseline_export_blocked_read_only".equals(status)) return "Export";
+        if (status.endsWith("_ready_read_only")) return "Ready";
         if ("baseline_bootstrap".equals(status)) return "Bootstrap";
         if ("baseline_partial".equals(status)) return "Partial";
         return "Baseline";
@@ -773,7 +774,8 @@ public final class MainActivity extends Activity {
     private int baselineStatusColor() {
         if (baselineIntegrationsStatus == null) return BLUE;
         String status = baselineIntegrationsStatus.optString("overall_status", "");
-        if ("baseline_ready_read_only".equals(status)) return GREEN;
+        if ("baseline_export_blocked_read_only".equals(status)) return YELLOW;
+        if (status.endsWith("_ready_read_only")) return GREEN;
         if ("baseline_bootstrap".equals(status)) return YELLOW;
         if ("baseline_partial".equals(status)) return CYAN;
         return BLUE;
@@ -781,6 +783,8 @@ public final class MainActivity extends Activity {
 
     private String baselineIntegrationLabel(String status) {
         if (status == null || status.isEmpty()) return "Unknown";
+        if ("blocked_export".equals(status)) return "Export";
+        if ("blocked_real_buffer".equals(status)) return "Real buffer";
         if ("display_ready".equals(status)) return "Display";
         if ("container_runtime_ready".equals(status)) return "Runtime";
         if ("runtime_preflight_ready".equals(status)) return "Runtime";
@@ -796,6 +800,7 @@ public final class MainActivity extends Activity {
     private int baselineIntegrationColor(JSONObject integration) {
         if (integration.optBoolean("ready", false)) return GREEN;
         String status = integration.optString("status", "");
+        if (status.contains("blocked")) return YELLOW;
         if (status.contains("preview") || status.contains("reference")) return CYAN;
         if (status.contains("partial") || status.contains("deferred")) return YELLOW;
         if (status.contains("missing")) return RED;
@@ -827,6 +832,44 @@ public final class MainActivity extends Activity {
         }
         if (integration.has("requirement_status")) {
             builder.append("  requirements=").append(integration.optString("requirement_status", "unknown"));
+        }
+        if (integration.has("active_blocker")) {
+            builder.append("\nblocker=").append(integration.optString("active_blocker", "unknown"));
+        }
+        if (integration.has("software_glx_reproduced")) {
+            builder.append("\nsoftwareGlx=")
+                    .append(integration.optBoolean("software_glx_reproduced", false));
+        }
+        if (integration.has("hardware_glx_pass")) {
+            builder.append("  hardwareGlx=")
+                    .append(integration.optBoolean("hardware_glx_pass", false));
+        }
+        if (integration.has("real_buffer_pass")) {
+            builder.append("  realBuffer=")
+                    .append(integration.optBoolean("real_buffer_pass", false));
+        }
+        if (integration.has("gl_renderer")) {
+            builder.append("\nglRenderer=").append(integration.optString("gl_renderer"));
+        }
+        if (integration.has("vk_get_memory_fd_failures")) {
+            builder.append("\nvkGetMemoryFdFailures=")
+                    .append(integration.optInt("vk_get_memory_fd_failures", -1));
+        }
+        if (integration.has("real_buffer_commits") || integration.has("no_buffer_commits")) {
+            builder.append("  realCommits=")
+                    .append(integration.optInt("real_buffer_commits", -1));
+            builder.append("  noBufferCommits=")
+                    .append(integration.optInt("no_buffer_commits", -1));
+        }
+        if (integration.has("a1_fasttest_env_status")) {
+            builder.append("\na1=").append(integration.optString("a1_fasttest_env_status"));
+        }
+        if (integration.has("hook_ready")) {
+            builder.append("\nhookReady=").append(integration.optBoolean("hook_ready", false));
+        }
+        if (integration.has("rezygisk_provider_state")) {
+            builder.append("  rezygiskProvider=")
+                    .append(integration.optString("rezygisk_provider_state"));
         }
         JSONArray missingRequirements = integration.optJSONArray("missing_requirements");
         if (missingRequirements != null && missingRequirements.length() > 0) {
@@ -1594,12 +1637,16 @@ public final class MainActivity extends Activity {
 
     private String displayStatusLabel(String status) {
         if (status == null || status.isEmpty()) return "Unknown";
-        if ("wayland_display_pass".equals(status)) return "Wayland";
+        if ("blocked_export".equals(status)) return "Export";
+        if ("blocked_real_buffer".equals(status)) return "Real buffer";
+        if ("paused_crash_gated".equals(status)) return "Crash-gated";
+        if ("reference_only".equals(status)) return "Reference";
+        if (status.contains("wayland") && status.contains("pass")) return "Legacy";
         if ("display_preflight_incomplete".equals(status)) return "Partial";
         if ("ready_for_glx_fix".equals(status)) return "Legacy";
         if ("container_runtime_ready".equals(status)) return "Runtime";
         if ("preflight_ready".equals(status)) return "Preflight";
-        if ("proven_reference_not_wired".equals(status)) return "Proven";
+        if (status.contains("reference")) return "Reference";
         if ("safe_mode_blocks_start".equals(status)) return "Safe";
         if ("always_available".equals(status)) return "Ready";
         if ("not_wired".equals(status)) return "Pending";
@@ -1608,6 +1655,7 @@ public final class MainActivity extends Activity {
 
     private int displayLaneColor(String status) {
         if (status == null) return BLUE;
+        if (status.contains("blocked") || status.contains("crash_gated")) return YELLOW;
         if (status.contains("ready") || status.contains("pass")
                 || status.contains("always_available")) return GREEN;
         if (status.contains("proven")) return CYAN;
@@ -1620,6 +1668,9 @@ public final class MainActivity extends Activity {
     private String displayLaneDetail(JSONObject lane) {
         StringBuilder builder = new StringBuilder();
         builder.append("id=").append(lane.optString("id", "unknown"));
+        if (lane.has("state")) {
+            builder.append("\nstate=").append(lane.optString("state"));
+        }
         builder.append("\navailable=").append(lane.optBoolean("available", false));
         builder.append("  mutating=").append(lane.optBoolean("mutating", false));
         if (lane.has("start_command_available")) {
@@ -1636,6 +1687,43 @@ public final class MainActivity extends Activity {
         }
         if (lane.has("proof_classification")) {
             builder.append("\nproof=").append(lane.optString("proof_classification"));
+        }
+        if (lane.has("software_glx_reproduced")) {
+            builder.append("\nsoftwareGlx=").append(lane.optBoolean("software_glx_reproduced", false));
+        }
+        if (lane.has("hardware_glx_pass")) {
+            builder.append("  hardwareGlx=").append(lane.optBoolean("hardware_glx_pass", false));
+        }
+        if (lane.has("real_buffer_pass")) {
+            builder.append("  realBuffer=").append(lane.optBoolean("real_buffer_pass", false));
+        }
+        if (lane.has("gl_renderer")) {
+            builder.append("\nglRenderer=").append(lane.optString("gl_renderer"));
+        }
+        if (lane.has("vk_get_memory_fd_failures")) {
+            builder.append("\nvkGetMemoryFdFailures=")
+                    .append(lane.optInt("vk_get_memory_fd_failures", -1));
+        }
+        if (lane.has("real_buffer_commits") || lane.has("no_buffer_commits")) {
+            builder.append("  realCommits=")
+                    .append(lane.optInt("real_buffer_commits", -1));
+            builder.append("  noBufferCommits=")
+                    .append(lane.optInt("no_buffer_commits", -1));
+        }
+        if (lane.has("a1_fasttest_env_status")) {
+            builder.append("\na1=").append(lane.optString("a1_fasttest_env_status"));
+        }
+        if (lane.has("dock_lease_state")) {
+            builder.append("\ndockLease=").append(lane.optString("dock_lease_state"));
+        }
+        if (lane.has("rezygisk_provider_state")) {
+            builder.append("\nrezygiskProvider=").append(lane.optString("rezygisk_provider_state"));
+        }
+        if (lane.has("cooling_policy_state")) {
+            builder.append("\ncoolingPolicy=").append(lane.optString("cooling_policy_state"));
+        }
+        if (lane.has("reason")) {
+            builder.append("\nreason=").append(lane.optString("reason"));
         }
         if (lane.has("unpromoted_lead")) {
             builder.append("\nlead=").append(lane.optString("unpromoted_lead"));
@@ -2111,6 +2199,9 @@ public final class MainActivity extends Activity {
                     sb.append("  ").append(lane.optString("title", lane.optString("id", "Lane")))
                             .append(": ").append(lane.optString("status", "unknown")).append('\n');
                     sb.append("    id=").append(lane.optString("id", "unknown")).append('\n');
+                    if (lane.has("state")) {
+                        sb.append("    state=").append(lane.optString("state")).append('\n');
+                    }
                     sb.append("    available=").append(lane.optBoolean("available", false)).append('\n');
                     sb.append("    mutating=").append(lane.optBoolean("mutating", false)).append('\n');
                     if (lane.has("active_blocker")) {
@@ -2119,6 +2210,39 @@ public final class MainActivity extends Activity {
                     if (lane.has("proof_classification")) {
                         sb.append("    proof=")
                                 .append(lane.optString("proof_classification")).append('\n');
+                    }
+                    if (lane.has("software_glx_reproduced")) {
+                        sb.append("    softwareGlx=")
+                                .append(lane.optBoolean("software_glx_reproduced", false)).append('\n');
+                    }
+                    if (lane.has("hardware_glx_pass")) {
+                        sb.append("    hardwareGlx=")
+                                .append(lane.optBoolean("hardware_glx_pass", false)).append('\n');
+                    }
+                    if (lane.has("real_buffer_pass")) {
+                        sb.append("    realBuffer=")
+                                .append(lane.optBoolean("real_buffer_pass", false)).append('\n');
+                    }
+                    if (lane.has("gl_renderer")) {
+                        sb.append("    glRenderer=").append(lane.optString("gl_renderer")).append('\n');
+                    }
+                    if (lane.has("vk_get_memory_fd_failures")) {
+                        sb.append("    vkGetMemoryFdFailures=")
+                                .append(lane.optInt("vk_get_memory_fd_failures", -1)).append('\n');
+                    }
+                    if (lane.has("real_buffer_commits") || lane.has("no_buffer_commits")) {
+                        sb.append("    realCommits=")
+                                .append(lane.optInt("real_buffer_commits", -1))
+                                .append(" noBufferCommits=")
+                                .append(lane.optInt("no_buffer_commits", -1)).append('\n');
+                    }
+                    if (lane.has("a1_fasttest_env_status")) {
+                        sb.append("    a1=")
+                                .append(lane.optString("a1_fasttest_env_status")).append('\n');
+                    }
+                    if (lane.has("dock_lease_state")) {
+                        sb.append("    dockLease=")
+                                .append(lane.optString("dock_lease_state")).append('\n');
                     }
                     if (lane.has("unpromoted_lead")) {
                         sb.append("    lead=").append(lane.optString("unpromoted_lead")).append('\n');

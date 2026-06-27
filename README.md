@@ -45,7 +45,7 @@ Keep compatibility lanes explicit:
 
 | Tier | Lane | Status |
 | --- | --- | --- |
-| 1 | RM11 Pro WayLandIE/Gamescope/Xwayland R6 sidecars | Proven display lane: `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`. |
+| 1 | RM11 Pro WayLandIE/Gamescope/Xwayland R6 sidecars | App/native bridge solved; local loader pin confirmed by `NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED`; software GLX reproduced with `llvmpipe`; current blocker is Vulkan export / real-buffer (`vkGetMemoryFdKHR` failures, 0 real-buffer commits). |
 | 2 | Anland + DroidSpaces Ubuntu26/KDE | Proven visible lane: `NEBULA_R6_ANLAND_DROIDSPACES_WAYLAND_VISIBLE`. |
 | 3 | DroidSpaces native profiles | Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio profiles exist; each needs its own proof. |
 | 4 | Vower WayLandIE latest | Compatibility candidate for non-RM11Pro/lower-spec devices; synced locally at `3ea02d5`, not promoted as the RM11 R6 baseline. |
@@ -76,13 +76,13 @@ These are test artifacts, not stable releases:
 ```text
 APK:
 /home/richtofen/.android/repositories/Droidspaces-Nebula/app/build/outputs/apk/debug/app-debug.apk
-size: 6468816
-sha256: aad9d504b5e8a41a5a7bf8718024ba631ccc97c47f2ac4e413c15eb35283e286
+size: 6469966
+sha256: 67e49e8da87cd1a698faeb66e390aef52a8f6e1a9ac5873e9ad40beb96113a8c
 
 Core module:
 /home/richtofen/.android/repositories/Droidspaces-Nebula/build/module/Droidspaces-Nebula-Core-0.2.2.zip
-size: 34365
-sha256: 27c6a46ff942cbf66771667128978c1ce0f16efff8b23dc95c41c3a9c0384436
+size: 36116
+sha256: cfcbbabcc99cac22a9f62b24134a21a4f448fa2c252668aff5bf94fb9f111756
 ```
 
 Tester install order:
@@ -130,7 +130,7 @@ must not share the same writable `rootfs.img`.
 
 | Method | Container ref | Current requirements |
 | --- | --- | --- |
-| Phone/App Mode | `waylandie_app_imagefs` | Display proven by `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`; game-client runtime proof is not promoted yet. |
+| Phone/App Mode | `waylandie_app_imagefs` | App/native bridge and local loader pin are proven; software GLX is reproduced via `llvmpipe`; hardware GLX and real-buffer pass are not proven. Current blocker: Vulkan export / real-buffer path. |
 | Anland Surface Mode | dedicated DroidSpaces Anland container, recommended `anland-ubuntu26-kde` | Needs the Anland Android consumer APK, `virtual-drm-daemon` module, Ubuntu26 KDE rootfs with `anland_kde`, `anland.env`, socket bind, and `startanland-kde.sh`. |
 | DroidSpaces rootfs image | `rootfs.img` | Use `--rootfs-img` or import `--rootfs-arc` into a sparse image for stable Android container storage. |
 | DroidSpaces rootfs directory | `rootfs_directory` | Use `--rootfs` for simple unpacked rootfs testing. |

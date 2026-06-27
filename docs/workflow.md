@@ -61,7 +61,8 @@ manual dispatch.
 
 ## Wayland / Vulkan Gate
 
-2026-06-25 R6 Wayland proof 03 is the current display baseline.
+2026-06-25 R6 evidence now treats WayLandIE as an export-blocked baseline, not
+a real-buffer display pass.
 
 Do not run Steam, Proton, DXVK, or game targets until the bounded game-client gate
 is staged. Display preflight must first confirm the same requirements used by the
@@ -75,7 +76,9 @@ proof:
 | Local KGSL driver | Present at `/data/user/0/io.droidspaces.nebula.waylandie/files/imagefs/usr/local/lib/libvulkan_freedreno.so` |
 | Gamescope sidecar | `xwayland-gamescope-14-exportable-fence-guard-a4-473ba531` |
 | Xwayland sidecar | `xwayland-gamescope-06-xwayland-9f1a3d62` |
-| Proof result | `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS` |
+| Loader-pin result | `NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED` |
+| Software GLX result | `NEBULA_R6_SOFTWARE_GLX_REPRODUCED` with `llvmpipe` |
+| Active blocker | `vulkan_export_real_buffer`: `vkGetMemoryFdKHR` failures, 0 real-buffer commits, 8 no-buffer commits |
 
-Next single action: promote a bounded game-client proof only after Core reports
-`display_ready=true` for the Phone/App lane.
+Next single action: rerun only the bounded A1 export/runtime proof after ADB is
+live and the staged runner path is verified.
