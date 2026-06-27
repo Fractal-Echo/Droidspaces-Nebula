@@ -64,6 +64,12 @@ be ready while display is still blocked.
 | `compatibility_software` | future dedicated software container | `none` today | Not wired by design. | No start command. |
 | `recovery_safe` | `none` | `none` | Safe status lane, not a display renderer. | Always available. |
 
+Phone/App Mode exposes `selected_icd`, `selected_vulkan_driver`, and
+`loader_pin` in read-only status output. For the current R6 proof path,
+`VK_ICD_FILENAMES` and `VK_DRIVER_FILES` both point to the pinned local
+Freedreno ICD manifest inside the WayLandIE imagefs; that ICD then points to
+the local `libvulkan_freedreno.so`.
+
 DroidSpaces-native rootfs, display, GPU, software rendering, and audio methods
 come from the DroidSpaces repos and remain separate rows. Anland must not
 silently rewrite a general Termux:X11, VirGL, or Turnip test container in place.

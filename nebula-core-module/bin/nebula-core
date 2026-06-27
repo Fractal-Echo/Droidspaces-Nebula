@@ -954,6 +954,12 @@ waylandie_runtime_status_payload() {
   printf '"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,' \
     "$(json_bool "$wl_gamescope_sidecar_present")" \
     "$(json_bool "$wl_xwayland_sidecar_present")"
+  printf '"selected_icd":%s,"selected_vulkan_driver":%s,' \
+    "$(json_string "$wl_local_icd")" \
+    "$(json_string "$wl_local_vulkan_driver")"
+  printf '"loader_pin":{"VK_ICD_FILENAMES":%s,"VK_DRIVER_FILES":%s},' \
+    "$(json_string "$wl_local_icd")" \
+    "$(json_string "$wl_local_icd")"
   printf '"errors":[%s],"display_errors":[%s]' "$wl_errors" "$wl_display_errors"
 }
 
@@ -1544,6 +1550,9 @@ display_phone_preflight_payload() {
   printf '"xwayland_sidecar":%s,' "$(json_string "$DISPLAY_PHONE_XWAYLAND_SIDECAR")"
   printf '"selected_icd":%s,' "$(json_string "$wl_local_icd")"
   printf '"selected_vulkan_driver":%s,' "$(json_string "$wl_local_vulkan_driver")"
+  printf '"loader_pin":{"VK_ICD_FILENAMES":%s,"VK_DRIVER_FILES":%s},' \
+    "$(json_string "$wl_local_icd")" \
+    "$(json_string "$wl_local_icd")"
   printf '"source":%s,' "$(json_string "$DISPLAY_PHONE_SOURCE")"
   printf '"checks":{"display_ready":%s,"runtime_ready":%s,"package_installed":%s,"imagefs_present":%s,"bridge_present":%s,"local_icd_present":%s,"local_vulkan_driver_present":%s,"gamescope_sidecar_present":%s,"xwayland_sidecar_present":%s,"proton_present":%s,"wine_present":%s},' \
     "$(json_bool "$wl_display_ready")" \

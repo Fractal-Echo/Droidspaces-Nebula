@@ -12,7 +12,7 @@ Nebula is not a replacement for DroidSpaces, Termux:X11, WayLandIE, Nubia Toolki
 - generate a copyable diagnostic report
 - keep risky root/module work out of the first app cut
 
-Current status: WIP. Do not describe Nebula as stable, production ready, or safe for general users yet.
+Current status: pre-release integration baseline. Do not describe Nebula as stable, production ready, or safe for general users yet.
 
 ## Package
 
@@ -142,6 +142,12 @@ must not share the same writable `rootfs.img`.
 | Compatibility Mode | future dedicated compatibility/software container | Not wired by design. |
 | Recovery/Safe Mode | `none` | Always available, blocks risky starts. |
 
+For Phone/App Mode, first check `runtime waylandie status --json` or
+`display lanes --json`. The read-only output now includes `selected_icd`,
+`selected_vulkan_driver`, and `loader_pin`, where `VK_ICD_FILENAMES` and
+`VK_DRIVER_FILES` both point to the pinned local Freedreno ICD manifest inside
+the WayLandIE imagefs.
+
 DroidSpaces already owns rootfs image/directory startup, Termux:X11, VirGL,
 Turnip/KGSL, llvmpipe, and PulseAudio wiring. Nebula reports them separately so
 we can try each method without mixing socket, GPU, audio, and rootfs assumptions
@@ -240,7 +246,7 @@ docs/       workflow, lane, upstream, and safety notes
 scripts/    validation helpers for CI and local review
 ```
 
-The current WayLandIE bridge experiments are still promoted selectively from the local WIP worktree:
+The current WayLandIE bridge experiments are still promoted selectively from the local review worktree:
 
 ```text
 /home/richtofen/.android/repositories/nebula-assets/Repos/waylandie-vower-578b431

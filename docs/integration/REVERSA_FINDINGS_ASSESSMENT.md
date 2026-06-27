@@ -45,13 +45,15 @@ Result: no active Nebula placeholder payload was found in the Hub by filename.
 
 Evidence:
 
-- `scripts/audit-placeholders.sh` is the only Hub file matched by the bounded
-  placeholder-name check.
+- `scripts/audit-placeholders.sh` was a self-match from the audit script's own
+  sentinel strings, not an unresolved runtime payload.
+- The audit script now builds those sentinel strings at runtime so Reversa does
+  not report the audit tool itself as source uncertainty.
 - Prior cleanup removed generated build residue and stale temporary phone probe
   files.
 
-Decision: no patch required. Future imports still need the Reversa placeholder
-classification gate before being trusted as runtime payloads.
+Decision: no runtime patch required. Future imports still need the Reversa
+placeholder classification gate before being trusted as runtime payloads.
 
 ### 2. Phone/App graphics contradiction
 

@@ -49,7 +49,7 @@ Allowed fixed commands:
 | `legacy modules --json` | Reports protected old Droidspaces module status from fixed module IDs. |
 | `integrations baseline --json` | Reports the one baseline APK/module contract across WayLandIE, DroidSpaces/Anland, Nubia Toolkit, RedMagic Control Center, and PowerDeck without enabling mutating behavior. |
 | `nubia toolkit status --json` | Reports audited Nubia Toolkit/Vector readiness without enabling hooks. |
-| `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, and linker readiness. |
+| `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, linker readiness, selected local Freedreno ICD/driver, and the `VK_ICD_FILENAMES` / `VK_DRIVER_FILES` loader pin. |
 | `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
 | `display lanes --json` | Read-only multi-lane selector status for Phone/App, Dock Lease, Anland, Compatibility, and Recovery lanes. |
 | `display lane phone preflight --json` | Read-only WayLandIE/Gamescope/Xwayland lane preflight and active blocker status. |

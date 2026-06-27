@@ -1635,12 +1635,19 @@ public final class MainActivity extends Activity {
         if (lane.has("kernel_va_bits_evidence")) {
             builder.append("  evidence=").append(lane.optString("kernel_va_bits_evidence"));
         }
-        if (lane.has("runtime_blocker")) {
-            builder.append("\nruntimeBlocker=").append(lane.optString("runtime_blocker"));
-        }
-        if (lane.has("runtime_constraint")) {
-            builder.append("\nruntimeConstraint=").append(lane.optString("runtime_constraint"));
-        }
+	        if (lane.has("runtime_blocker")) {
+	            builder.append("\nruntimeBlocker=").append(lane.optString("runtime_blocker"));
+	        }
+	        if (lane.has("selected_icd")) {
+	            builder.append("\nselectedIcd=").append(lane.optString("selected_icd"));
+	        }
+	        if (lane.has("selected_vulkan_driver")) {
+	            builder.append("\nselectedDriver=").append(lane.optString("selected_vulkan_driver"));
+	        }
+	        builder.append(loaderPinLines(lane));
+	        if (lane.has("runtime_constraint")) {
+	            builder.append("\nruntimeConstraint=").append(lane.optString("runtime_constraint"));
+	        }
         if (lane.has("evidence_captured")) {
             builder.append("\nevidenceCaptured=").append(lane.optBoolean("evidence_captured", false));
             builder.append("  externalOnly=").append(lane.optBoolean("external_display_only", false));
@@ -1707,15 +1714,27 @@ public final class MainActivity extends Activity {
         if (object == null) {
             return "moduleStatus=unavailable\nmethod=root_assisted_proot";
         }
-        return "package=" + object.optString("package", "unknown")
-                + "\nmethod=" + object.optString("method", "unknown")
-                + "\nready=" + object.optBoolean("ready", false)
-                + "\nsafeMode=" + object.optBoolean("safe_mode", false)
-                + "\nimagefs=" + jsonBoolLabel(object, "imagefs_present")
-                + "\nproton=" + jsonBoolLabel(object, "proton_present")
-                + "\nwine=" + jsonBoolLabel(object, "wine_present")
-                + "\nerrors=" + object.optJSONArray("errors");
-    }
+	        return "package=" + object.optString("package", "unknown")
+	                + "\nmethod=" + object.optString("method", "unknown")
+	                + "\nready=" + object.optBoolean("ready", false)
+	                + "\nsafeMode=" + object.optBoolean("safe_mode", false)
+	                + "\nimagefs=" + jsonBoolLabel(object, "imagefs_present")
+	                + "\nproton=" + jsonBoolLabel(object, "proton_present")
+	                + "\nwine=" + jsonBoolLabel(object, "wine_present")
+	                + "\nselectedIcd=" + object.optString("selected_icd", "unknown")
+	                + "\nselectedDriver=" + object.optString("selected_vulkan_driver", "unknown")
+	                + loaderPinLines(object)
+	                + "\nerrors=" + object.optJSONArray("errors");
+	    }
+
+	    private String loaderPinLines(JSONObject object) {
+	        JSONObject loaderPin = object.optJSONObject("loader_pin");
+	        if (loaderPin == null) {
+	            return "";
+	        }
+	        return "\nVK_ICD_FILENAMES=" + loaderPin.optString("VK_ICD_FILENAMES", "unknown")
+	                + "\nVK_DRIVER_FILES=" + loaderPin.optString("VK_DRIVER_FILES", "unknown");
+	    }
 
     private void runWaylandieSmoke() {
         CommandResult result = coreClient.waylandieProtonSmoke();
@@ -2093,13 +2112,30 @@ public final class MainActivity extends Activity {
                         sb.append("    kernelVaBitsConstraint=")
                                 .append(lane.optInt("kernel_va_bits_constraint", -1)).append('\n');
                     }
-                    if (lane.has("runtime_blocker")) {
-                        sb.append("    runtimeBlocker=")
-                                .append(lane.optString("runtime_blocker")).append('\n');
-                    }
-                    if (lane.has("evidence_captured")) {
-                        sb.append("    evidenceCaptured=").append(lane.optBoolean("evidence_captured", false)).append('\n');
-                    }
+	                    if (lane.has("runtime_blocker")) {
+	                        sb.append("    runtimeBlocker=")
+	                                .append(lane.optString("runtime_blocker")).append('\n');
+	                    }
+	                    if (lane.has("selected_icd")) {
+	                        sb.append("    selectedIcd=")
+	                                .append(lane.optString("selected_icd")).append('\n');
+	                    }
+	                    if (lane.has("selected_vulkan_driver")) {
+	                        sb.append("    selectedDriver=")
+	                                .append(lane.optString("selected_vulkan_driver")).append('\n');
+	                    }
+	                    JSONObject loaderPin = lane.optJSONObject("loader_pin");
+	                    if (loaderPin != null) {
+	                        sb.append("    VK_ICD_FILENAMES=")
+	                                .append(loaderPin.optString("VK_ICD_FILENAMES", "unknown"))
+	                                .append('\n');
+	                        sb.append("    VK_DRIVER_FILES=")
+	                                .append(loaderPin.optString("VK_DRIVER_FILES", "unknown"))
+	                                .append('\n');
+	                    }
+	                    if (lane.has("evidence_captured")) {
+	                        sb.append("    evidenceCaptured=").append(lane.optBoolean("evidence_captured", false)).append('\n');
+	                    }
                     sb.append("    source=").append(lane.optString("source", "unknown")).append('\n');
                 }
             }

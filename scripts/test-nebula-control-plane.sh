@@ -239,6 +239,10 @@ assert obj["display_ready"] is True
 assert obj["bridge_present"] is True
 assert obj["local_icd_present"] is True
 assert obj["local_vulkan_driver_present"] is True
+assert obj["selected_icd"].endswith("/files/imagefs/usr/local/etc/vulkan/icd.d/freedreno_icd.json")
+assert obj["selected_vulkan_driver"].endswith("/files/imagefs/usr/local/lib/libvulkan_freedreno.so")
+assert obj["loader_pin"]["VK_ICD_FILENAMES"] == obj["selected_icd"]
+assert obj["loader_pin"]["VK_DRIVER_FILES"] == obj["selected_icd"]
 assert obj["gamescope_sidecar_present"] is True
 assert obj["xwayland_sidecar_present"] is True
 assert obj["errors"] == []
@@ -387,6 +391,10 @@ assert lanes["phone_app_bridge"]["steam_allowed"] is False
 assert lanes["phone_app_bridge"]["kernel_va_bits_constraint"] == 39
 assert lanes["phone_app_bridge"]["kernel_va_bits_evidence"] == "live_proc_config_gz"
 assert lanes["phone_app_bridge"]["runtime_blocker"] == "GAME_CLIENT_RUNTIME_NOT_PROMOTED_39BIT_VA"
+assert lanes["phone_app_bridge"]["selected_icd"].endswith("/files/imagefs/usr/local/etc/vulkan/icd.d/freedreno_icd.json")
+assert lanes["phone_app_bridge"]["selected_vulkan_driver"].endswith("/files/imagefs/usr/local/lib/libvulkan_freedreno.so")
+assert lanes["phone_app_bridge"]["loader_pin"]["VK_ICD_FILENAMES"] == lanes["phone_app_bridge"]["selected_icd"]
+assert lanes["phone_app_bridge"]["loader_pin"]["VK_DRIVER_FILES"] == lanes["phone_app_bridge"]["selected_icd"]
 assert lanes["phone_app_bridge"]["checks"]["display_ready"] is True
 assert lanes["phone_app_bridge"]["checks"]["runtime_ready"] is True
 assert lanes["phone_app_bridge"]["checks"]["local_icd_present"] is True
