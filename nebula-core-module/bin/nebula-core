@@ -30,6 +30,9 @@ NUBIA_TOOLKIT_SOURCE="NubiaToolkit HookEntry and feature hooks@$NUBIA_TOOLKIT_SO
 NUBIA_TOOLKIT_PACKAGE=com.khanhnguyen9872.nubiatoolkit
 NUBIA_GAME_ASSIST_PACKAGE=cn.nubia.gameassist
 NUBIA_GAME_LAUNCHER_PACKAGE=cn.nubia.gamelauncher
+REZYGISK_MODULE_ID=rezygisk
+REZYGISK_ARTIFACT_SHA256=5da9308aca2f1233e1b74744a86b39ab55749db352a829c7578743df6af16f4f
+REZYGISK_ARTIFACT_PATH=/mnt/d/Downloads/ReZygisk-v1.0.0-rc.9-release.zip
 REDMAGIC_CONTROL_PACKAGE=com.elitedarkkaiser.redmagic
 DROIDSPACES_PACKAGE=com.droidspaces.app
 POWERDECK_MODULE_ID=redmagic_powerdeck
@@ -770,6 +773,21 @@ nubia_toolkit_status_json() {
   case "$vector_version_code" in
     ''|*[!0-9]*) vector_version_code=0 ;;
   esac
+  rezygisk_dir="$MODULES_ROOT/$REZYGISK_MODULE_ID"
+  rezygisk_installed=0
+  rezygisk_enabled=0
+  rezygisk_version=unknown
+  rezygisk_version_code=0
+  if [ -d "$rezygisk_dir" ]; then
+    rezygisk_installed=1
+    [ ! -f "$rezygisk_dir/disable" ] && rezygisk_enabled=1
+    rezygisk_version=$(module_prop_from_dir "$rezygisk_dir" version)
+    rezygisk_version_code=$(module_prop_from_dir "$rezygisk_dir" versionCode)
+  fi
+  [ -n "$rezygisk_version" ] || rezygisk_version=unknown
+  case "$rezygisk_version_code" in
+    ''|*[!0-9]*) rezygisk_version_code=0 ;;
+  esac
 
   printf '{"protocol_version":%s,"command":"nubia toolkit status",' "$PROTOCOL_VERSION"
   printf '"source_project":"NubiaToolkit","source_commit":%s,"license":"Apache-2.0",' \
@@ -781,6 +799,13 @@ nubia_toolkit_status_json() {
     "$(json_bool "$vector_enabled")" \
     "$(json_string "$vector_version")" \
     "$vector_version_code"
+  printf '"zygisk_provider":{"id":"rezygisk","name":"ReZygisk","role":"standalone_zygisk_provider","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"artifact_sha256":%s,"artifact_path":%s,"requires_magisk_builtin_zygisk_disabled":true},' \
+    "$(json_bool "$rezygisk_installed")" \
+    "$(json_bool "$rezygisk_enabled")" \
+    "$(json_string "$rezygisk_version")" \
+    "$rezygisk_version_code" \
+    "$(json_string "$REZYGISK_ARTIFACT_SHA256")" \
+    "$(json_string "$REZYGISK_ARTIFACT_PATH")"
   printf '"packages":{'
   nubia_package_json game_assist "$NUBIA_GAME_ASSIST_PACKAGE" "Game Assist hook target"
   printf ','
@@ -2471,6 +2496,19 @@ integrations_baseline_json() {
   if [ "$vector_installed" = "1" ] && [ "$(module_disabled_value zygisk_vector)" = "0" ]; then
     vector_enabled=1
   fi
+  rezygisk_installed=$(module_installed_value "$REZYGISK_MODULE_ID")
+  rezygisk_enabled=0
+  rezygisk_version=unknown
+  rezygisk_version_code=0
+  if [ "$rezygisk_installed" = "1" ]; then
+    [ "$(module_disabled_value "$REZYGISK_MODULE_ID")" = "0" ] && rezygisk_enabled=1
+    rezygisk_version=$(module_prop_from_dir "$MODULES_ROOT/$REZYGISK_MODULE_ID" version)
+    rezygisk_version_code=$(module_prop_from_dir "$MODULES_ROOT/$REZYGISK_MODULE_ID" versionCode)
+  fi
+  [ -n "$rezygisk_version" ] || rezygisk_version=unknown
+  case "$rezygisk_version_code" in
+    ''|*[!0-9]*) rezygisk_version_code=0 ;;
+  esac
   nubia_game_assist=$(package_visible_value "$NUBIA_GAME_ASSIST_PACKAGE")
   nubia_game_launcher=$(package_visible_value "$NUBIA_GAME_LAUNCHER_PACKAGE")
   nubia_toolkit_reference=$(package_visible_value "$NUBIA_TOOLKIT_PACKAGE")
@@ -2525,7 +2563,7 @@ integrations_baseline_json() {
   printf '{"protocol_version":%s,"command":"integrations baseline",' "$PROTOCOL_VERSION"
   printf '"baseline_id":"nebula_rm11pro_baseline","overall_status":%s,' "$(json_string "$overall_status")"
   printf '"apk_package":"io.droidspaces.nebula","module_id":"%s","safe_default":true,"mutating_controls_enabled":false,' "$MODULE_ID"
-  printf '"requirements":["Root with KernelSU/Magisk-compatible module support","Nebula Core module installed for root-side status","WayLandIE companion APK for Phone/App display lane","DroidSpaces/Anland files for container surface fallback","RM11 Pro/NX809J hardware for RedMagic fan, pump, LED, and trigger nodes","Vector/LSPosed only when hook lanes are intentionally enabled"],'
+  printf '"requirements":["Root with KernelSU/Magisk-compatible module support","Nebula Core module installed for root-side status","WayLandIE companion APK for Phone/App display lane","DroidSpaces/Anland files for container surface fallback","RM11 Pro/NX809J hardware for RedMagic fan, pump, LED, and trigger nodes","ReZygisk as standalone Zygisk provider when testing hook lanes; Magisk built-in Zygisk disabled","Vector/LSPosed only when hook lanes are intentionally enabled"],'
   printf '"integrations":['
   printf '{"id":"nebula_core","title":"Nebula Core module","owner":"Nebula","role":"fixed_root_contract","status":"ready","installed":true,"ready":true,"mutating":false,"version":%s,"source":"nebula-core-module"},' \
     "$(json_string "$(module_version)")"
@@ -2580,7 +2618,7 @@ integrations_baseline_json() {
 	    "$(json_string "$anland_selected_rootfs")" \
 	    "$(json_string "$ANLAND_REPAIR_SOURCE")" \
 	    "$anland_errors"
-  printf '{"id":"nubia_toolkit","title":"Nubia Toolkit hook lane","owner":"Nebula status port plus optional Vector/LSPosed","role":"gamehub_hooks_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"hooks_active":false,"old_toolkit_required":false,"packages":{"game_assist":%s,"game_launcher":%s,"toolkit_reference":%s},"hook_framework":{"id":"zygisk_vector","installed":%s,"enabled":%s},"source":%s},' \
+  printf '{"id":"nubia_toolkit","title":"Nubia Toolkit hook lane","owner":"Nebula status port plus optional ReZygisk provider and Vector/LSPosed","role":"gamehub_hooks_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"hooks_active":false,"old_toolkit_required":false,"packages":{"game_assist":%s,"game_launcher":%s,"toolkit_reference":%s},"hook_framework":{"id":"zygisk_vector","installed":%s,"enabled":%s},"zygisk_provider":{"id":"rezygisk","installed":%s,"enabled":%s,"version":%s,"version_code":%s,"artifact_sha256":%s,"requires_magisk_builtin_zygisk_disabled":true},"source":%s},' \
     "$(json_string "$nubia_status")" \
     "$(json_bool "$nubia_installed")" \
     "$(json_bool "$nubia_ready")" \
@@ -2589,6 +2627,11 @@ integrations_baseline_json() {
     "$(json_bool "$nubia_toolkit_reference")" \
     "$(json_bool "$vector_installed")" \
     "$(json_bool "$vector_enabled")" \
+    "$(json_bool "$rezygisk_installed")" \
+    "$(json_bool "$rezygisk_enabled")" \
+    "$(json_string "$rezygisk_version")" \
+    "$rezygisk_version_code" \
+    "$(json_string "$REZYGISK_ARTIFACT_SHA256")" \
     "$(json_string "$NUBIA_TOOLKIT_SOURCE")"
   printf '{"id":"redmagic_control_center","title":"RedMagic Control Center lane","owner":"Nebula read-only probe plus optional standalone APK","role":"hardware_status_reference","status":%s,"installed":%s,"ready":%s,"mutating":false,"writes_enabled":false,"package":%s,"checks":{"fan_enable":%s,"fan_level":%s,"pump_enable":%s,"led_effect":%s,"triggers":%s},"source":%s},' \
     "$(json_string "$redmagic_status")" \

@@ -841,6 +841,10 @@ public final class MainActivity extends Activity {
         if (integration.has("dry_run_required")) {
             builder.append("  dryRunRequired=").append(integration.optBoolean("dry_run_required", true));
         }
+        JSONObject provider = integration.optJSONObject("zygisk_provider");
+        if (provider != null) {
+            builder.append("\nzygiskProvider=").append(providerStatus(provider));
+        }
         if (integration.has("selected_container")) {
             builder.append("\nselectedContainer=").append(integration.optString("selected_container", "unknown"));
         }
@@ -1094,6 +1098,9 @@ public final class MainActivity extends Activity {
         JSONObject framework = object.optJSONObject("hook_framework");
         if (framework != null && framework.optBoolean("enabled", false)) return "Vector on";
         if (framework != null && framework.optBoolean("installed", false)) return "Vector off";
+        JSONObject provider = object.optJSONObject("zygisk_provider");
+        if (provider != null && provider.optBoolean("enabled", false)) return "ReZygisk";
+        if (provider != null && provider.optBoolean("installed", false)) return "Provider off";
         return "Ported";
     }
 
@@ -1103,6 +1110,9 @@ public final class MainActivity extends Activity {
         JSONObject framework = object.optJSONObject("hook_framework");
         if (framework != null && framework.optBoolean("enabled", false)) return GREEN;
         if (framework != null && framework.optBoolean("installed", false)) return YELLOW;
+        JSONObject provider = object.optJSONObject("zygisk_provider");
+        if (provider != null && provider.optBoolean("enabled", false)) return CYAN;
+        if (provider != null && provider.optBoolean("installed", false)) return YELLOW;
         return CYAN;
     }
 
@@ -1112,6 +1122,7 @@ public final class MainActivity extends Activity {
             return "moduleStatus=unavailable\nintegration=ported_status_only";
         }
         JSONObject framework = object.optJSONObject("hook_framework");
+        JSONObject provider = object.optJSONObject("zygisk_provider");
         JSONObject packages = object.optJSONObject("packages");
         JSONObject gameAssist = packages == null ? null : packages.optJSONObject("game_assist");
         JSONObject gameLauncher = packages == null ? null : packages.optJSONObject("game_launcher");
@@ -1121,6 +1132,7 @@ public final class MainActivity extends Activity {
                 + "\nlsposedRequiredForHooks=" + object.optBoolean("lsposed_required_for_hooks", true)
                 + "\nhooksActive=" + object.optBoolean("lsposed_hooks_active", false)
                 + "\nframework=" + frameworkStatus(framework)
+                + "\nzygiskProvider=" + providerStatus(provider)
                 + "\ngameAssist=" + packageVisibleLabel(gameAssist)
                 + "\ngameLauncher=" + packageVisibleLabel(gameLauncher)
                 + "\noldToolkitApk=" + packageVisibleLabel(toolkit);
@@ -1132,6 +1144,17 @@ public final class MainActivity extends Activity {
         String installed = framework.optBoolean("installed", false) ? "installed" : "missing";
         return framework.optString("name", "framework") + " " + installed + "/" + enabled
                 + " " + framework.optString("version", "unknown");
+    }
+
+    private String providerStatus(JSONObject provider) {
+        if (provider == null) return "unknown";
+        String enabled = provider.optBoolean("enabled", false) ? "enabled" : "disabled";
+        String installed = provider.optBoolean("installed", false) ? "installed" : "missing";
+        String note = provider.optBoolean("requires_magisk_builtin_zygisk_disabled", false)
+                ? " magiskBuiltinZygisk=disabled-required"
+                : "";
+        return provider.optString("name", provider.optString("id", "provider")) + " "
+                + installed + "/" + enabled + " " + provider.optString("version", "unknown") + note;
     }
 
     private String packageVisibleLabel(JSONObject object) {

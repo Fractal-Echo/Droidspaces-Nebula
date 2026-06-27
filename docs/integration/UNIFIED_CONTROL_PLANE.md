@@ -48,7 +48,7 @@ Allowed fixed commands:
 | `snapshot cooling rollback --dry-run --json` | Returns a rollback plan with `applied=false`; no hardware writes. |
 | `legacy modules --json` | Reports protected old Droidspaces module status from fixed module IDs. |
 | `integrations baseline --json` | Reports the one baseline APK/module contract across WayLandIE, DroidSpaces/Anland, Nubia Toolkit, RedMagic Control Center, and PowerDeck without enabling mutating behavior. |
-| `nubia toolkit status --json` | Reports audited Nubia Toolkit/Vector readiness without enabling hooks. |
+| `nubia toolkit status --json` | Reports audited Nubia Toolkit, ReZygisk provider, and Vector readiness without enabling hooks. |
 | `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, linker readiness, selected local Freedreno ICD/driver, and the `VK_ICD_FILENAMES` / `VK_DRIVER_FILES` loader pin. |
 | `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
 | `display lanes --json` | Read-only multi-lane selector status for Phone/App, Dock Lease, Anland, Compatibility, and Recovery lanes. |
@@ -105,6 +105,7 @@ Pass 01 defaults:
 - The baseline integration report is read-only. It can mark an integration ready,
   partial, missing, or deferred, but it does not activate LSPosed hooks, write
   RedMagic nodes, start DroidSpaces containers, or launch WayLandIE targets.
+- ReZygisk (`rezygisk`) is the selected standalone Zygisk provider for hook-lane testing when the normal provider path fails. Local artifact: `/mnt/d/Downloads/ReZygisk-v1.0.0-rc.9-release.zip`, SHA-256 `5da9308aca2f1233e1b74744a86b39ab55749db352a829c7578743df6af16f4f`, module version `v1.0.0 (513-faccedf-release)`, author `The PerformanC Organization`. Its module scripts exit when Magisk built-in Zygisk is enabled, so disable Magisk built-in Zygisk before using this provider.
 - Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane. Nebula Core reports its module state, but hook scoping and mutating Nubia Toolkit behavior remain deferred.
 - The WayLandIE Proton smoke command accepts no arbitrary path, package, or shell input and is blocked by Nebula safe mode.
 - The DRM Control package and Bob Dilian evidence are treated as confirmed Dock

@@ -159,13 +159,22 @@ package_dir="$tmp/packages"
 modules_root="$tmp/modules"
 mkdir -p "$package_dir/cn.nubia.gameassist" \
   "$package_dir/cn.nubia.gamelauncher" \
-  "$modules_root/zygisk_vector"
+  "$modules_root/zygisk_vector" \
+  "$modules_root/rezygisk"
 {
   printf 'id=zygisk_vector\n'
   printf 'name=Vector\n'
   printf 'version=v2.0 (3021)\n'
   printf 'versionCode=3021\n'
 } > "$modules_root/zygisk_vector/module.prop"
+{
+  printf 'id=rezygisk\n'
+  printf 'name=ReZygisk\n'
+  printf 'version=v1.0.0 (513-faccedf-release)\n'
+  printf 'versionCode=513\n'
+  printf 'author=The PerformanC Organization\n'
+  printf 'description=Standalone implementation of Zygisk.\n'
+} > "$modules_root/rezygisk/module.prop"
 nubia_status="$(
   NEBULA_TEST_PACKAGE_DIR="$package_dir" \
   NEBULA_MODULES_ROOT="$modules_root" \
@@ -185,6 +194,16 @@ assert framework["id"] == "zygisk_vector"
 assert framework["installed"] is True
 assert framework["enabled"] is True
 assert framework["android_16_compatible"] is True
+provider = obj["zygisk_provider"]
+assert provider["id"] == "rezygisk"
+assert provider["name"] == "ReZygisk"
+assert provider["role"] == "standalone_zygisk_provider"
+assert provider["installed"] is True
+assert provider["enabled"] is True
+assert provider["version"] == "v1.0.0 (513-faccedf-release)"
+assert provider["version_code"] == 513
+assert provider["artifact_sha256"] == "5da9308aca2f1233e1b74744a86b39ab55749db352a829c7578743df6af16f4f"
+assert provider["requires_magisk_builtin_zygisk_disabled"] is True
 packages = obj["packages"]
 assert packages["game_assist"]["visible"] is True
 assert packages["game_launcher"]["visible"] is True
@@ -1272,6 +1291,10 @@ assert items["droidspaces"]["selected_paths"]["container_config"] == "/data/loca
 assert items["nubia_toolkit"]["status"] == "hook_framework_ready_scope_deferred"
 assert items["nubia_toolkit"]["ready"] is True
 assert items["nubia_toolkit"]["hooks_active"] is False
+assert items["nubia_toolkit"]["zygisk_provider"]["id"] == "rezygisk"
+assert items["nubia_toolkit"]["zygisk_provider"]["installed"] is True
+assert items["nubia_toolkit"]["zygisk_provider"]["enabled"] is True
+assert items["nubia_toolkit"]["zygisk_provider"]["requires_magisk_builtin_zygisk_disabled"] is True
 assert items["redmagic_control_center"]["status"] == "read_only_nodes_visible"
 assert items["redmagic_control_center"]["ready"] is True
 assert items["redmagic_control_center"]["writes_enabled"] is False

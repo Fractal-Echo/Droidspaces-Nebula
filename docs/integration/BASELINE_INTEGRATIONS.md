@@ -30,7 +30,7 @@ shell text is accepted.
 | Nebula Core | Fixed privileged status contract | Fixed commands only |
 | WayLandIE | Phone/App display bridge and future game runtime lane | Display status read-only; Proton smoke remains safe-mode guarded |
 | DroidSpaces / Anland | Selected container and surface fallback lane | Preflight read-only |
-| Nubia Toolkit | GameHub/GameAssist hook reference | Hook activation deferred to explicit Vector/LSPosed scope |
+| Nubia Toolkit | GameHub/GameAssist hook reference | Hook activation deferred to explicit ReZygisk provider plus Vector/LSPosed scope |
 | RedMagic Control Center | Hardware node reference and optional standalone APK | Node writes disabled in baseline |
 | PowerDeck | Dry-run profile automation model | Preview/snapshot only |
 
@@ -42,6 +42,7 @@ shell text is accepted.
 - WayLandIE companion package installed for the Phone/App display lane.
 - DroidSpaces/Anland runtime files only if testing the selected container or
   surface lane.
+- ReZygisk v1.0.0-rc.9 only if intentionally testing standalone Zygisk provider plumbing for future Nubia hook lanes; Magisk built-in Zygisk must be disabled for that module path.
 - Vector/LSPosed only if intentionally testing future Nubia hook lanes.
 
 ## Container Method Matrix

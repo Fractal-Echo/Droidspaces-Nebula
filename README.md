@@ -33,7 +33,7 @@ Nebula then reports the status of the other lanes from one place:
 
 - WayLandIE display/runtime;
 - DroidSpaces / Anland container fallback;
-- Nubia Toolkit / Vector hook readiness;
+- Nubia Toolkit / ReZygisk provider / Vector hook readiness;
 - RedMagic Control Center hardware references;
 - PowerDeck dry-run automation readiness.
 
@@ -60,6 +60,7 @@ lane. It needs bounded install/launch/display proof before user promotion.
 - RM11 Pro / NX809J for RedMagic fan, pump, LED, trigger, and GameHub-specific checks.
 - WayLandIE companion APK for the Phone/App display lane.
 - DroidSpaces/Anland files only when testing the container surface lane.
+- ReZygisk v1.0.0-rc.9 as the standalone Zygisk provider when intentionally testing future Nubia hook lanes; disable Magisk built-in Zygisk for this module path.
 - Vector/LSPosed only when intentionally testing future Nubia hook lanes.
 - ADB access for logs, APK install, module install, and recovery.
 
@@ -68,20 +69,20 @@ nodes, start game clients, replace DroidSpaces, or launch Proton/Wine/Steam.
 
 ## Current Debug Artifacts
 
-Checked: 2026-06-26
+Checked: 2026-06-27
 
 These are test artifacts, not stable releases:
 
 ```text
 APK:
 /home/richtofen/.android/repositories/Droidspaces-Nebula/app/build/outputs/apk/debug/app-debug.apk
-size: 6468069
-sha256: fa6e1d5105f489f9ccbc47c847216ed9f2ed70c32251461d7d5f155b28d45af9
+size: 6468816
+sha256: aad9d504b5e8a41a5a7bf8718024ba631ccc97c47f2ac4e413c15eb35283e286
 
 Core module:
 /home/richtofen/.android/repositories/Droidspaces-Nebula/build/module/Droidspaces-Nebula-Core-0.2.2.zip
-size: 33756
-sha256: 75817ccdbf646fc31e83c522ff41afad212e7716af47928eaddca6dbedcb7e86
+size: 34365
+sha256: 27c6a46ff942cbf66771667128978c1ce0f16efff8b23dc95c41c3a9c0384436
 ```
 
 Tester install order:

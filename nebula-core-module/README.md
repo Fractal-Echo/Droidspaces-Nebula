@@ -58,10 +58,11 @@ transaction.
 
 Pass 05 stages protected legacy Droidspaces module migration evidence. The staged SELinux policy under `sepolicy.d/` is not active module policy yet; keep the old `droidspaces` and `rm11-droidspace-bridge-fd` modules enabled until one-at-a-time migration and reboot verification pass.
 
-`nubia toolkit status --json` reports the audited Nubia Toolkit hook lane and
-the Android 16-compatible Vector/LSPosed module state. It does not enable hooks,
-scope packages, force-stop vendor apps, or require the old standalone Nubia
-Toolkit APK for status display.
+`nubia toolkit status --json` reports the audited Nubia Toolkit hook lane, the
+ReZygisk standalone Zygisk provider state, and the Android 16-compatible
+Vector/LSPosed module state. It does not enable hooks, scope packages,
+force-stop vendor apps, or require the old standalone Nubia Toolkit APK for
+status display.
 
 `runtime waylandie status --json` checks fixed WayLandIE app/runtime paths only.
 `runtime waylandie proton-smoke --json` is safe-mode guarded and runs only the
