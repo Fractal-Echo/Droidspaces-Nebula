@@ -1,6 +1,9 @@
 # Nebula Unified Control Plane
 
 Pass 01 splits Droidspaces: Nebula into one Android APK and one KernelSU module.
+`CONTROL_PLANE_POLICY.md` is the current policy authority for docs/UI wording
+around read-only probes, preview-only status, runtime-lane separation, hook-lane
+separation, and source/asset rules.
 
 ## Roles
 
@@ -78,8 +81,12 @@ The APK displays:
 - app version;
 - expected module version;
 - protocol version;
-- app Git commit when Gradle can read it;
-- reported module version/protocol/Git commit from `status --json`.
+- app Git revision identifier when Gradle can read it;
+- reported module version/protocol/revision identifier from `status --json`.
+
+Git revision metadata here is project provenance only. It does not permit adding
+proprietary RedMagic ROM, GameHub, vendor APK, sound, icon, layout, or binary
+assets into the public Hub.
 
 A module version or protocol mismatch is visible in the Nebula Core card and doctor report.
 
@@ -91,7 +98,7 @@ Pass 01 defaults:
 - Safe mode available and explicit.
 - Dock profile activation blocked until the broker/receiver start path exists.
 - Dock Lease Mode is a proven external-display reference lane, surfaced read-only
-  until Nebula has fixed start/stop/revoke commands.
+  and paused/crash-gated until Nebula has fixed start/stop/revoke commands.
 - Compatibility Mode blocked.
 - No phone/device action during build or tests.
 - No boot-time target start.
@@ -105,13 +112,24 @@ Pass 01 defaults:
 - The baseline integration report is read-only. It can mark an integration ready,
   partial, missing, or deferred, but it does not activate LSPosed hooks, write
   RedMagic nodes, start DroidSpaces containers, or launch WayLandIE targets.
-- ReZygisk (`rezygisk`) is the selected standalone Zygisk provider for hook-lane testing when the normal provider path fails. Local artifact: `/mnt/d/Downloads/ReZygisk-v1.0.0-rc.9-release.zip`, SHA-256 `5da9308aca2f1233e1b74744a86b39ab55749db352a829c7578743df6af16f4f`, module version `v1.0.0 (513-faccedf-release)`, author `The PerformanC Organization`. Its module scripts exit when Magisk built-in Zygisk is enabled, so disable Magisk built-in Zygisk before using this provider.
-- Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane. Nebula Core reports its module state, but hook scoping and mutating Nubia Toolkit behavior remain deferred.
+- ReZygisk (`rezygisk`) is the selected standalone Zygisk provider candidate for
+  hook-lane testing when the normal provider path fails. Local artifact:
+  `/mnt/d/Downloads/ReZygisk-v1.0.0-rc.9-release.zip`, SHA-256
+  `5da9308aca2f1233e1b74744a86b39ab55749db352a829c7578743df6af16f4f`, module
+  version `v1.0.0 (513-faccedf-release)`, author `The PerformanC Organization`.
+  Recording this artifact does not mean it is installed, enabled, scoped, or
+  hook-ready. Its module scripts exit when Magisk built-in Zygisk is enabled, so
+  disable Magisk built-in Zygisk before using this provider in a separate hook
+  test pass.
+- Vector (`zygisk_vector`) is the Android 16 LSPosed-compatible framework lane.
+  Nebula Core reports its module state, but hook scoping and mutating Nubia
+  Toolkit behavior remain deferred.
 - The WayLandIE Proton smoke command accepts no arbitrary path, package, or shell input and is blocked by Nebula safe mode.
 - The DRM Control package and Bob Dilian evidence are treated as confirmed Dock
   references for external-display-only composer-fd DRM leasing, `SCM_RIGHTS`
   handoff, wlroots receiver startup, and explicit revoke/stop. This patch
-  exposes read-only preflight/status only; it does not execute leases.
+  exposes read-only preflight/status only; it does not execute leases and does
+  not imply an active Dock lease.
 
 ## Source Integration
 
@@ -132,8 +150,8 @@ Initial lane model:
 
 | Lane | Purpose | Current ownership | Current requirements |
 | --- | --- | --- | --- |
-| Phone/App Mode | Run through the proven WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | Current display proof is `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS` when the pinned local ICD/driver and exact Gamescope/Xwayland sidecars are staged. Steam/Proton remains unpromoted until a bounded game-client proof promotes it. |
-| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven reference, operator approval required; external-display-only; explicit stop/revoke; no boot auto-launch. |
+| Phone/App Mode | Run through the WayLandIE/bridge path on the phone display. | WayLandIE -> Wayland -> Turnip/KGSL -> bridge -> Gamescope/Xwayland. | App/native bridge is solved and the pinned local ICD/driver loader path is confirmed. The active blocker is the Vulkan export/real-buffer gate: `vkGetMemoryFdKHR` failures and `0` real-buffer commits keep full runtime success unpromoted. Steam/Proton remains unpromoted until a bounded game-client proof promotes it. |
+| Dock Lease Mode | Give Linux direct external-display ownership without taking the internal panel. | Future Nebula Core DRM lease broker and rootfs receiver. | Proven advisory evidence, paused/crash-gated, operator approval required; external-display-only; explicit stop/revoke; no boot auto-launch. |
 | Anland Surface Mode | Use Anland/Android app surface path when users need compatibility or a non-lease display. | Existing Anland/Droidspaces ecosystem. | Select by explicit override or one live active PID file; reject stale PID files and rootfs paths outside the selected container; require `anland.env` plus `/data/local/tmp/display_daemon.sock` before display-ready; fixed commands only; no raw helper-script execution. |
 | Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
 | Recovery/Safe Mode | Preserve rollback, ADB visibility, module safe mode, and phone usability. | Nebula Core and protected old modules until replacement is proven. | Always available; blocks target launches and risky display mutation. |
@@ -147,12 +165,14 @@ Runtime constraints:
   live-confirmed as a 39-bit kernel VA environment through `/proc/config.gz`.
   Nebula surfaces this in display-lane status and must avoid assuming 45-bit
   userspace/runtime behavior.
-- R6 Wayland proof 03 promotes the Phone/App display lane: dmabuf-present,
-  real-buffer commits greater than zero, zero `vkGetMemoryFdKHR` failures,
-  Gamescope exit `0`, bridge exit `0`, and Xwayland ready.
-- Steam, Proton, and Wine were not run in that proof. Treat the remaining blocker
-  as a game-client runtime requirement under 39-bit VA, not as a Wayland/Gamescope
-  display blocker.
+- Current Phone/App control-plane status is loader-pin confirmed, not a full A1
+  runtime/export pass. The local Freedreno ICD/driver path can be pinned, but the
+  active blocker is Vulkan export/real-buffer evidence: `vkGetMemoryFdKHR`
+  failures and `0` bridge real-buffer commits.
+- App/native bridge readiness and child software GLX reproduction should not
+  reopen the older full GLX visual/fbconfig inventory. Steam, Proton, Wine, DXVK,
+  FEX, and game clients remain unpromoted until the export/real-buffer gate
+  passes under the live-confirmed 39-bit VA constraint.
 
 See `AUTO_COOLING_POLICY.md` for the pass 04 policy schema, state machine, and safety rules.
 
@@ -161,8 +181,11 @@ See `LEGACY_MODULE_MIGRATION.md` for the protected module audit and migration gu
 See `DRM_CONTROL_REFERENCE.md` for the confirmed Dock-mode method that should be
 promoted only in a separate operator-approved pass.
 
+See `CONTROL_PLANE_POLICY.md` for the current control-plane policy split.
+
 See `REVERSA_FINDINGS_ASSESSMENT.md` for the contradiction assessment and the
-2026-06-26 update that promotes the R6 Wayland display proof.
+2026-06-27 update that demotes stale real-buffer-pass wording to historical
+evidence and keeps the Vulkan export/real-buffer gate active.
 
 See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the preserved sidecar chain and the
 ARM64EC/39-bit Wine GUI blocker audit.
@@ -172,6 +195,6 @@ private RM11/China-ROM asset-pack lane.
 
 Online references checked for future work:
 
-- [FrankBarretta/LSFG-Android](https://github.com/FrankBarretta/LSFG-Android): Android LSFG app. Future/reference only because it is a graphics lane.
-- [PancakeTAS/lsfg-vk](https://github.com/PancakeTAS/lsfg-vk): GPL-3.0 Vulkan layer. Future/reference only because it touches Vulkan/graphics and may depend on user-provided Lossless Scaling assets.
-- [KernelSU Encore Tweaks](https://github.com/KernelSU-Modules-Repo/encore): profile/tuning module reference. Future/reference only; no generic performance writes are imported in pass 01.
+- [FrankBarretta/LSFG-Android](https://github.com/FrankBarretta/LSFG-Android): Android LSFG app. Future advisory only because it is a graphics lane.
+- [PancakeTAS/lsfg-vk](https://github.com/PancakeTAS/lsfg-vk): GPL-3.0 Vulkan layer. Future advisory only because it touches Vulkan/graphics and may depend on user-provided Lossless Scaling assets.
+- [KernelSU Encore Tweaks](https://github.com/KernelSU-Modules-Repo/encore): profile/tuning module evidence. Future advisory only; no generic performance writes are added in pass 01.

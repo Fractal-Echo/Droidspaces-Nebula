@@ -11,31 +11,29 @@ artifact, command log, hash, source path, or bounded test result.
 No device action, compositor launch, DRM operation, install, reboot, or phone
 mutation was performed for this assessment.
 
-## Current Update: 2026-06-26
+## Current Update: 2026-06-27
 
-R6 Wayland proof 03 supersedes the old Phone/App display classification as the
-current default state:
+This documentation cleanup demotes stale real-buffer-pass wording from live
+control-plane status. The current confirmed state is loader-pin proof, not full
+A1 runtime/export success:
 
-- final classification: `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`;
-- proof result:
-  `/home/richtofen/.android/repositories/nebula-assets/logs/2026-06-25-nebula-r6-wayland-working-03/result.md`;
-- display evidence: `SUMMARY_COMMITS=7189`, `SUMMARY_FAILURES=0`,
-  `SUMMARY_ZERO_COPY=dmabuf-present`, `VKGETMEMORYFD_FAILURE_COUNT=0`,
-  `REAL_COMMIT_COUNT=2`, `XWAYLAND_READY=yes`, `GAMESCOPE_EXIT=0`, and
-  `BRIDGE_EXIT=0`;
-- app presenter evidence: `DMABUF_PRESENT_STATUS=pass`,
-  `DMABUF_PRESENT_NATIVE=surfacecontrol-vulkan-native`,
-  `DMABUF_PRESENT_ZERO_COPY=gpu`, and
-  `DMABUF_PRESENT_SYNC=surfacecontrol-acquire-fence`;
-- required runtime assets: pinned local
-  `/usr/local/etc/vulkan/icd.d/freedreno_icd.json`, local
-  `/usr/local/lib/libvulkan_freedreno.so`,
-  `xwayland-gamescope-14-exportable-fence-guard-a4-473ba531`, and
-  `xwayland-gamescope-06-xwayland-9f1a3d62`.
+- final current classification:
+  `NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED`;
+- proven: ADB/app context worked in the prior bounded proof, the local pinned
+  Freedreno ICD was readable, the local pinned `libvulkan_freedreno.so` was
+  readable, `VK_ICD_FILENAMES` and `VK_DRIVER_FILES` could be pinned to the local
+  ICD, and `vulkaninfo --summary` returned `0`;
+- not proven: `vkGetMemoryFdKHR` improvement, bridge real-buffer commits greater
+  than `0`, full Gamescope readiness, full Xwayland readiness, child software GLX
+  survival in the full A1 export/runtime pass, or game-client readiness;
+- active blocker: Vulkan export/real-buffer runtime evidence, specifically
+  `vkGetMemoryFdKHR` failures and `0` bridge real-buffer commits.
 
-Decision: the Wayland/Gamescope/Xwayland display gate is promoted when those
-exact prerequisites are staged. Steam, Proton, Wine, and game clients remain a
-separate bounded runtime proof gate under the 39-bit VA constraint.
+Decision: app/native bridge readiness and later software-GLX evidence must not
+reopen the old GLX visual/fbconfig inventory in this docs pass, but they also do
+not promote Steam, Proton, Wine, DXVK, FEX, or game clients. The next runtime
+gate is the bounded A1 export/runtime proof under the live-confirmed 39-bit VA
+constraint.
 
 ## Findings
 
@@ -57,9 +55,10 @@ placeholder classification gate before being trusted as runtime payloads.
 
 ### 2. Phone/App graphics contradiction
 
-Result: actionable promotion candidate.
+Result: historical evidence, superseded as the live control-plane blocker by the
+2026-06-27 loader-pin/export classification above.
 
-Canonical state remains Sidecar-11:
+Earlier canonical state was Sidecar-11:
 
 - endpoint: Xwayland launches;
 - active blocker: RGB GLX visual/fbconfig exposure.
@@ -75,9 +74,9 @@ the canonical chain:
 - bridge evidence: zero-copy dmabuf-present, 1318 commits, 0 failures;
 - child evidence: glxgears ran under Xwayland and printed FPS output.
 
-Decision: expose Sidecar-13 as a `promotion_candidate`, not as solved default
-behavior. The next exact action is a minimal Wine GUI smoke through the exact
-force-composition sidecar. Do not launch Steam until that smoke is promoted.
+Decision: preserve Sidecar-13 as historical promotion evidence, not as solved
+default behavior. Do not launch Steam, Proton, Wine, DXVK, FEX, or game clients
+until the Vulkan export/real-buffer gate is promoted.
 
 ### 3. Dock lease evidence
 
@@ -121,9 +120,8 @@ runtime fails during `winex11.drv` process attach with SEH `invalid frame` and
 `c0000005` evidence. Bridge real-buffer commits remain zero for those Wine GUI
 attempts.
 
-Decision: the next Wine path is not another blind display rerun. It is a bounded
-ARM64EC Wine runtime investigation for 39-bit VA behavior, PE unwind/exception
-metadata, and `winex11.drv` attach.
+Decision: this remains historical runtime evidence. The next live gate is not a
+Wine rerun; it is the bounded Vulkan export/real-buffer proof.
 
 See `OLD_SIDECAR_PROMOTION_AUDIT.md` for the sidecar-by-sidecar evidence chain
 and rejected interpretations.
@@ -144,11 +142,8 @@ or backend start was added.
 
 ## Next Single Action
 
-Run a bounded promotion pass for the Phone/App lane:
-
-1. Reuse the exact Sidecar-13 force-composition harness.
-2. Run minimal Wine GUI smoke first.
-3. Patch or swap the ARM64EC Wine runtime path so `winex11.drv` attach survives
-   under 39-bit VA.
-4. Promote only if artifact evidence matches the Sidecar-13 result and rollback
-   remains clean.
+Run the bounded A1 export/runtime proof only after the readiness checklist is
+true. Promote only if it reduces `vkGetMemoryFdKHR` failures, produces bridge
+real-buffer commits greater than `0`, preserves Gamescope/Xwayland readiness,
+and preserves child software GLX survival. Do not run Steam, Proton, Wine, DXVK,
+FEX, or game clients for this gate.

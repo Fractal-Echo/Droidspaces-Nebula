@@ -47,6 +47,9 @@ Allowed intent vocabulary:
 
 Pass 04 always returns `applied=false` for both channels.
 
+UI and status surfaces must preserve that meaning. A preview result can describe
+future fan/pump intent, but it must not be rendered as applied automation.
+
 ## JSON Shape
 
 ```json

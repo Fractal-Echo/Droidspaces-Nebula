@@ -1107,7 +1107,7 @@ printf nubia > "$props/ro.product.manufacturer"
 printf NX809J > "$props/ro.product.model"
 printf NX809J > "$props/ro.product.product.name"
 printf NX809J > "$props/ro.product.device"
-printf pineapple > "$props/ro.board.platform"
+printf nx809j-test > "$props/ro.board.platform"
 policy_defaults="$tmp/policy-defaults.json"
 write_policy_defaults "$policy_defaults" true
 

@@ -6,8 +6,8 @@ Source restoration:
 | --- | --- | --- | --- | --- |
 | NubiaToolkit | `https://github.com/KhanhNguyen9872/NubiaToolkit.git` | `0a2ee1a234b7f03dc6c5b0077bff003c1ba7c128` | Preserved `gradlew` diff reapplied from consolidation. | Apache-2.0 in `LICENSE`. |
 | Redmagic-Control-Center | `https://github.com/austineyoung2000/Redmagic-Control-Center.git` | `e94d36e8204c228c6e8781157dea22946cf715e3` | Preserved `gradlew` diff reapplied from consolidation. | No repo license file; user supplied author permission screenshot saying "Do as you please". Attribution required; no wholesale UI/code merge. |
-| RedMagicPowerDeck | Local archive `nebula-assets__Repos__RedMagicPowerDeck.tar.zst` | `SOURCE_ORIGIN_MISSING` | Local archived source only. | No recovered origin/license; reference only unless ownership/license is clarified. |
-| gpp-enable-module.zip | Local zip `rm11mainassets/modules/gpp-enable-module.zip` | Not a git source. | None. | No license; reference only. |
+| RedMagicPowerDeck | Local archive `nebula-assets__Repos__RedMagicPowerDeck.tar.zst` | `SOURCE_ORIGIN_MISSING` | Local archived evidence only. | No recovered origin/license; not ported unless ownership/license is clarified. |
+| gpp-enable-module.zip | Local zip `rm11mainassets/modules/gpp-enable-module.zip` | Not a git source. | None. | No license; evidence only. |
 
 ## Matrix
 
@@ -39,7 +39,11 @@ Source restoration:
 | GPP all-game property | gpp-enable-module.zip | `service.sh: setprop vendor.gpp.allgame.enable 1` | No license | Enable vendor GPP all-game flag at boot. | Mutating | Root | system property | RM11 relevance unknown; not live-tested | `setprop vendor.gpp.allgame.enable 0` if proven later | Medium due boot property mutation | Module later | REFERENCE_ONLY |
 | LSFG Android | Online fork | [FrankBarretta/LSFG-Android](https://github.com/FrankBarretta/LSFG-Android) | See upstream license | Android Lossless Scaling frame generation app. | Mutating graphics path | App/overlay/media capture | MediaProjection/overlay/Vulkan by upstream description | Reddit/source claims RM11 Pro works, not local proof | Disable app/overlay | High for this pass due graphics lane lock | Future graphics lane | REFERENCE_ONLY |
 | lsfg-vk | Online fork | [PancakeTAS/lsfg-vk](https://github.com/PancakeTAS/lsfg-vk) | GPL-3.0 | Vulkan frame generation layer. | Mutating graphics path | User runtime | Vulkan layer | Not Android/NX809J-specific | Remove layer/config | High due graphics lane lock and asset/license constraints | Future graphics lane | REFERENCE_ONLY |
-| Encore Tweaks | Online KSU module | [KernelSU-Modules-Repo/encore](https://github.com/KernelSU-Modules-Repo/encore) | See upstream | Dynamic performance profiles. | Mutating | Root | module scripts | Generic, not NX809J-specific | Disable module | Medium-high if blindly ported | Reference only | REFERENCE_ONLY |
+| Encore Tweaks | Online KSU module | [KernelSU-Modules-Repo/encore](https://github.com/KernelSU-Modules-Repo/encore) | See upstream | Dynamic performance profiles. | Mutating | Root | module scripts | Generic, not NX809J-specific | Disable module | Medium-high if blindly ported | Evidence only | REFERENCE_ONLY |
+
+Source evidence note: evidence-only rows, generated artifacts, local zips, and
+local archives are leads only. They are not copied into Nebula unless license,
+authorship, redistribution rights, and a bounded implementation plan are proven.
 
 ## Pass 01 Selected Work
 

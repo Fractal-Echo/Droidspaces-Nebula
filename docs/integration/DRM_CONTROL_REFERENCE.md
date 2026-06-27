@@ -1,8 +1,8 @@
 # DRM Control Reference
 
 This file records the confirmed external-display Dock method described in the
-user-provided Bob Dilian transcript and screenshots from 2026-06-22. It is a
-reference artifact only; no code is imported from the experiment here.
+user-provided Bob Dilian transcript and screenshots from 2026-06-22. It contains
+no experiment code.
 
 ## Confirmed Mechanism
 
@@ -133,6 +133,11 @@ Do not promote this into an active start command until these are true:
 
 ## Current Status
 
-Reference only. No DRM fd probing, composer fd probing, `CREATE_LEASE`,
+Advisory status. No DRM fd probing, composer fd probing, `CREATE_LEASE`,
 wlroots DRM backend launch, display mutation, SurfaceFlinger stop, or compositor
 launch is executed by this documentation pass.
+
+Dock Lease Mode is paused/crash-gated. Nebula may display the reference and
+preflight requirements, but no active DRM lease or display ownership transfer is
+implied until a separate operator-approved runtime pass wires start, stop,
+revoke, snapshot, safe-mode, and result logging.

@@ -72,19 +72,19 @@ shell argument and is never launched during boot.
 `display lanes --json` reports the multi-lane display selector state. The lane
 preflight commands are read-only:
 
-- Phone/App Mode reports the WayLandIE R6 Wayland proof state. A pass requires
-  the bridge binary, pinned local Freedreno ICD, local Vulkan driver, and the
-  exact Gamescope/Xwayland sidecars used by
-  `NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS`. Steam/Proton remains unpromoted
-  until a separate game-client proof passes under the live-confirmed 39-bit
-  kernel VA constraint.
+- Phone/App Mode reports the WayLandIE lane status. The app/native bridge is
+  solved and the pinned local Freedreno ICD/local Vulkan driver loader path is
+  confirmed, but full runtime success remains blocked on the Vulkan
+  export/real-buffer gate: `vkGetMemoryFdKHR` failures and `0` real-buffer
+  commits. Steam/Proton remains unpromoted until a separate game-client proof
+  passes under the live-confirmed 39-bit kernel VA constraint.
 - Anland Surface Mode selects an explicit or single live active DroidSpaces
   container, then checks config, Anland env, display socket presence, rootfs
   ownership, and render-node visibility. Stale PID files, unsafe `rootfs_path`
   values outside the selected container, and invalid overrides fail closed.
 - Dock Lease Mode reports the proven external-display DRM lease reference and
-  required operator-approved start conditions. It does not probe composer fds,
-  create leases, run wlroots, or mutate display state.
+  required operator-approved start conditions. It is paused/crash-gated and does
+  not probe composer fds, create leases, run wlroots, or mutate display state.
 
 Each display lane also reports `container_ref`, `container_kind`,
 `container_status`, `display_status`, `runtime_status`,

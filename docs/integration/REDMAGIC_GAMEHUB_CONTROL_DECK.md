@@ -23,6 +23,10 @@ Do not commit proprietary RedMagic ROM assets, sounds, pages, package resources,
 or APK payloads into the public Hub unless their license and redistribution
 rights are proven.
 
+Project Git revision metadata, app status text, and module status text are
+provenance for Nebula-owned source only. They are not permission to add private
+RM11/GameHub assets to the public Hub.
+
 ## Implementation Shape
 
 Nebula APK:

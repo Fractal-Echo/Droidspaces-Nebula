@@ -4,7 +4,28 @@ Date: 2026-06-25
 
 Purpose: pin the current R6 graphics frontier so future passes do not reopen solved stages.
 
-## Proven State
+## Current Policy Note: 2026-06-27
+
+This file preserves the 2026-06-25 child-libpath frontier. It is historical
+evidence now, not the active Nebula control-plane blocker.
+
+Current live control-plane status:
+
+- app/native bridge solved;
+- local ICD/driver loader pin confirmed;
+- later software GLX evidence is treated as reproduced;
+- do not reopen full GLX visual/fbconfig inventory or run `glxgears` for this
+  docs cleanup;
+- active blocker is Vulkan export/real-buffer evidence:
+  `vkGetMemoryFdKHR` failures and `0` bridge real-buffer commits.
+
+Current classification:
+
+```text
+NEBULA_R6_EXPORT_A1_VULKAN_LOADER_PIN_CONFIRMED
+```
+
+## Preserved 2026-06-25 Frontier
 
 Android abstract bridge:
 
@@ -33,7 +54,7 @@ Xwayland:
 - Xserver ready
 - exits `1` after child SIGBUS / broken pipe
 
-Current failure:
+Preserved failure at that time:
 
 - first decisive failure line: `Bus error`
 - child command: `glxgears`
@@ -42,7 +63,7 @@ Current failure:
 - GLX inventory was not captured
 - software GLX was requested but not reproduced yet
 
-Current classification:
+Preserved classification at that time:
 
 ```text
 NEBULA_R6_HARNESS_REGRESSION

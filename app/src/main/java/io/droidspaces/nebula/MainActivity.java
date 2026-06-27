@@ -95,7 +95,7 @@ public final class MainActivity extends Activity {
                     "waylandie",
                     "app_surface",
                     true,
-                    "WayLandIE bridge profile. Display proof is landed; game-client launch is not promoted.",
+                    "WayLandIE bridge profile. App/native bridge is solved; Vulkan export and real-buffer runtime proof are still blocked.",
                     Arrays.asList("boot_completed", "SurfaceFlinger PID", "composer PID"),
                     Arrays.asList("CREATE_LEASE", "composer fd probing", "wlroots DRM backend")),
             new TargetProfile(
@@ -134,7 +134,7 @@ public final class MainActivity extends Activity {
                     "Zero-copy display",
                     "WayLandIE proof",
                     "dmabuf/fd-passing display target for Linux apps and games.",
-                    "Current proof: R6 Wayland real-buffer pass with pinned ICD, Gamescope, and Xwayland sidecars.",
+                    "Current state: pinned ICD/driver path confirmed; vkGetMemoryFdKHR and zero real-buffer commits still block full runtime proof.",
                     Arrays.asList(
                             new Target("WayLandIE Display", "io.droidspaces.nebula.waylandie",
                                     "0.2.0-no-root-nebula13-rootfs-vulkan-smoke",

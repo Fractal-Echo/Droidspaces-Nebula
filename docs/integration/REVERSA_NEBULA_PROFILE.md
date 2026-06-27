@@ -13,7 +13,7 @@ Reversa local tool:
 
 Every Nebula-tuned Reversa agent must obey:
 
-- Read the locked source authority before reasoning.
+- Read the locked evidence rules before reasoning.
 - Search only the explicitly named trees for the pass.
 - Separate evidence from inference.
 - Treat screenshots, chats, and external claims as leads until backed by an
