@@ -972,6 +972,36 @@ assert obj["checks"]["anland_producer"] is True
 assert obj["errors"] == []
 PY
 rm -f "$image_root/data/local/Droidspaces/Pids/anland-ubuntu26-kde.pid"
+idle_recommended_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$image_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$idle_recommended_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "container_runtime_ready", obj
+assert obj["available"] is False
+assert obj["runtime_ready"] is True
+assert obj["selected_container"] == "anland-ubuntu26-kde"
+assert obj["container_selection_source"] == "recommended_profile"
+assert obj["container_ref"] == "anland-ubuntu26-kde"
+assert obj["container_status"] == "ready"
+assert obj["display_status"] == "display_missing"
+assert obj["runtime_status"] == "runtime_ready"
+assert obj["requirement_status"] == "missing_requirements"
+assert obj["container_active"] is False
+assert obj["container_pid"] is None
+assert obj["checks"]["active_container_pidfile"] is False
+assert obj["checks"]["container_config"] is True
+assert obj["checks"]["rootfs_path"] is True
+assert obj["checks"]["rootfs_image"] is True
+assert obj["checks"]["anland_env"] is True
+assert obj["checks"]["display_daemon_socket"] is True
+assert obj["checks"]["anland_producer"] is False
+assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/anland-ubuntu26-kde/container.config"
+assert obj["selected_paths"]["rootfs_path"] == "/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img"
+assert "unknown:anland_producer_inside_rootfs_image_run_verify_required" in obj["errors"]
+PY
 
 active_root="$tmp/device-root-active"
 mkdir -p "$active_root/data/local/Droidspaces/bin" \

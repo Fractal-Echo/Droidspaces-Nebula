@@ -1558,6 +1558,9 @@ anland_collect() {
   elif [ -n "$anland_active_name" ]; then
     anland_selected_container=$anland_active_name
     anland_selection_source=active_pidfile
+  elif anland_container_has_profile "$ANLAND_RECOMMENDED_CONTAINER"; then
+    anland_selected_container=$ANLAND_RECOMMENDED_CONTAINER
+    anland_selection_source=recommended_profile
   fi
 
   anland_selected_pidfile=$(anland_pidfile_for_container "$anland_selected_container")
