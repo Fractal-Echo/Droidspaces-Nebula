@@ -83,3 +83,13 @@ preflight before any mutating recipe can graduate.
 Final promotion requires a reproducible source build, bounded command schema,
 Reversa scan, host tests, and live proof before any new mutating command is
 exposed.
+
+`display anland status-check --json` is the first promoted read-only
+recipe-adjacent status surface. It does not run the contributor status script.
+Instead, it projects the selected Anland/DroidSpaces path from fixed checks:
+binary/config/env/rootfs/socket/render-node/producer presence, selected
+container source, and active pidfile state. It does not invoke DroidSpaces
+runtime commands, process inventory, daemon log tailing, recipe commands,
+container lifecycle, KDE launch, package installation, or game runtime commands.
+For active image rootfs cases, producer verification remains unknown until a
+separate bounded verify pass explicitly allows that runtime probe.

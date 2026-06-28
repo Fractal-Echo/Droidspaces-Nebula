@@ -335,6 +335,7 @@ capabilities_json() {
   printf '{"id":"display.method-containers","title":"Display method container map","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method container registry"},'
   printf '{"id":"display.method-profiles","title":"Display method profile templates","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method profile registry"},'
   printf '{"id":"display.anland.recipes","title":"Anland desktop recipe manifest","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_LINUX_NATIVE_ARTIFACT_SOURCE")"
+  printf '{"id":"display.anland.status-check","title":"Anland fixed read-only status check","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_LINUX_NATIVE_ARTIFACT_SOURCE")"
   printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DISPLAY_PHONE_SOURCE")"
   printf '{"id":"display.lane.anland.preflight","title":"Anland surface lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_REPAIR_SOURCE")"
   printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"proven_reference_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DRM_LEASE_SOURCE")"
@@ -1651,6 +1652,68 @@ anland_desktop_recipes_json() {
   printf '}\n'
 }
 
+anland_status_check_json() {
+  previous_skip=${NEBULA_ANLAND_SKIP_ACTIVE_IMAGE_PRODUCER:-}
+  NEBULA_ANLAND_SKIP_ACTIVE_IMAGE_PRODUCER=1
+  anland_collect
+  if [ -n "$previous_skip" ]; then
+    NEBULA_ANLAND_SKIP_ACTIVE_IMAGE_PRODUCER=$previous_skip
+  else
+    unset NEBULA_ANLAND_SKIP_ACTIVE_IMAGE_PRODUCER
+  fi
+
+  status_ready=0
+  if [ "$anland_ready" = "1" ]; then
+    status_ready=1
+  fi
+
+  printf '{"protocol_version":%s,"command":"display anland status-check","ok":true,' "$PROTOCOL_VERSION"
+  printf '"mutating":false,"executor_available":false,"status_check_ready":%s,' "$(json_bool "$status_ready")"
+  printf '"status":%s,"available":%s,"runtime_ready":%s,"display_ready":%s,' \
+    "$(json_string "$anland_status")" \
+    "$(json_bool "$anland_ready")" \
+    "$(json_bool "$anland_runtime_ready")" \
+    "$(json_bool "$anland_ready")"
+  printf '"selected_container":%s,"container_selection_source":%s,' \
+    "$(json_string "$anland_selected_container")" \
+    "$(json_string "$anland_selection_source")"
+  printf '"preflight":{"runtime_ready":%s,"display_ready":%s,"checks":{"droidspaces_binary":%s,"container_config":%s,"rootfs_path":%s,"rootfs_image":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s,"anland_producer":%s},"errors":[%s]},' \
+    "$(json_bool "$anland_runtime_ready")" \
+    "$(json_bool "$anland_ready")" \
+    "$(json_bool "$anland_bin")" \
+    "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_rootfs")" \
+    "$(json_bool "$anland_rootfs_image")" \
+    "$(json_bool "$anland_env")" \
+    "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_socket_writable")" \
+    "$(json_bool "$anland_render")" \
+    "$(json_bool "$anland_config_bind")" \
+    "$(json_bool "$anland_env_socket")" \
+    "$(json_bool "$anland_env_kgsl")" \
+    "$(json_bool "$anland_producer")" \
+    "$anland_errors"
+  printf '"selected_paths":{"droidspaces_binary":%s,"containers_dir":%s,"pids_dir":%s,"pidfile":%s,"container_config":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_mode":%s,"display_socket_host":%s,"display_socket_guest":%s,"render_node":%s},' \
+    "$(json_string "$ANLAND_DROIDSPACES_BIN")" \
+    "$(json_string "$ANLAND_CONTAINERS_DIR")" \
+    "$(json_string "$ANLAND_PIDS_DIR")" \
+    "$(json_string_or_null "$anland_selected_pidfile")" \
+    "$(json_string "$anland_selected_config")" \
+    "$(json_string "$anland_selected_env")" \
+    "$(json_string "$anland_selected_rootfs")" \
+    "$(json_string "$anland_selected_rootfs_mode")" \
+    "$(json_string "$ANLAND_SOCKET_HOST")" \
+    "$(json_string "$ANLAND_SOCKET_GUEST")" \
+    "$(json_string "$ANLAND_RENDER_NODE")"
+  printf '"active_container":{"active":%s,"pid":%s},' \
+    "$(json_bool "$anland_container_active")" \
+    "$(json_int_or_null "$anland_container_pid")"
+  printf '"probe_policy":{"fixed_path_only":true,"droidspaces_runtime_invoked":false,"process_inventory_invoked":false,"daemon_log_tail_invoked":false,"image_rootfs_producer_verify_invoked":false},'
+  printf '"guardrails":["read_only","fixed_paths_only","no_droidspaces_runtime_invocation","no_process_inventory","no_daemon_log_tail","no_recipes","no_setup_commands","no_container_lifecycle","no_kde_launch","no_shell_entry","no_package_install","no_daemon_restart","no_game_launch"],'
+  printf '"next_safe_action":"use display lane anland preflight --json for broader status; recover missing fixed paths before promoting any mutating recipe"'
+  printf '}\n'
+}
+
 anland_collect() {
   anland_errors=
   anland_collect_active_pidfiles
@@ -1745,7 +1808,7 @@ anland_collect() {
   [ -n "$anland_selected_env" ] && fixed_file_contains "$anland_selected_env" "MESA_LOADER_DRIVER_OVERRIDE=kgsl" && anland_env_kgsl=1 || true
   if anland_rootfs_has_producer "$anland_selected_rootfs"; then
     anland_producer=1
-  elif [ "$anland_rootfs_image" = "1" ] && anland_active_image_has_producer "$anland_selected_container"; then
+  elif [ "${NEBULA_ANLAND_SKIP_ACTIVE_IMAGE_PRODUCER:-0}" != "1" ] && [ "$anland_rootfs_image" = "1" ] && anland_active_image_has_producer "$anland_selected_container"; then
     anland_producer=1
   elif [ "$anland_rootfs_image" = "1" ] && [ "$anland_rootfs" = "1" ]; then
     anland_errors=$(list_append_json_string "$anland_errors" "unknown:anland_producer_inside_rootfs_image_run_verify_required")
@@ -3575,6 +3638,9 @@ main() {
       elif [ "${2:-}" = "anland" ] && [ "${3:-}" = "recipes" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
         log_command "display_anland_recipes"
         anland_desktop_recipes_json
+      elif [ "${2:-}" = "anland" ] && [ "${3:-}" = "status-check" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "display_anland_status_check"
+        anland_status_check_json
       elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "phone" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
         log_command "display_lane_phone_preflight"
         display_phone_preflight_json

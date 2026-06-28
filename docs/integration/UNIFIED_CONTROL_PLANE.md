@@ -59,6 +59,7 @@ Allowed fixed commands:
 | `display method-containers --json` | Read-only display method ownership map for WayLandIE, DroidSpaces/Anland, native DroidSpaces methods, Dock reference, compatibility, and recovery lanes. |
 | `display method-profiles --json` | Read-only DroidSpaces/Anland profile templates for separate rootfs image, rootfs directory, Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio methods. |
 | `display anland recipes --json` | Read-only contributor Linux-native Anland/DroidSpaces/KDE recipe manifest. It records fixed command shapes, preconditions, source drift, and deferred mutating steps without exposing an executor. |
+| `display anland status-check --json` | Strict read-only selected Anland/DroidSpaces status projection. It uses fixed path/config/proc checks only and does not invoke DroidSpaces runtime commands, process inventory, daemon log tailing, recipes, container lifecycle, KDE, package installs, or game runtimes. |
 | `display lane phone preflight --json` | Read-only WayLandIE/Gamescope/Xwayland lane preflight, active blocker status, and reinstall-safe live `package_path` / `native_lib_dir` / `glibc_loader` evidence. |
 | `display lane anland preflight --json` | Read-only selected DroidSpaces container, Anland env/socket, and render-node preflight. |
 | `display lane dock preflight --json` | Read-only Dock lease evidence and operator approval requirements. |

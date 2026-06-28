@@ -54,6 +54,10 @@ grep -q 'display anland recipes --json' app/src/main/java/io/droidspaces/nebula/
 grep -q 'display anland recipes --json' nebula-core-module/README.md
 grep -q 'display anland recipes --json' docs/integration/UNIFIED_CONTROL_PLANE.md
 grep -q 'display anland recipes --json' docs/integration/CONTRIBUTOR_LINUX_NATIVE_ARTIFACT.md
+grep -q 'display anland status-check --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'display anland status-check --json' nebula-core-module/README.md
+grep -q 'display anland status-check --json' docs/integration/UNIFIED_CONTROL_PLANE.md
+grep -q 'display anland status-check --json' docs/integration/CONTRIBUTOR_LINUX_NATIVE_ARTIFACT.md
 grep -q 'integrations standalone --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
 grep -q 'integrations standalone --json' nebula-core-module/README.md
 grep -q 'integrations standalone --json' docs/integration/UNIFIED_CONTROL_PLANE.md

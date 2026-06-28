@@ -108,6 +108,7 @@ The command contract is:
 su -c /data/adb/modules/nebula_core/bin/nebula-core display method-containers --json
 su -c /data/adb/modules/nebula_core/bin/nebula-core display method-profiles --json
 su -c /data/adb/modules/nebula_core/bin/nebula-core display anland recipes --json
+su -c /data/adb/modules/nebula_core/bin/nebula-core display anland status-check --json
 ```
 
 `method-profiles` is read-only. It emits per-method DroidSpaces profile
@@ -126,6 +127,13 @@ container lifecycle, KDE producer launch, status check, screenshot capture,
 audio fix, browser install, and Steam install. Every mutating recipe is marked
 deferred and `exposed_by_nebula=false`; the command is a noob-facing checklist,
 not a launcher.
+
+`display anland status-check --json` is the first promoted Anland recipe-adjacent
+status surface. It is intentionally stricter than the desktop status script:
+fixed path/config/proc checks only, no DroidSpaces runtime invocation, no process
+inventory, no daemon log tailing, no setup command payload, and no recipe
+execution. Image-rootfs producer status remains unknown until a separate
+bounded verify pass is approved.
 
 DroidSpaces `create` creates a rootfs image, while `start` persists or mirrors
 the active `container.config`. Use one writable rootfs image or directory per

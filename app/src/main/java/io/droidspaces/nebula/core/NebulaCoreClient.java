@@ -69,6 +69,7 @@ public final class NebulaCoreClient {
             "display method-containers --json",
             "display method-profiles --json",
             "display anland recipes --json",
+            "display anland status-check --json",
             "display lane phone preflight --json",
             "display lane anland preflight --json",
             "display lane dock preflight --json"
@@ -170,6 +171,10 @@ public final class NebulaCoreClient {
         return runFixed("display", "anland", "recipes", "--json");
     }
 
+    public CommandResult displayAnlandStatusCheck() {
+        return runFixed("display", "anland", "status-check", "--json");
+    }
+
     public CommandResult displayLanePhonePreflight() {
         return runFixed("display", "lane", "phone", "preflight", "--json");
     }
@@ -214,6 +219,7 @@ public final class NebulaCoreClient {
                 || "display method-containers --json".equals(logical)
                 || "display method-profiles --json".equals(logical)
                 || "display anland recipes --json".equals(logical)
+                || "display anland status-check --json".equals(logical)
                 || "display lane phone preflight --json".equals(logical)
                 || "display lane anland preflight --json".equals(logical)
                 || "display lane dock preflight --json".equals(logical)) {
@@ -231,6 +237,7 @@ public final class NebulaCoreClient {
                 || "display method-containers --json".equals(logical)
                 || "display method-profiles --json".equals(logical)
                 || "display anland recipes --json".equals(logical)
+                || "display anland status-check --json".equals(logical)
                 || "display lane phone preflight --json".equals(logical)
                 || "display lane anland preflight --json".equals(logical)
                 || "display lane dock preflight --json".equals(logical);

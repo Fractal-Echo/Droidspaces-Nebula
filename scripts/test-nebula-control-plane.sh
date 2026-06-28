@@ -223,6 +223,7 @@ required = {
     "display.lane.phone.preflight",
     "display.lane.anland.preflight",
     "display.anland.recipes",
+    "display.anland.status-check",
     "display.lane.dock.preflight",
     "adb.wifi",
 }
@@ -420,6 +421,10 @@ mkdir -p "$device_root/data/local/Droidspaces/bin" \
 chmod 755 "$device_root/data/local/Droidspaces/Containers/ubuntu/rootfs/usr/local/bin/startanland-kde.sh"
 cat > "$device_root/data/local/Droidspaces/bin/droidspaces" <<'SH'
 #!/bin/sh
+if [ -n "${NEBULA_DROIDSPACES_MARKER:-}" ]; then
+  printf 'invoked %s\n' "$*" >> "$NEBULA_DROIDSPACES_MARKER"
+fi
+printf 'droidspaces fixture\n'
 exit 0
 SH
 chmod 755 "$device_root/data/local/Droidspaces/bin/droidspaces"
@@ -872,6 +877,84 @@ assert obj["ok"] is False
 assert obj["error"] == "USAGE"
 PY
 
+anland_status_marker="$tmp/anland-status-droidspaces-marker"
+anland_status_check="$(
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  NEBULA_DROIDSPACES_MARKER="$anland_status_marker" \
+  sh "$cli" display anland status-check --json
+)"
+test ! -e "$anland_status_marker"
+python3 - "$anland_status_check" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+payload = json.dumps(obj)
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display anland status-check"
+assert obj["ok"] is True
+assert obj["mutating"] is False
+assert obj["executor_available"] is False
+assert obj["status_check_ready"] is True
+assert obj["status"] == "preflight_ready"
+assert obj["available"] is True
+assert obj["runtime_ready"] is True
+assert obj["display_ready"] is True
+assert obj["selected_container"] == "ubuntu"
+assert obj["container_selection_source"] == "default_fallback"
+assert obj["preflight"]["runtime_ready"] is True
+assert obj["preflight"]["display_ready"] is True
+checks = obj["preflight"]["checks"]
+assert checks["droidspaces_binary"] is True
+assert checks["container_config"] is True
+assert checks["rootfs_path"] is True
+assert checks["rootfs_image"] is False
+assert checks["anland_env"] is True
+assert checks["display_daemon_socket"] is True
+assert checks["display_daemon_socket_writable"] is True
+assert checks["render_node"] is True
+assert checks["config_socket_bind"] is True
+assert checks["env_socket"] is True
+assert checks["env_kgsl"] is True
+assert checks["anland_producer"] is True
+assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
+assert obj["selected_paths"]["display_socket_host"] == "/data/local/tmp/display_daemon.sock"
+assert obj["selected_paths"]["display_socket_guest"] == "/run/display.sock"
+assert obj["active_container"]["active"] is False
+assert obj["active_container"]["pid"] is None
+policy = obj["probe_policy"]
+assert policy["fixed_path_only"] is True
+assert policy["droidspaces_runtime_invoked"] is False
+assert policy["process_inventory_invoked"] is False
+assert policy["daemon_log_tail_invoked"] is False
+assert policy["image_rootfs_producer_verify_invoked"] is False
+assert "no_droidspaces_runtime_invocation" in obj["guardrails"]
+assert "no_recipes" in obj["guardrails"]
+assert "recipes" not in obj
+assert "setup_commands" not in obj
+for forbidden in [
+    "fixed_command_reference",
+    "producer_run_command",
+    "adb ",
+    "am ",
+    "ksud ",
+    "pkill",
+    "nohup",
+    "screencap",
+]:
+    assert forbidden not in payload
+PY
+
+set +e
+bad_anland_status_check="$(sh "$cli" display anland status-check --json /tmp/bad)"
+bad_anland_status_check_code=$?
+set -e
+[[ "$bad_anland_status_check_code" -eq 2 ]]
+python3 - "$bad_anland_status_check" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["ok"] is False
+assert obj["error"] == "USAGE"
+PY
+
 chmod 755 "$device_root/data/local/tmp/display_daemon.sock"
 locked_socket_preflight="$(
   NEBULA_TEST_DEVICE_ROOT="$device_root" \
@@ -1027,6 +1110,34 @@ assert obj["checks"]["rootfs_image"] is True
 assert obj["checks"]["display_daemon_socket_writable"] is True
 assert obj["checks"]["anland_producer"] is True
 assert obj["errors"] == []
+PY
+active_image_status_marker="$tmp/active-image-status-droidspaces-marker"
+active_image_anland_status_check="$(
+  NEBULA_TEST_DEVICE_ROOT="$image_root" \
+  NEBULA_ANLAND_CONTAINER=anland-ubuntu26-kde \
+  NEBULA_DROIDSPACES_MARKER="$active_image_status_marker" \
+  sh "$cli" display anland status-check --json
+)"
+test ! -e "$active_image_status_marker"
+python3 - "$active_image_anland_status_check" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["command"] == "display anland status-check"
+assert obj["mutating"] is False
+assert obj["executor_available"] is False
+assert obj["status_check_ready"] is False
+assert obj["status"] == "container_runtime_ready", obj
+assert obj["available"] is False
+assert obj["runtime_ready"] is True
+assert obj["display_ready"] is False
+assert obj["selected_container"] == "anland-ubuntu26-kde"
+assert obj["active_container"]["active"] is True
+assert obj["active_container"]["pid"] == 4343
+assert obj["preflight"]["checks"]["rootfs_image"] is True
+assert obj["preflight"]["checks"]["anland_producer"] is False
+assert obj["probe_policy"]["droidspaces_runtime_invoked"] is False
+assert obj["probe_policy"]["image_rootfs_producer_verify_invoked"] is False
+assert "unknown:anland_producer_inside_rootfs_image_run_verify_required" in obj["preflight"]["errors"]
 PY
 mkdir -p "$image_root/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/rootfs" \
   "$image_root/proc/4444"

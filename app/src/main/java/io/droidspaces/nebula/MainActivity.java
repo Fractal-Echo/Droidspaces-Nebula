@@ -209,6 +209,7 @@ public final class MainActivity extends Activity {
     private JSONObject displayMethodContainersStatus;
     private JSONObject displayMethodProfilesStatus;
     private JSONObject displayAnlandRecipesStatus;
+    private JSONObject displayAnlandStatusCheckStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -358,6 +359,7 @@ public final class MainActivity extends Activity {
         displayMethodContainersStatus = loadDisplayMethodContainersStatus();
         displayMethodProfilesStatus = loadDisplayMethodProfilesStatus();
         displayAnlandRecipesStatus = loadDisplayAnlandRecipesStatus();
+        displayAnlandStatusCheckStatus = loadDisplayAnlandStatusCheckStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
@@ -1697,6 +1699,21 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private JSONObject loadDisplayAnlandStatusCheckStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.displayAnlandStatusCheck();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
     private View buildDisplayLanesCard() {
         LinearLayout card = baseCard();
 
@@ -1765,6 +1782,11 @@ public final class MainActivity extends Activity {
 
         top.addView(chip(anlandRecipeTopLabel(), anlandRecipeTopColor()));
 
+        TextView statusCheck = text(anlandStatusCheckSummary(), 12, MUTED, Typeface.NORMAL);
+        statusCheck.setTypeface(Typeface.MONOSPACE);
+        statusCheck.setPadding(0, dp(10), 0, 0);
+        card.addView(statusCheck);
+
         JSONArray recipes = displayAnlandRecipesStatus == null
                 ? null : displayAnlandRecipesStatus.optJSONArray("recipes");
         if (recipes == null || recipes.length() == 0) {
@@ -1800,6 +1822,29 @@ public final class MainActivity extends Activity {
                 + "\nselectedContainer=" + selected
                 + "  source=" + source
                 + "\nartifactSha=" + sha;
+    }
+
+    private String anlandStatusCheckSummary() {
+        if (displayAnlandStatusCheckStatus == null) {
+            return "statusCheck=module_unavailable";
+        }
+        JSONObject preflight = displayAnlandStatusCheckStatus.optJSONObject("preflight");
+        JSONObject checks = preflight == null ? null : preflight.optJSONObject("checks");
+        JSONObject policy = displayAnlandStatusCheckStatus.optJSONObject("probe_policy");
+        JSONObject active = displayAnlandStatusCheckStatus.optJSONObject("active_container");
+        String selected = displayAnlandStatusCheckStatus.optString("selected_container", "unknown");
+        String source = displayAnlandStatusCheckStatus.optString("container_selection_source", "unknown");
+        String activeStatus = active == null ? "unknown" : String.valueOf(active.optBoolean("active", false));
+        String policyText = policy == null ? "unknown"
+                : "runtime=" + policy.optBoolean("droidspaces_runtime_invoked", true)
+                + ", process=" + policy.optBoolean("process_inventory_invoked", true)
+                + ", logTail=" + policy.optBoolean("daemon_log_tail_invoked", true);
+        return "statusCheckReady=" + displayAnlandStatusCheckStatus.optBoolean("status_check_ready", false)
+                + "\nselectedContainer=" + selected
+                + "  source=" + source
+                + "\nactiveContainer=" + activeStatus
+                + "\nprobePolicy=" + policyText
+                + "\nchecks=" + (checks == null ? "{}" : checkSummary(checks));
     }
 
     private String anlandRecipeTopLabel() {
@@ -2872,6 +2917,20 @@ public final class MainActivity extends Activity {
             JSONObject checks = preflight.optJSONObject("checks");
             if (checks != null) {
                 sb.append("  checks=").append(checkSummary(checks)).append('\n');
+            }
+        }
+        if (displayAnlandStatusCheckStatus != null) {
+            sb.append("  statusCheckReady=")
+                    .append(displayAnlandStatusCheckStatus.optBoolean("status_check_ready", false))
+                    .append('\n');
+            sb.append("  statusCheckSelected=")
+                    .append(displayAnlandStatusCheckStatus.optString("selected_container", "unknown"))
+                    .append('\n');
+            JSONObject policy = displayAnlandStatusCheckStatus.optJSONObject("probe_policy");
+            if (policy != null) {
+                sb.append("  statusCheckProbePolicy=")
+                        .append(policy)
+                        .append('\n');
             }
         }
         JSONArray drift = displayAnlandRecipesStatus.optJSONArray("source_drift");

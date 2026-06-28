@@ -250,12 +250,17 @@ recipe manifest:
 
 ```sh
 su -c '/data/adb/modules/nebula_core/bin/nebula-core display anland recipes --json'
+su -c '/data/adb/modules/nebula_core/bin/nebula-core display anland status-check --json'
 ```
 
 Use it as a checklist, not a launcher. It records APK/module verification,
 rootfs image creation, container lifecycle, KDE producer launch, status checks,
 screenshot capture, audio fixes, browser installs, and Steam install leads. All
 mutating recipes remain deferred and `exposed_by_nebula=false`.
+Use `display anland status-check --json` for the stricter selected-container
+status projection. It is fixed-path/proc/config only: no DroidSpaces runtime
+invocation, no process inventory, no daemon log tailing, no setup commands, no
+container lifecycle, no KDE launch, no package installs, and no game runtimes.
 
 ## Build
 
