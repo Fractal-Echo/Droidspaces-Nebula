@@ -143,6 +143,10 @@ must not share the same writable `rootfs.img`.
 | Compatibility Mode | future dedicated compatibility/software container | Not wired by design. |
 | Recovery/Safe Mode | `none` | Always available, blocks risky starts. |
 
+Dock Lease schema work is host-only. `docs/integration/schemas/` and
+`tests/fixtures/dock-lease/` describe the future command/result envelope without
+adding a start command, APK allowlist entry, DRM mutation, or compositor launch.
+
 For Phone/App Mode, first check `runtime waylandie status --json` or
 `display lanes --json`. The read-only output includes live reinstall-safe path
 fields (`package_path`, `native_lib_dir`, `glibc_loader`), plus `selected_icd`,

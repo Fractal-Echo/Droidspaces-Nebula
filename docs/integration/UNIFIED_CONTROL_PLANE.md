@@ -169,6 +169,12 @@ Initial lane model:
 | Compatibility Mode | Conservative fallback for devices without RM11 Pro hardware, modified kernel, or working dock lease. | App-guided setup and read-only diagnostics first. | Must stay blocked until exact behavior is implemented and reversible. |
 | Recovery/Safe Mode | Preserve rollback, ADB visibility, module safe mode, and phone usability. | Nebula Core and protected old modules until replacement is proven. | Always available; blocks target launches and risky display mutation. |
 
+Dock Lease Stage 08 is host-only. The command/result schemas under
+`docs/integration/schemas/` and fixtures under `tests/fixtures/dock-lease/`
+exist to prove the authority boundary before runtime work. They do not add an
+APK allowlist command, module command, DRM lease start path, compositor launch,
+or device mutation.
+
 The target experience is one app and one core module coordinating these lanes,
 not one rendering path forced onto every user.
 

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Fractal-Echo/Droidspaces-Nebula/docs/integration/schemas/dock-lease-command.schema.json",
+  "title": "Nebula Dock lease command envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lane",
+    "command_kind",
+    "execute",
+    "mutation_allowed_by_policy",
+    "operator_approved",
+    "safe_mode_required_clear",
+    "external_display_only",
+    "dynamic_discovery_required",
+    "test_only",
+    "inputs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "lane": {
+      "const": "dock_drm_lease_external"
+    },
+    "command_kind": {
+      "enum": [
+        "dock_lease_status",
+        "dock_lease_preflight",
+        "dock_lease_receiver_smoke",
+        "dock_lease_test_only",
+        "dock_lease_stop_revoke"
+      ]
+    },
+    "execute": {
+      "const": false
+    },
+    "mutation_allowed_by_policy": {
+      "const": false
+    },
+    "operator_approved": {
+      "const": false
+    },
+    "safe_mode_required_clear": {
+      "const": true
+    },
+    "external_display_only": {
+      "const": true
+    },
+    "dynamic_discovery_required": {
+      "const": true
+    },
+    "test_only": {
+      "type": "boolean"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allow_raw_shell",
+        "allow_manual_connector_id",
+        "allow_manual_crtc_id",
+        "allow_manual_plane_id",
+        "allow_manual_fd",
+        "allow_internal_panel",
+        "allow_whole_card_takeover"
+      ],
+      "properties": {
+        "allow_raw_shell": {
+          "const": false
+        },
+        "allow_manual_connector_id": {
+          "const": false
+        },
+        "allow_manual_crtc_id": {
+          "const": false
+        },
+        "allow_manual_plane_id": {
+          "const": false
+        },
+        "allow_manual_fd": {
+          "const": false
+        },
+        "allow_internal_panel": {
+          "const": false
+        },
+        "allow_whole_card_takeover": {
+          "const": false
+        }
+      }
+    },
+    "expected_result_schema": {
+      "const": "docs/integration/schemas/dock-lease-result.schema.json"
+    }
+  }
+}

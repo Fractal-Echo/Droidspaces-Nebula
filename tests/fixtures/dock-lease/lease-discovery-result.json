@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "lane": "dock_drm_lease_external",
+  "command_kind": "dock_lease_preflight",
+  "executed": false,
+  "mutation_performed": false,
+  "mutation_allowed_by_policy": false,
+  "safe_mode": {
+    "checked": true,
+    "blocks_start": false
+  },
+  "external_display_only": {
+    "required": true,
+    "internal_panel_allowed": false,
+    "whole_card_takeover_allowed": false
+  },
+  "dynamic_discovery": {
+    "required": true,
+    "source": "fixture",
+    "connector": 89,
+    "crtc": 285,
+    "planes": [
+      133
+    ],
+    "lease_fd": 3,
+    "mode": "1920x1080@75",
+    "hardcoded_forbidden": true
+  },
+  "receiver_smoke": {
+    "required_before_start": true,
+    "passed": false
+  },
+  "test_only": {
+    "required_before_commit": true,
+    "passed": false
+  },
+  "handoff": {
+    "mechanism": "SCM_RIGHTS",
+    "passed": false
+  },
+  "stop_revoke": {
+    "required": true,
+    "passed": false
+  },
+  "crash_gate": {
+    "counter_required": true,
+    "auto_retry_allowed": false
+  },
+  "rollback": {
+    "required": true,
+    "available": false
+  },
+  "errors": [
+    "HOST_ONLY_FIXTURE",
+    "LEASE_RECEIVER_NOT_WIRED"
+  ]
+}

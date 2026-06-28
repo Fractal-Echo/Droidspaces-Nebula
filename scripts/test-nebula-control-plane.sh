@@ -18,6 +18,8 @@ export NEBULA_MODULE_DIR="$repo_root/nebula-core-module"
 export NEBULA_MODULE_PROP="$repo_root/nebula-core-module/module.prop"
 export NEBULA_GIT_COMMIT="host-test"
 
+node "$repo_root/scripts/validate-dock-lease-schema.js"
+
 python3 - "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java" <<'PY'
 from pathlib import Path
 import sys

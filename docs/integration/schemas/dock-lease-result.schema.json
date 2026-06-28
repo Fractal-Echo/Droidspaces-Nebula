@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Fractal-Echo/Droidspaces-Nebula/docs/integration/schemas/dock-lease-result.schema.json",
+  "title": "Nebula Dock lease result envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lane",
+    "command_kind",
+    "executed",
+    "mutation_performed",
+    "mutation_allowed_by_policy",
+    "safe_mode",
+    "external_display_only",
+    "dynamic_discovery",
+    "receiver_smoke",
+    "test_only",
+    "handoff",
+    "stop_revoke",
+    "crash_gate",
+    "rollback",
+    "errors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "lane": {
+      "const": "dock_drm_lease_external"
+    },
+    "command_kind": {
+      "enum": [
+        "dock_lease_status",
+        "dock_lease_preflight",
+        "dock_lease_receiver_smoke",
+        "dock_lease_test_only",
+        "dock_lease_stop_revoke"
+      ]
+    },
+    "executed": {
+      "const": false
+    },
+    "mutation_performed": {
+      "const": false
+    },
+    "mutation_allowed_by_policy": {
+      "const": false
+    },
+    "safe_mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checked",
+        "blocks_start"
+      ],
+      "properties": {
+        "checked": {
+          "type": "boolean"
+        },
+        "blocks_start": {
+          "type": "boolean"
+        }
+      }
+    },
+    "external_display_only": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "internal_panel_allowed",
+        "whole_card_takeover_allowed"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "internal_panel_allowed": {
+          "const": false
+        },
+        "whole_card_takeover_allowed": {
+          "const": false
+        }
+      }
+    },
+    "dynamic_discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "source",
+        "connector",
+        "crtc",
+        "planes",
+        "lease_fd",
+        "mode",
+        "hardcoded_forbidden"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "source": {
+          "enum": [
+            "fixture",
+            "future_runtime"
+          ]
+        },
+        "connector": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "crtc": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "planes": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "lease_fd": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "hardcoded_forbidden": {
+          "const": true
+        }
+      }
+    },
+    "receiver_smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_before_start",
+        "passed"
+      ],
+      "properties": {
+        "required_before_start": {
+          "const": true
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "test_only": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_before_commit",
+        "passed"
+      ],
+      "properties": {
+        "required_before_commit": {
+          "const": true
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mechanism",
+        "passed"
+      ],
+      "properties": {
+        "mechanism": {
+          "const": "SCM_RIGHTS"
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "stop_revoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "passed"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "crash_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "counter_required",
+        "auto_retry_allowed"
+      ],
+      "properties": {
+        "counter_required": {
+          "const": true
+        },
+        "auto_retry_allowed": {
+          "const": false
+        }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "available"
+      ],
+      "properties": {
+        "required": {
+          "const": true
+        },
+        "available": {
+          "type": "boolean"
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

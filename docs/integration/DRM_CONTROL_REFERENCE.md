@@ -62,6 +62,34 @@ not permanent constants:
 The final implementation must discover these dynamically per boot/session.
 Never hard-code these object IDs as production behavior.
 
+## Decoded Media Evidence Update
+
+Reversa Stage 07 decoded three local videos from the RM11 Pro / DroidSpaces /
+Nebula evidence bucket and promoted them only as artifact-backed evidence.
+
+Two videos independently show the Dock/Anland userspace path reaching:
+
+- DRM lease mode
+- connector `89`
+- CRTC `285`
+- mode `1920x1080@75`
+- lease fd `fd3`
+- `/dev/dri/card0`
+- `/dev/dri/renderD128`
+- scanout plane `133`
+- Mesa KGSL render device
+- renderer `gles2`
+- Wayland socket `wayland-0`
+- wlroots DRM backend
+- labwc compositor
+- graphical target reached
+
+This does not replace the earlier reported object table. It sharpens the rule:
+object IDs, fds, planes, modes, and connector names are observed evidence, not
+constants. The older report mentioned `2560x1080@75` and planes `137` / `145`;
+the decoded videos show `1920x1080@75` and plane `133`. A real implementation
+must dynamically discover the current external-display object set each run.
+
 ## Reported Validation
 
 Reported evidence from the experiment:
@@ -116,6 +144,20 @@ dock lease stop --json
 
 All commands must reject arbitrary paths, raw shell text, connector IDs, CRTC
 IDs, plane IDs, and fd numbers from the app.
+
+Stage 08 adds host-only command/result schemas and fixtures, not executable
+runtime commands:
+
+- `docs/integration/schemas/dock-lease-command.schema.json`
+- `docs/integration/schemas/dock-lease-result.schema.json`
+- `tests/fixtures/dock-lease/`
+- `scripts/validate-dock-lease-schema.js`
+
+Those fixtures intentionally keep `execute=false`,
+`mutation_allowed_by_policy=false`, dynamic discovery required, external display
+only, internal panel blocked, whole-card takeover blocked, `TEST_ONLY` required,
+`SCM_RIGHTS` recorded, stop/revoke required, rollback required, and crash
+auto-retry disabled.
 
 ## Risk Gates
 

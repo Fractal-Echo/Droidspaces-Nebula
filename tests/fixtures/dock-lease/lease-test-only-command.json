@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "lane": "dock_drm_lease_external",
+  "command_kind": "dock_lease_test_only",
+  "execute": false,
+  "mutation_allowed_by_policy": false,
+  "operator_approved": false,
+  "safe_mode_required_clear": true,
+  "external_display_only": true,
+  "dynamic_discovery_required": true,
+  "test_only": true,
+  "inputs": {
+    "allow_raw_shell": false,
+    "allow_manual_connector_id": false,
+    "allow_manual_crtc_id": false,
+    "allow_manual_plane_id": false,
+    "allow_manual_fd": false,
+    "allow_internal_panel": false,
+    "allow_whole_card_takeover": false
+  },
+  "expected_result_schema": "docs/integration/schemas/dock-lease-result.schema.json"
+}
