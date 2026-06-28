@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1800" viewBox="0 0 1440 1800">
+  <defs>
+    <filter id="glow"><feGaussianBlur stdDeviation="6" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <radialGradient id="bg" cx="50%" cy="36%" r="60%"><stop stop-color="#071612"/><stop offset=".55" stop-color="#020607"/><stop offset="1" stop-color="#000"/></radialGradient>
+    <style>.t{font-family:"DejaVu Sans Condensed","Arial Narrow",Arial,sans-serif;font-weight:800;letter-spacing:5px}.m{font-family:"DejaVu Sans Mono",monospace;letter-spacing:11px}</style>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <g opacity=".55" fill="none">
+    <ellipse cx="720" cy="650" rx="510" ry="360" stroke="#52ff18"/>
+    <ellipse cx="720" cy="650" rx="430" ry="310" stroke="#00eaff"/>
+    <ellipse cx="720" cy="650" rx="355" ry="245" stroke="#ff2640"/>
+    <path d="M190 690 C430 420 800 410 1210 685" stroke="#52ff18" stroke-width="5" filter="url(#glow)"/>
+    <path d="M220 600 C500 835 870 900 1195 650" stroke="#00eaff" stroke-width="4" filter="url(#glow)"/>
+  </g>
+  <g fill="none" stroke="#52ff18" stroke-width="13" filter="url(#glow)">
+    <path d="M600 870 V430 H660 L845 852 H900 V430"/>
+    <path d="M650 805 V555 M690 500 L835 810"/>
+  </g>
+  <g fill="none" stroke="#00eaff" stroke-width="2" opacity=".7">
+    <path d="M45 45 H255 M45 45 V255 M1395 45 H1185 M1395 45 V255"/>
+    <path d="M45 1755 H255 M45 1755 V1545 M1395 1755 H1185 M1395 1755 V1545"/>
+  </g>
+  <text x="100" y="125" class="t" font-size="32" fill="#52ff18" filter="url(#glow)">NEBULA CORE</text>
+  <text x="1065" y="125" class="t" font-size="32" fill="#ff2640" filter="url(#glow)">DROIDSPACES</text>
+  <text x="720" y="1280" text-anchor="middle" class="t" font-size="88" filter="url(#glow)">
+    <tspan fill="#eef6ff">DROIDSPACES:</tspan><tspan dx="35" fill="#52ff18">NEBULA</tspan>
+  </text>
+  <line x1="115" y1="1380" x2="628" y2="1380" stroke="#52ff18" stroke-width="4"/>
+  <line x1="812" y1="1380" x2="1325" y2="1380" stroke="#52ff18" stroke-width="4"/>
+  <polygon points="720,1335 766,1362 766,1418 720,1445 674,1418 674,1362" fill="#001719" stroke="#00eaff" stroke-width="3"/>
+  <text x="720" y="1405" text-anchor="middle" class="t" font-size="46" fill="#52ff18" filter="url(#glow)">N</text>
+  <text x="720" y="1505" text-anchor="middle" class="m" font-size="30" fill="#00eaff" filter="url(#glow)">WHERE THE POSSIBILITIES ARE LIMITLESS*</text>
+</svg>
