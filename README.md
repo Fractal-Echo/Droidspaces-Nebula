@@ -146,6 +146,8 @@ must not share the same writable `rootfs.img`.
 Dock Lease schema work is host-only. `docs/integration/schemas/` and
 `tests/fixtures/dock-lease/` describe the future command/result envelope without
 adding a start command, APK allowlist entry, DRM mutation, or compositor launch.
+`scripts/dock-lease-command-plan-report.js` can generate a review report from
+those fixtures, but `profile set dock` remains blocked.
 
 For Phone/App Mode, first check `runtime waylandie status --json` or
 `display lanes --json`. The read-only output includes live reinstall-safe path

@@ -173,7 +173,9 @@ Dock Lease Stage 08 is host-only. The command/result schemas under
 `docs/integration/schemas/` and fixtures under `tests/fixtures/dock-lease/`
 exist to prove the authority boundary before runtime work. They do not add an
 APK allowlist command, module command, DRM lease start path, compositor launch,
-or device mutation.
+or device mutation. `scripts/dock-lease-command-plan-report.js` turns those
+fixtures into a generated review report only; it does not unlock Dock runtime
+execution.
 
 The target experience is one app and one core module coordinating these lanes,
 not one rendering path forced onto every user.

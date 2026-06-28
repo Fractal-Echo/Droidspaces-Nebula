@@ -20,6 +20,40 @@ export NEBULA_GIT_COMMIT="host-test"
 
 node "$repo_root/scripts/validate-dock-lease-schema.js"
 
+dock_plan="$(node "$repo_root/scripts/dock-lease-command-plan-report.js" --json)"
+python3 - "$dock_plan" <<'PY'
+import json, sys
+
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "dock lease command-plan report"
+assert obj["host_only"] is True
+assert obj["profile_set_dock"] == "BLOCKED_NOT_READY"
+assert obj["start_command_available"] is False
+assert obj["runtime_allowlists_modified"] is False
+assert obj["app_allowlists_modified"] is False
+assert obj["lane"] == "dock_drm_lease_external"
+assert "NO_ADB" in obj["safety_locks"]
+assert "NO_DRM_MUTATION" in obj["safety_locks"]
+assert "NO_CREATE_LEASE" in obj["safety_locks"]
+assert len(obj["plans"]) >= 4
+for plan in obj["plans"]:
+    assert plan["execute"] is False
+    assert plan["mutation_allowed_by_policy"] is False
+    assert plan["external_display_only"] is True
+    assert plan["dynamic_discovery_required"] is True
+    assert plan["inputs"]["allow_raw_shell"] is False
+    assert plan["inputs"]["allow_manual_connector_id"] is False
+    assert plan["inputs"]["allow_manual_crtc_id"] is False
+    assert plan["inputs"]["allow_manual_plane_id"] is False
+    assert plan["inputs"]["allow_manual_fd"] is False
+    assert plan["inputs"]["allow_internal_panel"] is False
+    assert plan["inputs"]["allow_whole_card_takeover"] is False
+    assert plan["observed_fixture_values"]["hardcoded_forbidden"] is True
+    assert plan["required_guards"]["auto_retry_allowed"] is False
+    assert "HOST_ONLY_FIXTURE" in plan["result_errors"]
+PY
+
 python3 - "$repo_root/app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java" <<'PY'
 from pathlib import Path
 import sys

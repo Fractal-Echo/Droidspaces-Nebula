@@ -152,12 +152,17 @@ runtime commands:
 - `docs/integration/schemas/dock-lease-result.schema.json`
 - `tests/fixtures/dock-lease/`
 - `scripts/validate-dock-lease-schema.js`
+- `scripts/dock-lease-command-plan-report.js`
 
 Those fixtures intentionally keep `execute=false`,
 `mutation_allowed_by_policy=false`, dynamic discovery required, external display
 only, internal panel blocked, whole-card takeover blocked, `TEST_ONLY` required,
 `SCM_RIGHTS` recorded, stop/revoke required, rollback required, and crash
 auto-retry disabled.
+
+The generated command-plan report is also host-only. It records the future step
+order and guard state while keeping `profile set dock` blocked and leaving the
+APK/module runtime allowlists unchanged.
 
 ## Risk Gates
 

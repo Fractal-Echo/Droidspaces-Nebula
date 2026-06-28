@@ -23,6 +23,7 @@ required_files=(
   "tests/fixtures/dock-lease/lease-discovery-result.json"
   "tests/fixtures/dock-lease/lease-test-only-command.json"
   "tests/fixtures/dock-lease/lease-test-only-result.json"
+  "scripts/dock-lease-command-plan-report.js"
   "scripts/validate-dock-lease-schema.js"
 )
 
@@ -50,11 +51,14 @@ grep -q 'display method-profiles --json' nebula-core-module/README.md
 grep -q 'display method-profiles --json' docs/integration/UNIFIED_CONTROL_PLANE.md
 grep -q 'dock-lease-command.schema.json' docs/integration/DRM_CONTROL_REFERENCE.md
 grep -q 'dock-lease-result.schema.json' docs/integration/DRM_CONTROL_REFERENCE.md
+grep -q 'dock-lease-command-plan-report.js' docs/integration/DRM_CONTROL_REFERENCE.md
 grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' nebula-core-module/bin/nebula-core
 grep -q 'NEBULA_R6_WAYLAND_WORKING_REAL_BUFFER_PASS' docs/integration/REVERSA_FINDINGS_ASSESSMENT.md
 grep -q 'NONE_WAYLAND_DISPLAY' docs/integration/STATUS_MODEL.md
 
 node scripts/validate-dock-lease-schema.js
+node --check scripts/dock-lease-command-plan-report.js
+node scripts/dock-lease-command-plan-report.js --json >/dev/null
 
 python3 - <<'PY'
 from pathlib import Path
