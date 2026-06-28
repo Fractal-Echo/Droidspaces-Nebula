@@ -219,8 +219,10 @@ required = {
     "runtime.waylandie.proton-smoke",
     "display.lanes",
     "display.method-containers",
+    "display.method-profiles",
     "display.lane.phone.preflight",
     "display.lane.anland.preflight",
+    "display.anland.recipes",
     "display.lane.dock.preflight",
     "adb.wifi",
 }
@@ -589,8 +591,10 @@ assert anland["container_ref"] == "ubuntu"
 assert anland["recommended_container"] == "anland-ubuntu26-kde"
 assert anland["selected_is_recommended"] is False
 assert "bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock" in anland["required_config"]
+assert "enable_pulseaudio=1" in anland["required_config"]
 assert "ANLAND_SOCKET=/run/display.sock" in anland["required_env"]
 assert "MESA_LOADER_DRIVER_OVERRIDE=kgsl" in anland["required_env"]
+assert "PULSE_SERVER=unix:/tmp/.pulse-socket" in anland["required_env"]
 assert anland["setup_commands"]["consumer_apk_package"] == "com.anland.consumer"
 assert "ksud module install" in anland["setup_commands"]["daemon_module_install"]
 assert anland["setup_commands"]["recommended_rootfs_archive"] == "/sdcard/Download/anland-ubuntu26-kde.tar.xz"
@@ -778,11 +782,94 @@ assert obj["checks"]["display_daemon_socket"] is True
 assert obj["checks"]["display_daemon_socket_writable"] is True
 assert obj["checks"]["env_kgsl"] is True
 assert "ANLAND_SOCKET=/run/display.sock" in obj["required_env"]
+assert "PULSE_SERVER=unix:/tmp/.pulse-socket" in obj["required_env"]
 assert obj["setup_commands"]["recommended_container"] == "anland-ubuntu26-kde"
 assert "--rootfs-arc=/sdcard/Download/anland-ubuntu26-kde.tar.xz" in obj["setup_commands"]["droidspaces_create_rootfs_img"]
 assert "--bind=/data/local/tmp/display_daemon.sock:/run/display.sock" in obj["setup_commands"]["droidspaces_start_recommended"]
 assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
 assert obj["selected_paths"]["rootfs_mode"] == "directory"
+PY
+
+anland_recipes="$(
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  sh "$cli" display anland recipes --json
+)"
+python3 - "$anland_recipes" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "display anland recipes"
+assert obj["mutating"] is False
+assert obj["executor_available"] is False
+assert obj["recipe_manifest_only"] is True
+assert obj["artifact"]["sha256"] == "848bab354f6f1a46f842cc32536d558518d21e0280e299f814a9a1fbaf73e4ec"
+assert obj["artifact"]["public_repo_payloads_committed"] is False
+assert obj["preflight"]["selected_container"] == "ubuntu"
+assert obj["preflight"]["container_selection_source"] == "default_fallback"
+assert obj["preflight"]["runtime_ready"] is True
+assert obj["preflight"]["display_ready"] is True
+checks = obj["preflight"]["checks"]
+assert checks["droidspaces_binary"] is True
+assert checks["container_config"] is True
+assert checks["rootfs_path"] is True
+assert checks["rootfs_image"] is False
+assert checks["anland_env"] is True
+assert checks["display_daemon_socket"] is True
+assert checks["display_daemon_socket_writable"] is True
+assert checks["render_node"] is True
+assert checks["config_socket_bind"] is True
+assert checks["env_socket"] is True
+assert checks["env_kgsl"] is True
+assert checks["anland_producer"] is True
+recipes = {item["id"]: item for item in obj["recipes"]}
+required = {
+    "open_anland_consumer",
+    "install_or_verify_anland_consumer_apk",
+    "install_or_verify_anland_daemon_module",
+    "create_anland_rootfs_image",
+    "phone_setup_container",
+    "restart_display_daemon",
+    "stop_container",
+    "start_container",
+    "restart_selected_with_socket",
+    "start_kde_producer",
+    "status_check",
+    "capture_screenshot",
+    "terminal_enter",
+    "verify_requirements",
+    "audio_fix",
+    "browser_install",
+    "steam_install",
+}
+assert required <= recipes.keys()
+assert all(item["exposed_by_nebula"] is False for item in recipes.values())
+assert recipes["status_check"]["mutating"] is False
+assert recipes["verify_requirements"]["mutating"] is False
+assert recipes["terminal_enter"]["status"] == "not_allowed_in_apk"
+assert recipes["steam_install"]["status"] == "research_reference_only"
+assert "/opt/anland/startup.sh" in recipes["start_kde_producer"]["fixed_command_reference"]
+assert "startanland-kde.sh" in recipes["start_kde_producer"]["fixed_command_reference"]
+assert "--rootfs-arc=/sdcard/Download/anland-ubuntu26-kde.tar.xz" in recipes["create_anland_rootfs_image"]["fixed_command_reference"]
+assert "anland-daemon" in recipes["install_or_verify_anland_daemon_module"]["fixed_command_reference"]
+assert "virtual-drm-daemon" in recipes["install_or_verify_anland_daemon_module"]["fixed_command_reference"]
+assert "ps -A" in recipes["status_check"]["fixed_command_reference"]
+assert "no_arbitrary_shell" in obj["guardrails"]
+assert "no_terminal_enter_from_apk" in obj["guardrails"]
+assert "no_steam_proton_wine_dxvk_game_launch_from_recipe_manifest" in obj["guardrails"]
+assert "preserve_waylandie_known_good_frontier" in obj["guardrails"]
+assert any("container=Ubuntu or ubuntu" in item for item in obj["source_drift"])
+PY
+
+set +e
+bad_anland_recipes="$(sh "$cli" display anland recipes --json /tmp/bad)"
+bad_anland_recipes_code=$?
+set -e
+[[ "$bad_anland_recipes_code" -eq 2 ]]
+python3 - "$bad_anland_recipes" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["ok"] is False
+assert obj["error"] == "USAGE"
 PY
 
 chmod 755 "$device_root/data/local/tmp/display_daemon.sock"

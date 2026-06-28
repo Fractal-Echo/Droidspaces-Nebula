@@ -245,6 +245,18 @@ For sparse-image containers, verify and launch it through DroidSpaces:
   run sh -lc 'nohup /usr/local/bin/startanland-kde.sh >/tmp/anland-kde.log 2>&1 &'
 ```
 
+Nebula also exposes the contributor Linux-native desktop flow as a read-only
+recipe manifest:
+
+```sh
+su -c '/data/adb/modules/nebula_core/bin/nebula-core display anland recipes --json'
+```
+
+Use it as a checklist, not a launcher. It records APK/module verification,
+rootfs image creation, container lifecycle, KDE producer launch, status checks,
+screenshot capture, audio fixes, browser installs, and Steam install leads. All
+mutating recipes remain deferred and `exposed_by_nebula=false`.
+
 ## Build
 
 ```bash

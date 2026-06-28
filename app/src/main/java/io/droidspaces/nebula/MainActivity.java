@@ -208,6 +208,7 @@ public final class MainActivity extends Activity {
     private JSONObject displayLanesStatus;
     private JSONObject displayMethodContainersStatus;
     private JSONObject displayMethodProfilesStatus;
+    private JSONObject displayAnlandRecipesStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -356,6 +357,7 @@ public final class MainActivity extends Activity {
         displayLanesStatus = loadDisplayLanesStatus();
         displayMethodContainersStatus = loadDisplayMethodContainersStatus();
         displayMethodProfilesStatus = loadDisplayMethodProfilesStatus();
+        displayAnlandRecipesStatus = loadDisplayAnlandRecipesStatus();
 
         systemTargetContainer.removeAllViews();
         systemTargetContainer.addView(buildSystemTargetBar());
@@ -376,6 +378,7 @@ public final class MainActivity extends Activity {
 
         displayLaneContainer.removeAllViews();
         displayLaneContainer.addView(buildDisplayLanesCard());
+        displayLaneContainer.addView(buildAnlandRecipesCard());
 
         targetProfileContainer.removeAllViews();
         for (TargetProfile profile : targetProfiles) {
@@ -1679,6 +1682,21 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private JSONObject loadDisplayAnlandRecipesStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.displayAnlandRecipes();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
     private View buildDisplayLanesCard() {
         LinearLayout card = baseCard();
 
@@ -1724,6 +1742,119 @@ public final class MainActivity extends Activity {
         methodProfiles.setPadding(0, dp(10), 0, 0);
         card.addView(methodProfiles);
         return card;
+    }
+
+    private View buildAnlandRecipesCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("Anland Desktop Recipes", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(anlandRecipeSummary(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(anlandRecipeTopLabel(), anlandRecipeTopColor()));
+
+        JSONArray recipes = displayAnlandRecipesStatus == null
+                ? null : displayAnlandRecipesStatus.optJSONArray("recipes");
+        if (recipes == null || recipes.length() == 0) {
+            TextView unavailable = text("recipes=module_unavailable", 12, MUTED, Typeface.NORMAL);
+            unavailable.setTypeface(Typeface.MONOSPACE);
+            unavailable.setPadding(0, dp(12), 0, 0);
+            card.addView(unavailable);
+            return card;
+        }
+
+        for (int i = 0; i < recipes.length(); i++) {
+            JSONObject recipe = recipes.optJSONObject(i);
+            if (recipe != null) {
+                card.addView(buildAnlandRecipeRow(recipe));
+            }
+        }
+        return card;
+    }
+
+    private String anlandRecipeSummary() {
+        if (displayAnlandRecipesStatus == null) {
+            return "recipes=module_unavailable\nexecutor=false";
+        }
+        JSONObject preflight = displayAnlandRecipesStatus.optJSONObject("preflight");
+        JSONObject artifact = displayAnlandRecipesStatus.optJSONObject("artifact");
+        String selected = preflight == null
+                ? "unknown" : preflight.optString("selected_container", "unknown");
+        String source = preflight == null
+                ? "unknown" : preflight.optString("container_selection_source", "unknown");
+        String sha = artifact == null ? "unknown" : artifact.optString("sha256", "unknown");
+        return "manifestOnly=" + displayAnlandRecipesStatus.optBoolean("recipe_manifest_only", true)
+                + "\nexecutor=" + displayAnlandRecipesStatus.optBoolean("executor_available", true)
+                + "\nselectedContainer=" + selected
+                + "  source=" + source
+                + "\nartifactSha=" + sha;
+    }
+
+    private String anlandRecipeTopLabel() {
+        if (displayAnlandRecipesStatus == null) return "Unknown";
+        JSONObject preflight = displayAnlandRecipesStatus.optJSONObject("preflight");
+        if (preflight != null && preflight.optBoolean("display_ready", false)) return "Display";
+        if (preflight != null && preflight.optBoolean("runtime_ready", false)) return "Runtime";
+        return "Manifest";
+    }
+
+    private int anlandRecipeTopColor() {
+        if (displayAnlandRecipesStatus == null) return BLUE;
+        JSONObject preflight = displayAnlandRecipesStatus.optJSONObject("preflight");
+        if (preflight != null && preflight.optBoolean("display_ready", false)) return GREEN;
+        if (preflight != null && preflight.optBoolean("runtime_ready", false)) return CYAN;
+        return YELLOW;
+    }
+
+    private View buildAnlandRecipeRow(JSONObject recipe) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(4));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(top);
+
+        TextView label = text(recipe.optString("title", recipe.optString("id", "Recipe")),
+                15, TEXT, Typeface.BOLD);
+        top.addView(label, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        String status = recipe.optString("status", "unknown");
+        int color = recipe.optBoolean("mutating", false) ? YELLOW : CYAN;
+        if (status.contains("not_allowed")) color = RED;
+        top.addView(chip(status.length() > 14 ? status.substring(0, 14) : status, color));
+
+        TextView detail = text(anlandRecipeDetail(recipe), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(6), 0, 0);
+        row.addView(detail);
+        return row;
+    }
+
+    private String anlandRecipeDetail(JSONObject recipe) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("id=").append(recipe.optString("id", "unknown"));
+        builder.append("\nscript=").append(recipe.optString("source_script", "unknown"));
+        builder.append("\nkind=").append(recipe.optString("kind", "unknown"));
+        builder.append("\nmutating=").append(recipe.optBoolean("mutating", false));
+        builder.append("  exposed=").append(recipe.optBoolean("exposed_by_nebula", false));
+        builder.append("\ncommand=").append(recipe.optString("fixed_command_reference", "unknown"));
+        builder.append("\nnote=").append(recipe.optString("note", "unknown"));
+        return builder.toString();
     }
 
     private String displayLaneSummary() {
@@ -2571,6 +2702,8 @@ public final class MainActivity extends Activity {
             sb.append('\n');
         }
 
+        appendAnlandRecipesReport(sb);
+
         sb.append("[Targets]\n");
         for (TargetProfile profile : targetProfiles) {
             sb.append("  ").append(profile.label).append(": ")
@@ -2703,6 +2836,63 @@ public final class MainActivity extends Activity {
             }
         }
         sb.append("  nextStep=").append(baselineIntegrationsStatus.optString("next_step", "unknown")).append("\n\n");
+    }
+
+    private void appendAnlandRecipesReport(StringBuilder sb) {
+        sb.append("[Anland Desktop Recipes]\n");
+        if (displayAnlandRecipesStatus == null) {
+            sb.append("  status=unavailable\n\n");
+            return;
+        }
+        sb.append("  manifestOnly=")
+                .append(displayAnlandRecipesStatus.optBoolean("recipe_manifest_only", true))
+                .append('\n');
+        sb.append("  executorAvailable=")
+                .append(displayAnlandRecipesStatus.optBoolean("executor_available", true))
+                .append('\n');
+        JSONObject artifact = displayAnlandRecipesStatus.optJSONObject("artifact");
+        if (artifact != null) {
+            sb.append("  artifactSha=").append(artifact.optString("sha256", "unknown")).append('\n');
+            sb.append("  payloadsCommitted=")
+                    .append(artifact.optBoolean("public_repo_payloads_committed", true))
+                    .append('\n');
+        }
+        JSONObject preflight = displayAnlandRecipesStatus.optJSONObject("preflight");
+        if (preflight != null) {
+            sb.append("  selectedContainer=")
+                    .append(preflight.optString("selected_container", "unknown"))
+                    .append('\n');
+            sb.append("  selectionSource=")
+                    .append(preflight.optString("container_selection_source", "unknown"))
+                    .append('\n');
+            sb.append("  runtimeReady=")
+                    .append(preflight.optBoolean("runtime_ready", false)).append('\n');
+            sb.append("  displayReady=")
+                    .append(preflight.optBoolean("display_ready", false)).append('\n');
+            JSONObject checks = preflight.optJSONObject("checks");
+            if (checks != null) {
+                sb.append("  checks=").append(checkSummary(checks)).append('\n');
+            }
+        }
+        JSONArray drift = displayAnlandRecipesStatus.optJSONArray("source_drift");
+        if (drift != null && drift.length() > 0) {
+            sb.append("  sourceDrift=").append(drift).append('\n');
+        }
+        JSONArray recipes = displayAnlandRecipesStatus.optJSONArray("recipes");
+        if (recipes != null) {
+            for (int i = 0; i < recipes.length(); i++) {
+                JSONObject recipe = recipes.optJSONObject(i);
+                if (recipe == null) continue;
+                sb.append("  ").append(recipe.optString("id", "unknown"))
+                        .append(": ").append(recipe.optString("status", "unknown")).append('\n');
+                sb.append("    mutating=").append(recipe.optBoolean("mutating", false)).append('\n');
+                sb.append("    exposed=").append(recipe.optBoolean("exposed_by_nebula", false)).append('\n');
+                sb.append("    script=").append(recipe.optString("source_script", "unknown")).append('\n');
+            }
+        }
+        sb.append("  next=")
+                .append(displayAnlandRecipesStatus.optString("safe_next_action", "unknown"))
+                .append("\n\n");
     }
 
     private void appendCapabilities(StringBuilder sb, String title, List<NebulaCapability> capabilities) {

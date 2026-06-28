@@ -50,6 +50,10 @@ grep -q 'pending module rejected by anti-regression guard' app/src/main/java/io/
 grep -q 'display method-profiles --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
 grep -q 'display method-profiles --json' nebula-core-module/README.md
 grep -q 'display method-profiles --json' docs/integration/UNIFIED_CONTROL_PLANE.md
+grep -q 'display anland recipes --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'display anland recipes --json' nebula-core-module/README.md
+grep -q 'display anland recipes --json' docs/integration/UNIFIED_CONTROL_PLANE.md
+grep -q 'display anland recipes --json' docs/integration/CONTRIBUTOR_LINUX_NATIVE_ARTIFACT.md
 grep -q 'integrations standalone --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
 grep -q 'integrations standalone --json' nebula-core-module/README.md
 grep -q 'integrations standalone --json' docs/integration/UNIFIED_CONTROL_PLANE.md

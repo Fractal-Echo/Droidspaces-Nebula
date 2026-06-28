@@ -62,6 +62,24 @@ Not allowed:
 - RedMagic hardware: device-firmware node evidence, read-only in baseline.
 - PowerDeck: preview/snapshot policy lane.
 
+`display anland recipes --json` records the source-level desktop flow without
+turning it into an executor. The manifest keeps these recipe families visible:
+
+- verify/install Anland Consumer APK and daemon module artifacts;
+- create the Anland Ubuntu/KDE DroidSpaces rootfs image;
+- materialize `container.config` and `anland.env`;
+- restart the display daemon and socket;
+- start/stop/restart the selected container;
+- launch the KDE/Anland producer;
+- run status checks or capture screenshot evidence;
+- defer shell entry, audio mutation, browser installs, and Steam installs.
+
+The command also records the important drift: the contributor proof used
+`Ubuntu`/`ubuntu` scripts, an observed 16G rootfs-create path, and both
+`anland-daemon` and `virtual-drm-daemon` module naming. Nebula normalizes the
+future clean profile to `anland-ubuntu26-kde`, 32G sparse image, and explicit
+preflight before any mutating recipe can graduate.
+
 Final promotion requires a reproducible source build, bounded command schema,
 Reversa scan, host tests, and live proof before any new mutating command is
 exposed.

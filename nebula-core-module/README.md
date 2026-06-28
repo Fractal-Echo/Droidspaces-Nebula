@@ -32,6 +32,7 @@ Pass 01 exposes only a fixed JSON command protocol:
 - `display lanes --json`
 - `display method-containers --json`
 - `display method-profiles --json`
+- `display anland recipes --json`
 - `display lane phone preflight --json`
 - `display lane anland preflight --json`
 - `display lane dock preflight --json`
@@ -84,6 +85,11 @@ shell argument and is never launched during boot.
 container/runtime. `display method-profiles --json` reports read-only
 DroidSpaces/Anland profile templates for separate rootfs image, rootfs
 directory, Termux:X11, VirGL, Turnip/KGSL, llvmpipe, and PulseAudio methods.
+`display anland recipes --json` reports the contributor Linux-native
+Anland/DroidSpaces/KDE recipe manifest as read-only evidence. It does not start
+containers, launch the Anland consumer, install APKs/modules, restart daemons,
+write `container.config`/`anland.env`, enter a shell, install browser/Steam
+packages, or launch games.
 The lane preflight commands are read-only:
 
 - Phone/App Mode reports the WayLandIE lane status. The app/native bridge,

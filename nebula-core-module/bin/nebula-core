@@ -51,6 +51,9 @@ DISPLAY_DOCK_LEASE_STATE=proven_reference_not_wired
 DISPLAY_REZGISK_PROVIDER_STATE=documented_not_installed
 DISPLAY_COOLING_POLICY_STATE=preview_only
 ANLAND_REPAIR_SOURCE="Droidspaces-OSS CLI --env/--bind; Droidspaces-rootfs-KDE-builder Ubuntu26 anland_kde; Anland daemon/consumer"
+ANLAND_LINUX_NATIVE_ARTIFACT_SHA256=848bab354f6f1a46f842cc32536d558518d21e0280e299f814a9a1fbaf73e4ec
+ANLAND_LINUX_NATIVE_ARTIFACT_SOURCE="Contributor linux native.zip reviewed 2026-06-28; desktop-scripts, phone_setup.sh, LEIA-ME.txt, README_AUDIO_FIX.md"
+ANLAND_LINUX_NATIVE_LOCAL_EVIDENCE=/home/richtofen/.android/repositories/nebula-assets/local/contributor-linux-native-2026-06-28
 DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
 ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
 ANLAND_CONTAINERS_DIR=/data/local/Droidspaces/Containers
@@ -330,6 +333,8 @@ capabilities_json() {
   printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"display.lanes","title":"Display lane selector status","status":"available_read_only","mutating":false,"source":"nebula-core lane registry"},'
   printf '{"id":"display.method-containers","title":"Display method container map","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method container registry"},'
+  printf '{"id":"display.method-profiles","title":"Display method profile templates","status":"available_read_only","mutating":false,"source":"DroidSpaces/Anland method profile registry"},'
+  printf '{"id":"display.anland.recipes","title":"Anland desktop recipe manifest","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_LINUX_NATIVE_ARTIFACT_SOURCE")"
   printf '{"id":"display.lane.phone.preflight","title":"Phone/App WayLandIE lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DISPLAY_PHONE_SOURCE")"
   printf '{"id":"display.lane.anland.preflight","title":"Anland surface lane preflight","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$ANLAND_REPAIR_SOURCE")"
   printf '{"id":"display.lane.dock.preflight","title":"Dock lease lane preflight","status":"proven_reference_read_only","mutating":false,"source":"%s"},' "$(json_escape "$DRM_LEASE_SOURCE")"
@@ -1459,13 +1464,13 @@ anland_active_image_has_producer() {
 }
 
 anland_required_env_json() {
-  printf '["ANLAND=1","ANLAND_SOCKET=%s","ANLAND_DRM_DEVICE=%s","WAYLAND_DISPLAY=wayland-0","XDG_SESSION_TYPE=wayland","QT_QPA_PLATFORM=wayland","MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform"]' \
+  printf '["ANLAND=1","ANLAND_SOCKET=%s","ANLAND_DRM_DEVICE=%s","WAYLAND_DISPLAY=wayland-0","XDG_SESSION_TYPE=wayland","QT_QPA_PLATFORM=wayland","MESA_LOADER_DRIVER_OVERRIDE=kgsl","GALLIUM_DRIVER=kgsl","FD_FORCE_KGSL=1","TU_DEBUG=noconform","PULSE_SERVER=unix:/tmp/.pulse-socket"]' \
     "$(json_escape "$ANLAND_SOCKET_GUEST")" \
     "$(json_escape "$ANLAND_RENDER_NODE")"
 }
 
 anland_required_config_json() {
-  printf '["enable_termux_x11=0","enable_hw_access=1","enable_gpu_mode=1","selinux_permissive=1","privileged=nocaps,noseccomp","env_file=<container>/anland.env","bind_mounts=%s:%s"]' \
+  printf '["enable_termux_x11=0","enable_hw_access=1","enable_gpu_mode=1","enable_pulseaudio=1","selinux_permissive=1","privileged=nocaps,noseccomp","env_file=<container>/anland.env","bind_mounts=%s:%s"]' \
     "$(json_escape "$ANLAND_SOCKET_HOST")" \
     "$(json_escape "$ANLAND_SOCKET_GUEST")"
 }
@@ -1526,6 +1531,124 @@ anland_setup_commands_json() {
   printf '"producer_verify_command":%s,' "$(json_string "$(anland_recommended_producer_verify_command)")"
   printf '"producer_run_command":%s,' "$(json_string "$(anland_recommended_producer_run_command)")"
   printf '"repo_build_profile":"Droidspaces-rootfs-KDE-builder Ubuntu26 with KDE auto-start and anland_kde enabled"}'
+}
+
+anland_recipe_item_json() {
+  recipe_id=$1
+  title=$2
+  source_script=$3
+  recipe_kind=$4
+  status=$5
+  mutating=$6
+  exposed=$7
+  command_ref=$8
+  note=$9
+  printf '{"id":%s,"title":%s,"source_script":%s,"kind":%s,"status":%s,"mutating":%s,"exposed_by_nebula":%s,"fixed_command_reference":%s,"note":%s}' \
+    "$(json_string "$recipe_id")" \
+    "$(json_string "$title")" \
+    "$(json_string "$source_script")" \
+    "$(json_string "$recipe_kind")" \
+    "$(json_string "$status")" \
+    "$(json_bool "$mutating")" \
+    "$(json_bool "$exposed")" \
+    "$(json_string "$command_ref")" \
+    "$(json_string "$note")"
+}
+
+anland_desktop_recipes_json() {
+  anland_collect
+  selected_restart=$(anland_selected_restart_command)
+  status_probe="$ANLAND_DROIDSPACES_BIN --name=<container> info; ls -la $ANLAND_SOCKET_GUEST; tail -n 20 /data/local/tmp/display_daemon.log"
+  status_process_probe="ps -A | grep -E 'display_daemon|droidspaces'"
+  consumer_start="adb shell am"
+  consumer_start="$consumer_start start -n $ANLAND_CONSUMER_PACKAGE/.MainActivity"
+  phone_setup="phone_setup.sh writes container.config, anland.env, Termux PulseAudio defaults, and display_daemon service state"
+  consumer_install="adb install anland-consumer.apk; verify package $ANLAND_CONSUMER_PACKAGE"
+  daemon_install="ksud module install anland-daemon.zip or virtual-drm-daemon.zip; verify module id anland-daemon or $ANLAND_DAEMON_MODULE_ID"
+  daemon_restart="pkill -f display_daemon; rm -f /data/local/tmp/display_daemon.sock; start virtual-drm-daemon display_daemon at /data/local/tmp/display_daemon.sock"
+  rootfs_create=$(anland_recommended_create_command)
+  container_stop="$ANLAND_DROIDSPACES_BIN --name=<container> stop"
+  container_start="$ANLAND_DROIDSPACES_BIN --name=<container> start"
+  kde_start="$ANLAND_DROIDSPACES_BIN --name=<container> run bash /opt/anland/startup.sh OR $(anland_recommended_producer_run_command)"
+  screenshot_capture="adb shell screencap -p /data/local/tmp/screen.png; adb pull /data/local/tmp/screen.png"
+  terminal_enter="$ANLAND_DROIDSPACES_BIN --name=<container> enter"
+  audio_fix="AUDIO_Corrigir_Som.bat restarts container, checks /dev/snd, and runs pactl info"
+  browser_install="Navegadores/install_browsers.sh installs Firefox/Chromium packages inside the container"
+  steam_install="Steam/install_steam.sh installs box86/box64, binfmt_misc setup, i386/armhf packages, and Steam"
+
+  printf '{"protocol_version":%s,"command":"display anland recipes",' "$PROTOCOL_VERSION"
+  printf '"mutating":false,"executor_available":false,"recipe_manifest_only":true,'
+  printf '"source":%s,' "$(json_string "$ANLAND_LINUX_NATIVE_ARTIFACT_SOURCE")"
+  printf '"artifact":{"sha256":%s,"local_evidence":%s,"public_repo_payloads_committed":false,"review_status":"source_level_requirements_only"},' \
+    "$(json_string "$ANLAND_LINUX_NATIVE_ARTIFACT_SHA256")" \
+    "$(json_string "$ANLAND_LINUX_NATIVE_LOCAL_EVIDENCE")"
+  printf '"preflight":{"selected_container":%s,"container_selection_source":%s,"runtime_ready":%s,"display_ready":%s,"selected_paths":{"container_config":%s,"anland_env":%s,"rootfs_path":%s,"rootfs_mode":%s,"display_socket_host":%s,"display_socket_guest":%s,"render_node":%s},"checks":{"droidspaces_binary":%s,"container_config":%s,"rootfs_path":%s,"rootfs_image":%s,"anland_env":%s,"display_daemon_socket":%s,"display_daemon_socket_writable":%s,"render_node":%s,"config_socket_bind":%s,"env_socket":%s,"env_kgsl":%s,"anland_producer":%s},"errors":[%s]},' \
+    "$(json_string "$anland_selected_container")" \
+    "$(json_string "$anland_selection_source")" \
+    "$(json_bool "$anland_runtime_ready")" \
+    "$(json_bool "$anland_ready")" \
+    "$(json_string "$anland_selected_config")" \
+    "$(json_string "$anland_selected_env")" \
+    "$(json_string "$anland_selected_rootfs")" \
+    "$(json_string "$anland_selected_rootfs_mode")" \
+    "$(json_string "$ANLAND_SOCKET_HOST")" \
+    "$(json_string "$ANLAND_SOCKET_GUEST")" \
+    "$(json_string "$ANLAND_RENDER_NODE")" \
+    "$(json_bool "$anland_bin")" \
+    "$(json_bool "$anland_config")" \
+    "$(json_bool "$anland_rootfs")" \
+    "$(json_bool "$anland_rootfs_image")" \
+    "$(json_bool "$anland_env")" \
+    "$(json_bool "$anland_socket")" \
+    "$(json_bool "$anland_socket_writable")" \
+    "$(json_bool "$anland_render")" \
+    "$(json_bool "$anland_config_bind")" \
+    "$(json_bool "$anland_env_socket")" \
+    "$(json_bool "$anland_env_kgsl")" \
+    "$(json_bool "$anland_producer")" \
+    "$anland_errors"
+  printf '"source_drift":["desktop proof container=Ubuntu or ubuntu; Nebula normalized baseline container=%s","desktop proof rootfs archive used /data/media/0 Ubuntu26 16G evidence; Nebula normalized archive=%s size=%s","daemon module id observed as anland-daemon and virtual-drm-daemon; Nebula treats both as candidates before promotion","producer aliases are /opt/anland/startup.sh and /usr/local/bin/startanland-kde.sh"],' \
+    "$(json_escape "$ANLAND_RECOMMENDED_CONTAINER")" \
+    "$(json_escape "$ANLAND_RECOMMENDED_ROOTFS_ARCHIVE")" \
+    "$(json_escape "$ANLAND_RECOMMENDED_ROOTFS_SIZE")"
+  printf '"recipes":['
+  anland_recipe_item_json "open_anland_consumer" "Open Anland Consumer" "desktop-scripts/2_Abrir_Anland_Consumer.bat" "android_activity_launch" "deferred_fixed_launcher_required" 1 0 "$consumer_start" "Launches the Android consumer only after preflight proves the socket/producer path."
+  printf ','
+  anland_recipe_item_json "install_or_verify_anland_consumer_apk" "Install or verify Anland Consumer APK" "droidspaces-rootfs-KDE-builder README_english.md" "apk_install_or_verify" "deferred_artifact_install_required" 1 0 "$consumer_install" "External APK payload is not vendored; verify package before any consumer launch."
+  printf ','
+  anland_recipe_item_json "install_or_verify_anland_daemon_module" "Install or verify Anland daemon module" "desktop-scripts/LEIA-ME.txt + droidspaces-engine/tools/fix-anland-display.sh" "module_install_or_verify" "deferred_artifact_install_required" 1 0 "$daemon_install" "External module zip is not vendored; observed ids include anland-daemon and virtual-drm-daemon."
+  printf ','
+  anland_recipe_item_json "create_anland_rootfs_image" "Create Anland Ubuntu26 KDE rootfs image" "droidspaces-engine/tmp-create-ubuntu.sh + builder README" "rootfs_create" "deferred_fixed_container_command_required" 1 0 "$rootfs_create" "Creates sparse rootfs image; source proof used ubuntu/16G while Nebula normalizes to anland-ubuntu26-kde/32G."
+  printf ','
+  anland_recipe_item_json "phone_setup_container" "Materialize Anland container config" "phone_setup.sh" "container_config_materialization" "deferred_guarded_materializer_required" 1 0 "$phone_setup" "Writes DroidSpaces config/env and Termux audio defaults; not exposed as a baseline APK command."
+  printf ','
+  anland_recipe_item_json "restart_display_daemon" "Restart Anland display daemon" "phone_setup.sh" "daemon_restart" "deferred_module_executor_required" 1 0 "$daemon_restart" "Touches module daemon state and socket permissions; keep guarded."
+  printf ','
+  anland_recipe_item_json "stop_container" "Stop selected DroidSpaces container" "desktop-scripts/3_Parar_Container_Ubuntu.bat" "container_lifecycle" "deferred_fixed_container_command_required" 1 0 "$container_stop" "Mutates selected container lifecycle."
+  printf ','
+  anland_recipe_item_json "start_container" "Start selected DroidSpaces container" "desktop-scripts/4_Iniciar_Container_Ubuntu.bat" "container_lifecycle" "deferred_fixed_container_command_required" 1 0 "$container_start" "Requires clean selected container, rootfs, socket bind, and env proof first."
+  printf ','
+  anland_recipe_item_json "restart_selected_with_socket" "Restart selected container with Anland socket" "nebula derived from DroidSpaces CLI" "container_lifecycle" "deferred_fixed_container_command_required" 1 0 "$selected_restart" "Derived command only; blank when no safe selected container exists."
+  printf ','
+  anland_recipe_item_json "start_kde_producer" "Start KDE/Anland producer" "desktop-scripts/5_Iniciar_KDE_Plasma.bat" "producer_launch" "deferred_after_container_preflight" 1 0 "$kde_start" "Starts the KDE/Wayland producer inside the selected container."
+  printf ','
+  anland_recipe_item_json "status_check" "Verify Anland/DroidSpaces status" "desktop-scripts/6_Verificar_Status.bat" "read_only_preflight" "future_read_only_candidate" 0 0 "$status_process_probe; $status_probe" "Prefer display lane anland preflight --json as the authoritative fixed status surface."
+  printf ','
+  anland_recipe_item_json "capture_screenshot" "Capture Android screenshot" "desktop-scripts/7_Capturar_Screenshot.bat" "evidence_capture" "deferred_evidence_command" 1 0 "$screenshot_capture" "Writes/pulls a screenshot artifact; useful after display proof."
+  printf ','
+  anland_recipe_item_json "terminal_enter" "Enter DroidSpaces container shell" "desktop-scripts/8_Terminal_no_Container.bat" "interactive_shell" "not_allowed_in_apk" 1 0 "$terminal_enter" "Interactive shell is not a Nebula APK command surface."
+  printf ','
+  anland_recipe_item_json "verify_requirements" "Run DroidSpaces requirements check" "desktop-scripts/9_Verificar_Requisitos.bat" "read_only_preflight" "future_read_only_candidate" 0 0 "droidspaces check" "Can become a fixed preflight once output schema is bounded."
+  printf ','
+  anland_recipe_item_json "audio_fix" "Apply PulseAudio/OpenSL ES compatibility fix" "desktop-scripts/AUDIO_Corrigir_Som.bat + README_AUDIO_FIX.md" "audio_config" "deferred_guarded_audio_materializer_required" 1 0 "$audio_fix" "Useful compatibility lane; mutates container/audio state."
+  printf ','
+  anland_recipe_item_json "browser_install" "Install browser packages in container" "desktop-scripts/Navegadores/install_browsers.sh" "package_install" "research_reference_only" 1 0 "$browser_install" "Network/package install stays outside baseline control."
+  printf ','
+  anland_recipe_item_json "steam_install" "Install Steam compatibility stack" "desktop-scripts/Steam/install_steam.sh" "package_install" "research_reference_only" 1 0 "$steam_install" "Steam/Proton/game runtime remains unpromoted until bounded display/runtime proof."
+  printf '],'
+  printf '"guardrails":["recipes_are_not_executors","no_arbitrary_shell","no_terminal_enter_from_apk","no_steam_proton_wine_dxvk_game_launch_from_recipe_manifest","no_browser_or_package_install_from_baseline","no_phone_setup_mutation_without_guarded_materializer","no_container_lifecycle_mutation_until_preflight_clean","preserve_waylandie_known_good_frontier"],'
+  printf '"safe_next_action":"display lane anland preflight --json first; promote one fixed recipe at a time only after tests and live proof"'
+  printf '}\n'
 }
 
 anland_collect() {
@@ -3449,6 +3572,9 @@ main() {
       elif [ "${2:-}" = "method-profiles" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
         log_command "display_method_profiles"
         display_method_profiles_json
+      elif [ "${2:-}" = "anland" ] && [ "${3:-}" = "recipes" ] && [ "${4:-}" = "--json" ] && [ -z "${5:-}" ]; then
+        log_command "display_anland_recipes"
+        anland_desktop_recipes_json
       elif [ "${2:-}" = "lane" ] && [ "${3:-}" = "phone" ] && [ "${4:-}" = "preflight" ] && [ "${5:-}" = "--json" ] && [ -z "${6:-}" ]; then
         log_command "display_lane_phone_preflight"
         display_phone_preflight_json

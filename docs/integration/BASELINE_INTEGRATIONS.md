@@ -107,6 +107,7 @@ The command contract is:
 ```sh
 su -c /data/adb/modules/nebula_core/bin/nebula-core display method-containers --json
 su -c /data/adb/modules/nebula_core/bin/nebula-core display method-profiles --json
+su -c /data/adb/modules/nebula_core/bin/nebula-core display anland recipes --json
 ```
 
 `method-profiles` is read-only. It emits per-method DroidSpaces profile
@@ -117,6 +118,14 @@ Safe config-only materialization is direct atomic file creation of
 ```sh
 droidspaces --config=<container.config> start
 ```
+
+`display anland recipes --json` is also read-only. It maps the contributor
+desktop scripts and DroidSpaces/Anland evidence into fixed recipe IDs such as
+consumer APK verification, daemon module verification, rootfs image creation,
+container lifecycle, KDE producer launch, status check, screenshot capture,
+audio fix, browser install, and Steam install. Every mutating recipe is marked
+deferred and `exposed_by_nebula=false`; the command is a noob-facing checklist,
+not a launcher.
 
 DroidSpaces `create` creates a rootfs image, while `start` persists or mirrors
 the active `container.config`. Use one writable rootfs image or directory per
