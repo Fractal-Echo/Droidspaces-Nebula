@@ -90,6 +90,55 @@ constants. The older report mentioned `2560x1080@75` and planes `137` / `145`;
 the decoded videos show `1920x1080@75` and plane `133`. A real implementation
 must dynamically discover the current external-display object set each run.
 
+## BD DRM Control Package Intake
+
+The 2026-06-28 Drive/ZIP intake preserved BD's DRM Control package as
+reference evidence, not as vendored runtime code.
+
+- Supplied ZIP SHA-256:
+  `d680e50c50c3f4081fc0319cf6130efbb955d3c7a91678b7f4599a340e939558`
+- Local intake report:
+  `/home/richtofen/.android/repositories/nebula-assets/local/2026-06-28-bd-drm-control-drive-01/result.md`
+- The supplied ZIP matched the 175-entry Drive manifest.
+- Reversa scans for Dock lease, policy, gateway, and frontier profiles reported
+  zero contradictions and zero patch candidates.
+- Static syntax checks passed for shell and C sources.
+- Remaining package debt is ShellCheck cleanup in
+  `adapters/droidspace/android/stop-lease.sh`; do not promote the package to an
+  active Nebula runtime until that is reviewed and fixed upstream or ported
+  cleanly.
+
+Nebula may use the package to sharpen the source-level command model,
+provenance, object-discovery requirements, broker/receiver sequencing, and
+rollback checklist. Nebula must not import the APK, generated artifacts, or
+prebuilt helpers into the public repo without a separate rebuild/provenance
+pass.
+
+## Qualcomm / Adreno Guidance Reference
+
+Qualcomm's public documentation page
+`https://docs.qualcomm.com/doc/80-78185-2/topic/mobile_best_practices.html`
+was captured as local-only evidence on 2026-06-28. The topic payload resolved to
+a PDF and was summarized without copying vendor text into this public source.
+
+Nebula promotes only these high-level guardrails:
+
+- Prefer Vulkan-first runtime proof on Adreno display/runtime lanes.
+- Treat swapchain and presentation behavior as power/thermal policy, not only
+  latency policy.
+- Preserve tile-rendering, UBWC, GMEM, and optimal image-layout assumptions
+  when designing sidecars, wrappers, or native display paths.
+- Avoid CPU/GPU readback and linear/mutable/sparse image paths unless a bounded
+  runtime proof justifies them.
+- Key Adreno workarounds from runtime driver/version evidence instead of
+  generic assumptions.
+- Require profiler or direct runtime evidence before promoting performance
+  claims.
+
+The Qualcomm PDFs/text extraction remain local-only under
+`nebula-assets/local/qualcomm-mobile-best-practices-2026-06-28`. Do not commit
+vendor PDF/text payloads or proprietary blobs.
+
 ## Reported Validation
 
 Reported evidence from the experiment:

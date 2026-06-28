@@ -1431,6 +1431,15 @@ assert "external_display_discovery_required" in obj["missing_requirements"]
 assert "lease_receiver_not_wired" in obj["missing_requirements"]
 assert obj["reported_objects"]["connector"] == 89
 assert obj["reported_objects"]["hardcoded_forbidden"] is True
+assert obj["reference_package_status"] == "captured_validated_reference_only"
+assert obj["reference_package_sha256"] == "d680e50c50c3f4081fc0319cf6130efbb955d3c7a91678b7f4599a340e939558"
+assert obj["binary_import_allowed"] is False
+assert obj["rebuild_required_before_binary_import"] is True
+assert obj["runtime_execution_allowed"] is False
+assert obj["mutation_allowed_by_policy"] is False
+assert obj["vendor_guidance_policy"] == "provenance_only_no_copied_vendor_text_no_vendor_blobs"
+assert "vulkan_first" in obj["adreno_runtime_guardrails"]
+assert "driver_version_workarounds_require_runtime_probe" in obj["adreno_runtime_guardrails"]
 PY
 
 settings_dir="$tmp/settings"

@@ -146,6 +146,10 @@ Pass 01 defaults:
   handoff, wlroots receiver startup, and explicit revoke/stop. This patch
   exposes read-only preflight/status only; it does not execute leases and does
   not imply an active Dock lease.
+- Qualcomm Adreno mobile best-practices material is recorded as provenance for
+  Vulkan-first, power-aware, tile/UBWC/GMEM-preserving runtime design. The PDFs
+  and extracted text remain local-only evidence; public source records only
+  short non-verbatim guardrails and never vendors Qualcomm blobs.
 
 ## Source Integration
 

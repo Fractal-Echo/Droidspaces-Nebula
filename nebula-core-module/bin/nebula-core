@@ -55,6 +55,12 @@ ANLAND_LINUX_NATIVE_ARTIFACT_SHA256=848bab354f6f1a46f842cc32536d558518d21e0280e2
 ANLAND_LINUX_NATIVE_ARTIFACT_SOURCE="Contributor linux native.zip reviewed 2026-06-28; desktop-scripts, phone_setup.sh, LEIA-ME.txt, README_AUDIO_FIX.md"
 ANLAND_LINUX_NATIVE_LOCAL_EVIDENCE=/home/richtofen/.android/repositories/nebula-assets/local/contributor-linux-native-2026-06-28
 DRM_LEASE_SOURCE="Bob Dilian DRM lease evidence captured 2026-06-22; docs/integration/DRM_CONTROL_REFERENCE.md"
+DRM_CONTROL_BD_PACKAGE_SOURCE="BD DRM Control Drive package captured 2026-06-28; docs/integration/DRM_CONTROL_REFERENCE.md"
+DRM_CONTROL_BD_ARTIFACT_SHA256=d680e50c50c3f4081fc0319cf6130efbb955d3c7a91678b7f4599a340e939558
+DRM_CONTROL_BD_LOCAL_EVIDENCE=/home/richtofen/.android/repositories/nebula-assets/local/2026-06-28-bd-drm-control-drive-01/result.md
+DRM_CONTROL_BD_VALIDATION="zip_matches_drive_manifest; Reversa dock/policy/frontier scans zero contradictions; bash_n and C syntax checks pass; ShellCheck debt remains in stop-lease.sh"
+QUALCOMM_ADRENO_BEST_PRACTICES_SOURCE="Qualcomm Adreno GPU on Mobile: Best Practices doc 80-78185-2 captured 2026-06-28; local-only evidence qualcomm-mobile-best-practices-2026-06-28"
+QUALCOMM_ADRENO_BEST_PRACTICES_SHA256=25fcf74dcf9c5f40d13747b8b0fdd85e9a098fd677055d229ffd131f5c8479b5
 ANLAND_DROIDSPACES_BIN=/data/local/Droidspaces/bin/droidspaces
 ANLAND_CONTAINERS_DIR=/data/local/Droidspaces/Containers
 ANLAND_PIDS_DIR=/data/local/Droidspaces/Pids
@@ -2110,6 +2116,19 @@ display_dock_preflight_payload() {
   printf '"dynamic_discovery_required":true,'
   printf '"reported_objects":{"connector":89,"crtc":285,"planes":[137,145],"rejected_encoder":86,"composer_fd_observed":11,"hardcoded_forbidden":true},'
   printf '"method":["composer_fd_duplicate","CREATE_LEASE_external_only","SCM_RIGHTS_fd_handoff","wlroots_drm_backend_lease_fd","explicit_stop_revoke"],'
+  printf '"reference_package_status":"captured_validated_reference_only",'
+  printf '"reference_package_source":%s,' "$(json_string "$DRM_CONTROL_BD_PACKAGE_SOURCE")"
+  printf '"reference_package_sha256":%s,' "$(json_string "$DRM_CONTROL_BD_ARTIFACT_SHA256")"
+  printf '"reference_package_local_evidence":%s,' "$(json_string "$DRM_CONTROL_BD_LOCAL_EVIDENCE")"
+  printf '"reference_validation":%s,' "$(json_string "$DRM_CONTROL_BD_VALIDATION")"
+  printf '"binary_import_allowed":false,'
+  printf '"rebuild_required_before_binary_import":true,'
+  printf '"runtime_execution_allowed":false,'
+  printf '"mutation_allowed_by_policy":false,'
+  printf '"vendor_guidance_source":%s,' "$(json_string "$QUALCOMM_ADRENO_BEST_PRACTICES_SOURCE")"
+  printf '"vendor_guidance_topic_sha256":%s,' "$(json_string "$QUALCOMM_ADRENO_BEST_PRACTICES_SHA256")"
+  printf '"vendor_guidance_policy":"provenance_only_no_copied_vendor_text_no_vendor_blobs",'
+  printf '"adreno_runtime_guardrails":["vulkan_first","presentation_mode_is_power_thermal_policy","preserve_tile_ubwc_gmem_assumptions","avoid_readback_linear_mutable_sparse_paths_without_proof","driver_version_workarounds_require_runtime_probe","profiler_or_runtime_proof_required"],'
   printf '"source":%s,' "$(json_string "$DRM_LEASE_SOURCE")"
   printf '"evidence_source_detail":%s,' "$(json_string "$DRM_LEASE_SOURCE")"
   printf '"errors":[]'

@@ -317,6 +317,15 @@ Do not vendor that whole worktree until the active diffs are reviewed and trimme
 - Vower latest compatibility: synced candidate for broader device support, not
   the RM11 R6 proof baseline
 
+Current external-display research inputs:
+
+- BD DRM Control package is captured and validated as reference evidence for
+  external-display-only DRM leasing. It is not vendored or executable in Nebula.
+- Qualcomm Adreno mobile best-practices documentation is captured local-only as
+  provenance for Vulkan-first, power-aware, tile/UBWC/GMEM-preserving runtime
+  design. Public source keeps only distilled guardrails and never commits
+  Qualcomm PDFs, extracted text, drivers, or blobs.
+
 See:
 
 - [Asset Policy](docs/asset-policy.md)
@@ -329,4 +338,4 @@ See:
 
 This app does not request storage, root, notification, overlay, or shell permissions. It does not write device nodes or install APKs.
 
-Public source must not contain private dumps, full EDL backups, private keys, serials, personal logs, token material, or proprietary Qualcomm blobs.
+Public source must not contain private dumps, full EDL backups, private keys, serials, personal logs, token material, proprietary Qualcomm blobs, or copied vendor documentation payloads.
