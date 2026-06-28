@@ -1032,6 +1032,74 @@ assert obj["container_pid"] is None
 assert obj["checks"]["active_container_pidfile"] is False
 PY
 
+stale_reuse_root="$tmp/device-root-stale-reuse"
+mkdir -p "$stale_reuse_root/data/local/Droidspaces/bin" \
+  "$stale_reuse_root/data/local/Droidspaces/Pids" \
+  "$stale_reuse_root/data/local/Droidspaces/Containers/ubuntu/rootfs" \
+  "$stale_reuse_root/data/local/Droidspaces/Containers/anland-ubuntu26-kde" \
+  "$stale_reuse_root/proc/3296"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$stale_reuse_root/data/local/Droidspaces/bin/droidspaces"
+cat > "$stale_reuse_root/data/local/Droidspaces/Containers/ubuntu/container.config" <<'EOF'
+name=ubuntu
+rootfs_path=/data/local/Droidspaces/Containers/ubuntu/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+EOF
+cat > "$stale_reuse_root/data/local/Droidspaces/Containers/anland-ubuntu26-kde/container.config" <<'EOF'
+name=anland-ubuntu26-kde
+rootfs_path=/data/local/Droidspaces/Containers/anland-ubuntu26-kde/rootfs.img
+enable_hw_access=1
+enable_gpu_mode=1
+EOF
+printf 3296 > "$stale_reuse_root/data/local/Droidspaces/Pids/anland-ubuntu26-kde.pid"
+printf '/system/bin/audioserver\0' > "$stale_reuse_root/proc/3296/cmdline"
+cat > "$stale_reuse_root/proc/3296/status" <<'EOF'
+Name:	AudioOut_1D
+Pid:	3296
+Uid:	1041	1041	1041	1041
+Gid:	1005	1005	1005	1005
+EOF
+stale_reuse_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$stale_reuse_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$stale_reuse_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["selected_container"] == "ubuntu", obj
+assert obj["container_selection_source"] == "default_fallback"
+assert obj["container_active"] is False
+assert obj["container_pid"] is None
+assert obj["checks"]["active_container_pidfile"] is False
+PY
+
+traversal_root="$tmp/device-root-traversal"
+mkdir -p "$traversal_root/data/local/Droidspaces/bin" \
+  "$traversal_root/data/local/Droidspaces/Containers/ubuntu" \
+  "$traversal_root/data/local/Droidspaces/Containers/other/rootfs" \
+  "$traversal_root/dev/dri"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$traversal_root/data/local/Droidspaces/bin/droidspaces"
+: > "$traversal_root/dev/dri/renderD128"
+cat > "$traversal_root/data/local/Droidspaces/Containers/ubuntu/container.config" <<'EOF'
+name=ubuntu
+rootfs_path=/data/local/Droidspaces/Containers/ubuntu/../other/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+EOF
+traversal_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$traversal_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$traversal_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["selected_container"] == "ubuntu", obj
+assert obj["checks"]["rootfs_path"] is False
+assert "invalid:rootfs_path_outside_container" in obj["errors"]
+PY
+
 mkdir -p "$active_root/data/local/Droidspaces/Containers/rm11-second/rootfs"
 cat > "$active_root/data/local/Droidspaces/Containers/rm11-second/container.config" <<'EOF'
 name=rm11-second

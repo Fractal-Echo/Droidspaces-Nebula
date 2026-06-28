@@ -1287,6 +1287,29 @@ anland_pid_running() {
   fixed_path_exists "/proc/$pid"
 }
 
+anland_pid_matches_container() {
+  pid=$1
+  container=${2:-}
+  anland_pid_running "$pid" || return 1
+  proc_dir=$(fixed_device_path "/proc/$pid")
+  status_file="$proc_dir/status"
+  cmdline_file="$proc_dir/cmdline"
+  if [ -f "$status_file" ]; then
+    uid_line=$(sed -n 's/^Uid:[[:space:]]*//p' "$status_file" | head -n 1)
+    primary_uid=${uid_line%%[!0-9]*}
+    if [ -n "$primary_uid" ] && [ "$primary_uid" != "0" ]; then
+      return 1
+    fi
+  fi
+  if [ -f "$cmdline_file" ]; then
+    cmdline=$(tr '\000' ' ' < "$cmdline_file" 2>/dev/null | sed 's/[[:space:]]*$//')
+    case "$cmdline" in
+      /system/bin/*|/vendor/bin/*|/apex/*|*audioserver*) return 1 ;;
+    esac
+  fi
+  return 0
+}
+
 anland_collect_active_pidfiles() {
   anland_active_name=
   anland_active_pidfile=
@@ -1303,7 +1326,7 @@ anland_collect_active_pidfiles() {
 	    fixed_path_exists "$(anland_config_for_container "$name")" || continue
 	    canonical_pidfile="$ANLAND_PIDS_DIR/$name.$suffix"
 	    pid=$(anland_pid_from_real_file "$pid_file")
-	    anland_pid_running "$pid" || continue
+	    anland_pid_matches_container "$pid" "$name" || continue
 	    if [ -z "$anland_active_name" ]; then
       anland_active_name=$name
       anland_active_pidfile=$canonical_pidfile
@@ -1330,7 +1353,7 @@ anland_pidfile_for_container() {
     real_path=$(fixed_device_path "$candidate_path")
     if [ -s "$real_path" ]; then
       pid=$(anland_pid_from_real_file "$real_path")
-      if anland_pid_running "$pid"; then
+      if anland_pid_matches_container "$pid" "$container"; then
         printf '%s' "$candidate_path"
         return
       fi
@@ -1381,6 +1404,9 @@ anland_rootfs_mode_for_path() {
 anland_path_belongs_to_container() {
   container=$1
   path=$2
+  case "$path" in
+    *..*) return 1 ;;
+  esac
   case "$container:$path" in
     :*) return 1 ;;
     *:"$ANLAND_CONTAINERS_DIR/$container"/*) return 0 ;;
