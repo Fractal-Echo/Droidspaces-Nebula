@@ -1264,6 +1264,24 @@ anland_env_for_container() {
   printf '%s/%s/anland.env' "$ANLAND_CONTAINERS_DIR" "$1"
 }
 
+anland_container_has_profile() {
+  container=$1
+  anland_safe_container_name "$container" || return 1
+  config=$(anland_config_for_container "$container")
+  fixed_path_exists "$config" || return 1
+  env=$(fixed_file_value "$config" env_file)
+  case "$env" in
+    "$ANLAND_CONTAINERS_DIR/$container"/*) ;;
+    *) env=$(anland_env_for_container "$container") ;;
+  esac
+  fixed_file_contains "$env" "ANLAND=1" && return 0
+  fixed_file_contains "$env" "ANLAND_SOCKET=$ANLAND_SOCKET_GUEST" && return 0
+  fixed_file_contains "$env" "MESA_LOADER_DRIVER_OVERRIDE=kgsl" && return 0
+  fixed_file_contains "$config" "$ANLAND_SOCKET_HOST:$ANLAND_SOCKET_GUEST" && return 0
+  fixed_file_contains "$config" "env_file=$ANLAND_CONTAINERS_DIR/$container/anland.env" && return 0
+  return 1
+}
+
 anland_safe_container_name() {
   case "$1" in
     ''|*/*|*..*|*[!A-Za-z0-9._-]*) return 1 ;;
@@ -1323,11 +1341,11 @@ anland_collect_active_pidfiles() {
     suffix=${base##*.}
     name=${base%."$suffix"}
     anland_safe_container_name "$name" || continue
-	    fixed_path_exists "$(anland_config_for_container "$name")" || continue
-	    canonical_pidfile="$ANLAND_PIDS_DIR/$name.$suffix"
-	    pid=$(anland_pid_from_real_file "$pid_file")
-	    anland_pid_matches_container "$pid" "$name" || continue
-	    if [ -z "$anland_active_name" ]; then
+    anland_container_has_profile "$name" || continue
+    canonical_pidfile="$ANLAND_PIDS_DIR/$name.$suffix"
+    pid=$(anland_pid_from_real_file "$pid_file")
+    anland_pid_matches_container "$pid" "$name" || continue
+    if [ -z "$anland_active_name" ]; then
       anland_active_name=$name
       anland_active_pidfile=$canonical_pidfile
       anland_active_pid=$pid

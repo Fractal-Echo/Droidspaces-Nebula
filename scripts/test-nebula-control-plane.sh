@@ -940,6 +940,37 @@ assert obj["checks"]["display_daemon_socket_writable"] is True
 assert obj["checks"]["anland_producer"] is True
 assert obj["errors"] == []
 PY
+mkdir -p "$image_root/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/rootfs" \
+  "$image_root/proc/4444"
+cat > "$image_root/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/container.config" <<'EOF'
+name=rm11-alpine-324-turnip
+rootfs_path=/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+run_at_boot=1
+EOF
+printf 4444 > "$image_root/data/local/Droidspaces/Pids/rm11-alpine-324-turnip.pid"
+mixed_active_anland_preflight="$(
+  NEBULA_TEST_DEVICE_ROOT="$image_root" \
+  sh "$cli" display lane anland preflight --json
+)"
+python3 - "$mixed_active_anland_preflight" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["status"] == "preflight_ready", obj
+assert obj["available"] is True
+assert obj["runtime_ready"] is True
+assert obj["selected_container"] == "anland-ubuntu26-kde"
+assert obj["container_selection_source"] == "active_pidfile"
+assert obj["container_status"] == "active"
+assert obj["requirement_status"] == "complete"
+assert obj["missing_requirements"] == []
+assert obj["container_active"] is True
+assert obj["container_pid"] == 4343
+assert obj["checks"]["active_container_pidfile"] is True
+assert obj["checks"]["anland_producer"] is True
+assert obj["errors"] == []
+PY
 rm -f "$image_root/data/local/Droidspaces/Pids/anland-ubuntu26-kde.pid"
 
 active_root="$tmp/device-root-active"
@@ -967,31 +998,35 @@ active_anland_preflight="$(
 python3 - "$active_anland_preflight" <<'PY'
 import json, sys
 obj = json.loads(sys.argv[1])
-assert obj["status"] == "container_runtime_ready"
+assert obj["status"] == "partial"
 assert obj["available"] is False
-assert obj["runtime_ready"] is True
-assert obj["selected_container"] == "rm11-alpine-324-turnip"
-assert obj["container_selection_source"] == "active_pidfile"
-assert obj["container_ref"] == "rm11-alpine-324-turnip"
-assert obj["container_status"] == "active"
+assert obj["runtime_ready"] is False
+assert obj["selected_container"] == "ubuntu"
+assert obj["container_selection_source"] == "default_fallback"
+assert obj["container_ref"] == "ubuntu"
+assert obj["container_status"] == "missing"
 assert obj["display_status"] == "display_missing"
-assert obj["runtime_status"] == "runtime_ready"
+assert obj["runtime_status"] == "runtime_missing"
 assert obj["requirement_status"] == "missing_requirements"
+assert "missing:container_config" in obj["missing_requirements"]
 assert "missing:anland_env" in obj["missing_requirements"]
 assert "missing:display_daemon_socket" in obj["missing_requirements"]
+assert "missing:rootfs_path" in obj["missing_requirements"]
 assert "missing:anland_producer" in obj["missing_requirements"]
-assert obj["container_active"] is True
-assert obj["container_pid"] == 4242
-assert obj["checks"]["active_container_pidfile"] is True
-assert obj["checks"]["container_config"] is True
-assert obj["checks"]["rootfs_path"] is True
+assert obj["container_active"] is False
+assert obj["container_pid"] is None
+assert obj["checks"]["active_container_pidfile"] is False
+assert obj["checks"]["container_config"] is False
+assert obj["checks"]["rootfs_path"] is False
 assert obj["checks"]["anland_env"] is False
 assert obj["checks"]["display_daemon_socket"] is False
 assert obj["checks"]["anland_producer"] is False
-assert obj["selected_paths"]["pidfile"] == "/data/local/Droidspaces/Pids/rm11-alpine-324-turnip.pid"
-assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/container.config"
+assert obj["selected_paths"]["pidfile"] is None
+assert obj["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
+assert "missing:container_config" in obj["errors"]
 assert "missing:anland_env" in obj["errors"]
 assert "missing:display_daemon_socket" in obj["errors"]
+assert "missing:rootfs_path" in obj["errors"]
 assert "missing:anland_producer" in obj["errors"]
 PY
 
@@ -1100,18 +1135,35 @@ assert obj["checks"]["rootfs_path"] is False
 assert "invalid:rootfs_path_outside_container" in obj["errors"]
 PY
 
-mkdir -p "$active_root/data/local/Droidspaces/Containers/rm11-second/rootfs"
-cat > "$active_root/data/local/Droidspaces/Containers/rm11-second/container.config" <<'EOF'
-name=rm11-second
-rootfs_path=/data/local/Droidspaces/Containers/rm11-second/rootfs
+ambiguous_profile_root="$tmp/device-root-ambiguous-profile"
+mkdir -p "$ambiguous_profile_root/data/local/Droidspaces/bin" \
+  "$ambiguous_profile_root/data/local/Droidspaces/Pids" \
+  "$ambiguous_profile_root/data/local/Droidspaces/Containers/anland-one/rootfs" \
+  "$ambiguous_profile_root/data/local/Droidspaces/Containers/anland-two/rootfs" \
+  "$ambiguous_profile_root/proc/4243" \
+  "$ambiguous_profile_root/proc/4244"
+cp "$device_root/data/local/Droidspaces/bin/droidspaces" \
+  "$ambiguous_profile_root/data/local/Droidspaces/bin/droidspaces"
+cat > "$ambiguous_profile_root/data/local/Droidspaces/Containers/anland-one/container.config" <<'EOF'
+name=anland-one
+rootfs_path=/data/local/Droidspaces/Containers/anland-one/rootfs
 enable_hw_access=1
 enable_gpu_mode=1
-run_at_boot=1
+env_file=/data/local/Droidspaces/Containers/anland-one/anland.env
+bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock
 EOF
-mkdir -p "$active_root/proc/4243"
-printf 4243 > "$active_root/data/local/Droidspaces/Pids/rm11-second.pid"
+cat > "$ambiguous_profile_root/data/local/Droidspaces/Containers/anland-two/container.config" <<'EOF'
+name=anland-two
+rootfs_path=/data/local/Droidspaces/Containers/anland-two/rootfs
+enable_hw_access=1
+enable_gpu_mode=1
+env_file=/data/local/Droidspaces/Containers/anland-two/anland.env
+bind_mounts=/data/local/tmp/display_daemon.sock:/run/display.sock
+EOF
+printf 4243 > "$ambiguous_profile_root/data/local/Droidspaces/Pids/anland-one.pid"
+printf 4244 > "$ambiguous_profile_root/data/local/Droidspaces/Pids/anland-two.pid"
 ambiguous_anland_preflight="$(
-  NEBULA_TEST_DEVICE_ROOT="$active_root" \
+  NEBULA_TEST_DEVICE_ROOT="$ambiguous_profile_root" \
   sh "$cli" display lane anland preflight --json
 )"
 python3 - "$ambiguous_anland_preflight" <<'PY'
@@ -1527,7 +1579,6 @@ assert "preserve_wayland_real_buffer_pass" in obj["guardrails"]
 assert obj["next_step"] == "bounded_game_client_runtime_before_steam"
 PY
 
-rm -f "$active_root/data/local/Droidspaces/Pids/rm11-second.pid"
 active_baseline="$(
   NEBULA_TEST_PACKAGE_DIR="$package_dir" \
   NEBULA_MODULES_ROOT="$modules_root" \
@@ -1544,28 +1595,30 @@ obj = json.loads(sys.argv[1])
 assert obj["overall_status"] == "baseline_ready_read_only"
 items = {item["id"]: item for item in obj["integrations"]}
 ds = items["droidspaces"]
-assert ds["status"] == "container_runtime_ready"
-assert ds["ready"] is True
-assert ds["runtime_ready"] is True
+assert ds["status"] == "partial"
+assert ds["ready"] is False
+assert ds["runtime_ready"] is False
 assert ds["display_socket_ready"] is False
 assert ds["method_id"] == "anland_surface"
-assert ds["container_ref"] == "rm11-alpine-324-turnip"
+assert ds["container_ref"] == "ubuntu"
 assert ds["container_kind"] == "droidspaces"
-assert ds["container_status"] == "active"
+assert ds["container_status"] == "missing"
 assert ds["display_status"] == "display_missing"
-assert ds["runtime_status"] == "runtime_ready"
+assert ds["runtime_status"] == "runtime_missing"
 assert ds["requirement_status"] == "missing_requirements"
+assert "missing:container_config" in ds["missing_requirements"]
 assert "missing:anland_env" in ds["missing_requirements"]
 assert "missing:display_daemon_socket" in ds["missing_requirements"]
+assert "missing:rootfs_path" in ds["missing_requirements"]
 assert "missing:anland_producer" in ds["missing_requirements"]
-assert ds["selected_container"] == "rm11-alpine-324-turnip"
-assert ds["container_selection_source"] == "active_pidfile"
-assert ds["container_active"] is True
-assert ds["container_pid"] == 4242
-assert ds["checks"]["active_container_pidfile"] is True
-assert ds["checks"]["container_config"] is True
+assert ds["selected_container"] == "ubuntu"
+assert ds["container_selection_source"] == "default_fallback"
+assert ds["container_active"] is False
+assert ds["container_pid"] is None
+assert ds["checks"]["active_container_pidfile"] is False
+assert ds["checks"]["container_config"] is False
 assert ds["checks"]["anland_producer"] is False
-assert ds["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/rm11-alpine-324-turnip/container.config"
+assert ds["selected_paths"]["container_config"] == "/data/local/Droidspaces/Containers/ubuntu/container.config"
 PY
 
 snapshot_create="$(
