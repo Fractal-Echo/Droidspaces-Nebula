@@ -23,6 +23,17 @@ su -c /data/adb/modules/nebula_core/bin/nebula-core integrations baseline --json
 The APK calls the same fixed command through `NebulaCoreClient`. No arbitrary
 shell text is accepted.
 
+For the one-APK/one-module ownership view, use:
+
+```sh
+su -c /data/adb/modules/nebula_core/bin/nebula-core integrations standalone --json
+```
+
+`integrations standalone` wraps the baseline state with bundled-vs-external
+ownership, fixed-command policy, active-module-first dispatch, and promotion
+guardrails. It is the noob-facing answer to "what do I install first and which
+layer owns this?"
+
 ## Integration Ownership
 
 | Integration | Baseline role | Current mutation state |
@@ -33,6 +44,20 @@ shell text is accepted.
 | Nubia Toolkit | GameHub/GameAssist hook reference | Hook activation deferred to explicit ReZygisk provider plus Vector/LSPosed scope |
 | RedMagic Control Center | Hardware node reference and optional standalone APK | Node writes disabled in baseline |
 | PowerDeck | Dry-run profile automation model | Preview/snapshot only |
+
+## Contributor Linux Native Artifact
+
+The 2026-06-28 `linux native.zip` contributor archive is local evidence under:
+
+```text
+/home/richtofen/.android/repositories/nebula-assets/local/contributor-linux-native-2026-06-28
+```
+
+It contains Anland compositor work, DroidSpaces engine material, KDE rootfs
+builder scripts, desktop helper scripts, screenshots, APK/module artifacts,
+keystores, generated build directories, and compiled binaries. Nebula can
+promote source-level requirements and fixed command shapes from it, but the
+public repo must not ingest the binary/build/private-key payloads wholesale.
 
 ## Requirements For Testers
 

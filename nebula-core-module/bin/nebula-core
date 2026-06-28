@@ -324,6 +324,7 @@ capabilities_json() {
   printf '{"id":"snapshot.cooling","title":"Cooling snapshot and rollback dry-run","status":"available_state_only","mutating":false,"source":"nebula-core state"},'
   printf '{"id":"legacy.modules","title":"Protected legacy Droidspaces module status","status":"available_read_only","mutating":false,"source":"protected module audit"},'
   printf '{"id":"integrations.baseline","title":"Baseline APK/module integration status","status":"available_read_only","mutating":false,"source":"nebula-core integration registry"},'
+  printf '{"id":"integrations.standalone","title":"Standalone baseline ownership manifest","status":"available_read_only","mutating":false,"source":"nebula-core standalone registry"},'
   printf '{"id":"nubia.toolkit.status","title":"Nubia Toolkit compatibility status","status":"ported_status_only","mutating":false,"source":"%s"},' "$(json_escape "$NUBIA_TOOLKIT_SOURCE")"
   printf '{"id":"runtime.waylandie.status","title":"WayLandIE runtime readiness","status":"available_read_only","mutating":false,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
   printf '{"id":"runtime.waylandie.proton-smoke","title":"WayLandIE Proton root-assisted smoke","status":"available_safe_mode_guarded","mutating":true,"source":"%s"},' "$(json_escape "$WAYLANDIE_SOURCE")"
@@ -2858,6 +2859,34 @@ integrations_baseline_json() {
 		  printf '"next_step":"bounded_game_client_runtime_before_steam"}\n'
 }
 
+integrations_standalone_json() {
+  baseline_json=$(integrations_baseline_json)
+  printf '{"protocol_version":%s,"command":"integrations standalone",' "$PROTOCOL_VERSION"
+  printf '"standalone_id":"nebula_one_apk_one_module_control_deck",'
+  printf '"mode":"authority_registry",'
+  printf '"apk_package":"io.droidspaces.nebula","module_id":"%s",' "$MODULE_ID"
+  printf '"baseline":%s,' "$baseline_json"
+  printf '"contract":{"single_apk":true,"single_core_module":true,"fixed_commands_only":true,"active_module_first":true,"pending_module_default":false,"status_before_mutation":true,"source_artifact_authority":"json_jsonl_logs_tests_first","public_repo_payload_policy":"no_large_or_unreviewed_binary_payloads"},'
+  printf '"ownership_layers":['
+  printf '{"id":"nebula_apk","owner":"Nebula APK","bundled_in":"apk","responsibility":"UI, refresh, doctor report, fixed command buttons, app-info launchers","mutation_authority":false,"external_dependency":false},'
+  printf '{"id":"nebula_core","owner":"Nebula Core module","bundled_in":"module","responsibility":"fixed root-side status, safe mode, snapshots, read-only probes, guarded smoke commands","mutation_authority":true,"mutation_policy":"allowlisted_only"},'
+  printf '{"id":"waylandie","owner":"WayLandIE companion package/imagefs","bundled_in":"external_app_data","responsibility":"Phone/App display and bounded Proton smoke lane","mutation_authority":false,"promotion_state":"display_proven_runtime_smoke_next"},'
+  printf '{"id":"droidspaces_anland","owner":"DroidSpaces/Anland container stack","bundled_in":"external_container_assets","responsibility":"container surface fallback and native method profiles","mutation_authority":false,"promotion_state":"preflight_or_copyable_config_only"},'
+  printf '{"id":"nubia_hooks","owner":"ReZygisk provider plus Vector/LSPosed scope","bundled_in":"external_modules","responsibility":"future Nubia hook lane readiness","mutation_authority":false,"promotion_state":"status_only_scope_deferred"},'
+  printf '{"id":"redmagic_hardware","owner":"Nebula read-only probes plus RM11 Pro firmware nodes","bundled_in":"device_firmware","responsibility":"fan, pump, LED, trigger, GameHub capability discovery","mutation_authority":false,"promotion_state":"read_only_nodes_preview"},'
+  printf '{"id":"powerdeck","owner":"Nebula preview contract","bundled_in":"module_policy","responsibility":"dry-run power/cooling/profile automation plan","mutation_authority":false,"promotion_state":"preview_snapshot_only"}'
+  printf '],'
+  printf '"compatibility_modes":['
+  printf '{"id":"rm11pro_waylandie","rank":1,"status_source":"baseline.integrations.waylandie","promotion":"known_good_frontier_preserved"},'
+  printf '{"id":"anland_droidspaces","rank":2,"status_source":"baseline.integrations.droidspaces","promotion":"preflight_before_start"},'
+  printf '{"id":"droidspaces_native_profiles","rank":3,"status_source":"display method-profiles --json","promotion":"per_profile_proof_required"},'
+  printf '{"id":"vower_waylandie_compat","rank":4,"status_source":"repo_reference","promotion":"not_baseline_until_bounded_install_display_proof"}'
+  printf '],'
+  printf '"standalone_guardrails":["one_apk_one_module_entrypoint","external_payloads_are_detected_not_silently_vendored","no_arbitrary_shell","no_hook_activation_from_standalone_status","no_redmagic_node_writes_from_standalone_status","no_droidspaces_container_start_from_standalone_status","no_steam_proton_wine_dxvk_game_launch_from_standalone_status","preserve_active_module_known_good_frontier"],'
+  printf '"next_user_action":"refresh_nebula_then_run_fixed_preflight_or_guarded_smoke_only",'
+  printf '"next_engineering_action":"bounded_game_client_runtime_before_steam"}\n'
+}
+
 cooling_snapshot_payload() {
   snap_errors=
   snap_fan_present=0
@@ -3361,6 +3390,9 @@ main() {
       if [ "${2:-}" = "baseline" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
         log_command "integrations_baseline"
         integrations_baseline_json
+      elif [ "${2:-}" = "standalone" ] && [ "${3:-}" = "--json" ] && [ -z "${4:-}" ]; then
+        log_command "integrations_standalone"
+        integrations_standalone_json
       else
         usage_json
         return 2

@@ -17,6 +17,7 @@ required_files=(
   "docs/repo-map.md"
   "docs/workflow.md"
   "docs/integration/STATUS_MODEL.md"
+  "docs/integration/CONTRIBUTOR_LINUX_NATIVE_ARTIFACT.md"
   "docs/integration/schemas/dock-lease-command.schema.json"
   "docs/integration/schemas/dock-lease-result.schema.json"
   "tests/fixtures/dock-lease/lease-discovery-command.json"
@@ -49,6 +50,11 @@ grep -q 'pending module rejected by anti-regression guard' app/src/main/java/io/
 grep -q 'display method-profiles --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
 grep -q 'display method-profiles --json' nebula-core-module/README.md
 grep -q 'display method-profiles --json' docs/integration/UNIFIED_CONTROL_PLANE.md
+grep -q 'integrations standalone --json' app/src/main/java/io/droidspaces/nebula/core/NebulaCoreClient.java
+grep -q 'integrations standalone --json' nebula-core-module/README.md
+grep -q 'integrations standalone --json' docs/integration/UNIFIED_CONTROL_PLANE.md
+grep -q '848bab354f6f1a46f842cc32536d558518d21e0280e299f814a9a1fbaf73e4ec' docs/integration/CONTRIBUTOR_LINUX_NATIVE_ARTIFACT.md
+grep -q 'not a source drop to commit wholesale' docs/integration/CONTRIBUTOR_LINUX_NATIVE_ARTIFACT.md
 grep -q 'dock-lease-command.schema.json' docs/integration/DRM_CONTROL_REFERENCE.md
 grep -q 'dock-lease-result.schema.json' docs/integration/DRM_CONTROL_REFERENCE.md
 grep -q 'dock-lease-command-plan-report.js' docs/integration/DRM_CONTROL_REFERENCE.md

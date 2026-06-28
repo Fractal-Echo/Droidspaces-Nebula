@@ -24,6 +24,8 @@ Pass 01 exposes only a fixed JSON command protocol:
 - `snapshot cooling get --json`
 - `snapshot cooling rollback --dry-run --json`
 - `legacy modules --json`
+- `integrations baseline --json`
+- `integrations standalone --json`
 - `nubia toolkit status --json`
 - `runtime waylandie status --json`
 - `runtime waylandie proton-smoke --json`
@@ -59,6 +61,12 @@ by re-applying only those same ADB Wi-Fi settings and the fixed ADB manager
 transaction.
 
 Pass 05 stages protected legacy Droidspaces module migration evidence. The staged SELinux policy under `sepolicy.d/` is not active module policy yet; keep the old `droidspaces` and `rm11-droidspace-bridge-fd` modules enabled until one-at-a-time migration and reboot verification pass.
+
+`integrations standalone --json` reports the one-APK/one-module ownership
+manifest. It wraps the baseline integration state with bundled-vs-external
+ownership, fixed-command policy, active-module-first dispatch, and promotion
+guardrails. It is read-only and does not vendor external APKs, modules, rootfs
+images, generated build trees, or private keys into Nebula Core.
 
 `nubia toolkit status --json` reports the audited Nubia Toolkit hook lane, the
 ReZygisk standalone Zygisk provider state, and the Android 16-compatible

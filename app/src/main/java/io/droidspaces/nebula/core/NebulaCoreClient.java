@@ -61,6 +61,7 @@ public final class NebulaCoreClient {
             "redmagic probe --json",
             "redmagic pump probe --json",
             "integrations baseline --json",
+            "integrations standalone --json",
             "nubia toolkit status --json",
             "runtime waylandie status --json",
             "runtime waylandie proton-smoke --json",
@@ -136,6 +137,10 @@ public final class NebulaCoreClient {
         return runFixed("integrations", "baseline", "--json");
     }
 
+    public CommandResult standaloneIntegrations() {
+        return runFixed("integrations", "standalone", "--json");
+    }
+
     public CommandResult nubiaToolkitStatus() {
         return runFixed("nubia", "toolkit", "status", "--json");
     }
@@ -198,6 +203,7 @@ public final class NebulaCoreClient {
                 || "redmagic pump probe --json".equals(logical)
                 || "cooling policy --json".equals(logical)
                 || "integrations baseline --json".equals(logical)
+                || "integrations standalone --json".equals(logical)
                 || "runtime waylandie status --json".equals(logical)
                 || "display lanes --json".equals(logical)
                 || "display method-containers --json".equals(logical)
@@ -212,6 +218,7 @@ public final class NebulaCoreClient {
 
     private boolean preferMountMaster(String logical) {
         return "integrations baseline --json".equals(logical)
+                || "integrations standalone --json".equals(logical)
                 || "runtime waylandie status --json".equals(logical)
                 || "runtime waylandie proton-smoke --json".equals(logical)
                 || "display lanes --json".equals(logical)

@@ -51,6 +51,7 @@ Allowed fixed commands:
 | `snapshot cooling rollback --dry-run --json` | Returns a rollback plan with `applied=false`; no hardware writes. |
 | `legacy modules --json` | Reports protected old Droidspaces module status from fixed module IDs. |
 | `integrations baseline --json` | Reports the one baseline APK/module contract across WayLandIE, DroidSpaces/Anland, Nubia Toolkit, RedMagic Control Center, and PowerDeck without enabling mutating behavior. |
+| `integrations standalone --json` | Reports the one-APK/one-module ownership manifest, bundled-vs-external layers, fixed-command policy, active-module-first dispatch, and promotion guardrails. |
 | `nubia toolkit status --json` | Reports audited Nubia Toolkit, ReZygisk provider, and Vector readiness without enabling hooks. |
 | `runtime waylandie status --json` | Reports fixed WayLandIE rootfs, Proton, proot, live package/native/linker paths, selected local Freedreno ICD/driver, and the `VK_ICD_FILENAMES` / `VK_DRIVER_FILES` loader pin. |
 | `runtime waylandie proton-smoke --json` | Safe-mode guarded fixed root-assisted proot Proton smoke command. |
@@ -151,6 +152,14 @@ Nubia Toolkit remains an LSPosed hook lane. Pass 01 does not enable hooks.
 RedMagic Control Center source is permitted by user-supplied author approval evidence and remains attributed. Nebula does not merge the APK or copy its UI; it ports only bounded capability knowledge into documentation and non-mutating status surfaces.
 
 RedMagic PowerDeck is a local archived source reference with no recovered origin URL. Its dry-run/snapshot design is reimplemented conceptually in Nebula Core, not copied as a third-party payload.
+
+The 2026-06-28 contributor `linux native.zip` archive is local evidence for
+Anland compositor, DroidSpaces engine, and KDE rootfs-builder integration work.
+It is not public source authority by itself because it also contains APKs,
+module zips, keystores, build directories, and generated outputs. Nebula may
+promote source-level contracts, reproducible build steps, and fixed command
+surfaces from it after review; it must not ingest those binaries or keys into
+the public repo.
 
 ## Display Lane Strategy
 

@@ -202,6 +202,7 @@ public final class MainActivity extends Activity {
     private RedMagicProbe redMagicProbe = RedMagicProbe.unavailable("Not refreshed");
     private JSONObject adbWifiModuleStatus;
     private JSONObject baselineIntegrationsStatus;
+    private JSONObject standaloneIntegrationsStatus;
     private JSONObject nubiaToolkitStatus;
     private JSONObject waylandieRuntimeStatus;
     private JSONObject displayLanesStatus;
@@ -349,6 +350,7 @@ public final class MainActivity extends Activity {
         redMagicProbe = loadRedMagicProbe(coreStatus);
         adbWifiModuleStatus = loadAdbWifiModuleStatus();
         baselineIntegrationsStatus = loadBaselineIntegrationsStatus();
+        standaloneIntegrationsStatus = loadStandaloneIntegrationsStatus();
         nubiaToolkitStatus = loadNubiaToolkitStatus();
         waylandieRuntimeStatus = loadWaylandieRuntimeStatus();
         displayLanesStatus = loadDisplayLanesStatus();
@@ -366,6 +368,7 @@ public final class MainActivity extends Activity {
 
         coreContainer.removeAllViews();
         coreContainer.addView(buildCoreCard(coreStatus));
+        coreContainer.addView(buildStandaloneIntegrationsCard());
         coreContainer.addView(buildBaselineIntegrationsCard());
 
         autoCoolingContainer.removeAllViews();
@@ -685,6 +688,126 @@ public final class MainActivity extends Activity {
         } catch (JSONException error) {
             return null;
         }
+    }
+
+    private JSONObject loadStandaloneIntegrationsStatus() {
+        if (!coreStatus.installed || coreStatus.hasVisibleError()) {
+            return null;
+        }
+        CommandResult result = coreClient.standaloneIntegrations();
+        if (!result.ok()) {
+            return null;
+        }
+        try {
+            return new JSONObject(result.stdout);
+        } catch (JSONException error) {
+            return null;
+        }
+    }
+
+    private View buildStandaloneIntegrationsCard() {
+        LinearLayout card = baseCard();
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(top);
+
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.VERTICAL);
+        top.addView(titleBox, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        titleBox.addView(text("Standalone Control Deck", 19, TEXT, Typeface.BOLD));
+        TextView detail = text(standaloneSummary(), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(4), 0, 0);
+        titleBox.addView(detail);
+
+        top.addView(chip(standaloneStatusLabel(), standaloneStatusColor()));
+
+        JSONArray layers = standaloneIntegrationsStatus == null
+                ? null : standaloneIntegrationsStatus.optJSONArray("ownership_layers");
+        if (layers == null || layers.length() == 0) {
+            TextView unavailable = text("standalone=module_unavailable", 12, MUTED, Typeface.NORMAL);
+            unavailable.setTypeface(Typeface.MONOSPACE);
+            unavailable.setPadding(0, dp(12), 0, 0);
+            card.addView(unavailable);
+            return card;
+        }
+
+        for (int i = 0; i < layers.length(); i++) {
+            JSONObject layer = layers.optJSONObject(i);
+            if (layer != null) {
+                card.addView(buildStandaloneLayerRow(layer));
+            }
+        }
+        return card;
+    }
+
+    private View buildStandaloneLayerRow(JSONObject layer) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(10), 0, dp(4));
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(top);
+
+        TextView label = text(layer.optString("owner", layer.optString("id", "Layer")),
+                15, TEXT, Typeface.BOLD);
+        top.addView(label, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        top.addView(chip(layer.optBoolean("mutation_authority", false) ? "Authority" : "Observe",
+                layer.optBoolean("mutation_authority", false) ? YELLOW : CYAN));
+
+        TextView detail = text(standaloneLayerDetail(layer), 12, MUTED, Typeface.NORMAL);
+        detail.setTypeface(Typeface.MONOSPACE);
+        detail.setPadding(0, dp(6), 0, 0);
+        row.addView(detail);
+        return row;
+    }
+
+    private String standaloneSummary() {
+        if (standaloneIntegrationsStatus == null) {
+            return "standalone=module_unavailable\nfixedCommands=unknown";
+        }
+        JSONObject contract = standaloneIntegrationsStatus.optJSONObject("contract");
+        return "standalone=" + standaloneIntegrationsStatus.optString("standalone_id", "unknown")
+                + "\nmode=" + standaloneIntegrationsStatus.optString("mode", "unknown")
+                + "\napk=" + standaloneIntegrationsStatus.optString("apk_package", "unknown")
+                + "\nmodule=" + standaloneIntegrationsStatus.optString("module_id", "unknown")
+                + "\nfixedCommands=" + jsonBoolLabel(contract, "fixed_commands_only")
+                + "\nactiveFirst=" + jsonBoolLabel(contract, "active_module_first");
+    }
+
+    private String standaloneLayerDetail(JSONObject layer) {
+        return "id=" + layer.optString("id", "unknown")
+                + "\nbundledIn=" + layer.optString("bundled_in", "unknown")
+                + "\nresponsibility=" + layer.optString("responsibility", "unknown")
+                + "\nmutationAuthority=" + layer.optBoolean("mutation_authority", false)
+                + "\npromotion=" + layer.optString("promotion_state",
+                layer.optString("mutation_policy", "status_only"));
+    }
+
+    private String standaloneStatusLabel() {
+        if (standaloneIntegrationsStatus == null) return "Unknown";
+        JSONObject contract = standaloneIntegrationsStatus.optJSONObject("contract");
+        if (contract != null
+                && contract.optBoolean("single_apk", false)
+                && contract.optBoolean("single_core_module", false)
+                && contract.optBoolean("fixed_commands_only", false)
+                && contract.optBoolean("active_module_first", false)) {
+            return "Unified";
+        }
+        return "Check";
+    }
+
+    private int standaloneStatusColor() {
+        if (standaloneIntegrationsStatus == null) return BLUE;
+        return "Unified".equals(standaloneStatusLabel()) ? GREEN : YELLOW;
     }
 
     private View buildBaselineIntegrationsCard() {
@@ -1379,6 +1502,9 @@ public final class MainActivity extends Activity {
     }
 
     private String jsonBoolLabel(JSONObject object, String key) {
+        if (object == null) {
+            return "unknown";
+        }
         if (!object.has(key) || object.isNull(key)) {
             return "unknown";
         }
@@ -2261,6 +2387,7 @@ public final class MainActivity extends Activity {
         sb.append("  coolingPumpIntent=").append(redMagicProbe.coolingPolicy.pumpIntent).append('\n');
         sb.append('\n');
 
+        appendStandaloneIntegrationsReport(sb);
         appendBaselineIntegrationsReport(sb);
 
         sb.append("[Display Lanes]\n");
@@ -2493,6 +2620,50 @@ public final class MainActivity extends Activity {
             sb.append('\n');
         }
         return sb.toString();
+    }
+
+    private void appendStandaloneIntegrationsReport(StringBuilder sb) {
+        sb.append("[Standalone Control Deck]\n");
+        if (standaloneIntegrationsStatus == null) {
+            sb.append("  status=unavailable\n\n");
+            return;
+        }
+        sb.append("  standalone=")
+                .append(standaloneIntegrationsStatus.optString("standalone_id", "unknown"))
+                .append('\n');
+        sb.append("  mode=").append(standaloneIntegrationsStatus.optString("mode", "unknown")).append('\n');
+        sb.append("  apk=").append(standaloneIntegrationsStatus.optString("apk_package", "unknown")).append('\n');
+        sb.append("  module=").append(standaloneIntegrationsStatus.optString("module_id", "unknown")).append('\n');
+        JSONObject contract = standaloneIntegrationsStatus.optJSONObject("contract");
+        if (contract != null) {
+            sb.append("  singleApk=").append(contract.optBoolean("single_apk", false)).append('\n');
+            sb.append("  singleModule=").append(contract.optBoolean("single_core_module", false)).append('\n');
+            sb.append("  fixedCommands=").append(contract.optBoolean("fixed_commands_only", false)).append('\n');
+            sb.append("  activeFirst=").append(contract.optBoolean("active_module_first", false)).append('\n');
+            sb.append("  pendingDefault=").append(contract.optBoolean("pending_module_default", true)).append('\n');
+        }
+        JSONArray layers = standaloneIntegrationsStatus.optJSONArray("ownership_layers");
+        if (layers != null) {
+            for (int i = 0; i < layers.length(); i++) {
+                JSONObject layer = layers.optJSONObject(i);
+                if (layer == null) continue;
+                sb.append("  ").append(layer.optString("id", "unknown"))
+                        .append(": ").append(layer.optString("bundled_in", "unknown")).append('\n');
+                sb.append("    owner=").append(layer.optString("owner", "unknown")).append('\n');
+                sb.append("    mutationAuthority=")
+                        .append(layer.optBoolean("mutation_authority", false)).append('\n');
+                sb.append("    promotion=")
+                        .append(layer.optString("promotion_state",
+                                layer.optString("mutation_policy", "status_only")))
+                        .append('\n');
+            }
+        }
+        sb.append("  nextUserAction=")
+                .append(standaloneIntegrationsStatus.optString("next_user_action", "unknown"))
+                .append('\n');
+        sb.append("  nextEngineeringAction=")
+                .append(standaloneIntegrationsStatus.optString("next_engineering_action", "unknown"))
+                .append("\n\n");
     }
 
     private void appendBaselineIntegrationsReport(StringBuilder sb) {

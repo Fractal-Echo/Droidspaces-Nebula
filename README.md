@@ -4,13 +4,18 @@ DroidSpaces Nebula is the public release hub for the RM11 Pro DroidSpaces, Wayla
 
 This repo is the reviewable source and workflow layer. Large APKs, screenshots, logs, Mesa packages, rootfs images, and private device evidence stay in the local `nebula-assets` folder or in explicit GitHub Release assets after review.
 
-Nebula is not a replacement for DroidSpaces, Termux:X11, WayLandIE, Nubia Toolkit, or RedMagic Control Center. It is the coordination layer:
+Nebula is the single baseline APK/module entrypoint for this stack. It does not
+silently vendor or replace DroidSpaces, Termux:X11, WayLandIE, Nubia Toolkit, or
+RedMagic Control Center; it detects them, reports ownership, and promotes fixed
+commands only after proof:
 
 - show which lanes are installed
 - verify versions and signer hashes
 - launch the existing apps or their Android app-info screens
 - generate a copyable diagnostic report
 - keep risky root/module work out of the first app cut
+- expose one standalone ownership manifest for APK, module, display, container,
+  hook, hardware, and PowerDeck lanes
 
 Current status: pre-release integration baseline. Do not describe Nebula as stable, production ready, or safe for general users yet.
 
@@ -118,6 +123,16 @@ For concrete DroidSpaces profile templates, run:
 ```sh
 su -c '/data/adb/modules/nebula_core/bin/nebula-core display method-profiles --json'
 ```
+
+For the one-APK/one-module ownership contract, run:
+
+```sh
+su -c '/data/adb/modules/nebula_core/bin/nebula-core integrations standalone --json'
+```
+
+`integrations standalone` is read-only. It shows which layer Nebula owns,
+which external payloads are detected instead of bundled, which commands are
+fixed, and why active module output stays authoritative over pending updates.
 
 `method-profiles` is read-only. It emits config/env lines, config paths, and
 copyable `create`/`start` commands. Safe config-only materialization is direct
@@ -261,6 +276,14 @@ The current WayLandIE bridge experiments are still promoted selectively from the
 ```text
 /home/richtofen/.android/repositories/nebula-assets/Repos/waylandie-vower-578b431
 ```
+
+The 2026-06-28 contributor `linux native.zip` artifact is tracked as local
+evidence only under `nebula-assets/local/contributor-linux-native-2026-06-28`.
+It contains Anland compositor, DroidSpaces engine, KDE rootfs builder, APK, zip,
+keystore, and build-output material. Nebula may absorb source-level contracts
+and reproducible command surfaces from it, but the public repo must not ingest
+large binaries, private keys, generated build trees, or unreviewed APK/module
+payloads.
 
 Do not vendor that whole worktree until the active diffs are reviewed and trimmed.
 

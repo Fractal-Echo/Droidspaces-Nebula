@@ -213,6 +213,7 @@ required = {
     "snapshot.cooling",
     "legacy.modules",
     "integrations.baseline",
+    "integrations.standalone",
     "nubia.toolkit.status",
     "runtime.waylandie.status",
     "runtime.waylandie.proton-smoke",
@@ -1609,6 +1610,56 @@ assert "preserve_wayland_real_buffer_pass" in obj["guardrails"]
 assert obj["next_step"] == "bounded_game_client_runtime_before_steam"
 PY
 
+standalone="$(
+  NEBULA_TEST_PACKAGE_DIR="$package_dir" \
+  NEBULA_MODULES_ROOT="$modules_root" \
+  NEBULA_WAYLANDIE_DATA_DIR="$waylandie_data" \
+  NEBULA_WAYLANDIE_NATIVE_LIB_DIR="$waylandie_lib" \
+  NEBULA_WAYLANDIE_UID=10518 \
+  NEBULA_TEST_DEVICE_ROOT="$device_root" \
+  NEBULA_SYSROOT="$fixture" \
+  sh "$cli" integrations standalone --json
+)"
+python3 - "$standalone" <<'PY'
+import json, sys
+obj = json.loads(sys.argv[1])
+assert obj["protocol_version"] == 1
+assert obj["command"] == "integrations standalone"
+assert obj["standalone_id"] == "nebula_one_apk_one_module_control_deck"
+assert obj["mode"] == "authority_registry"
+assert obj["apk_package"] == "io.droidspaces.nebula"
+assert obj["module_id"] == "nebula_core"
+contract = obj["contract"]
+assert contract["single_apk"] is True
+assert contract["single_core_module"] is True
+assert contract["fixed_commands_only"] is True
+assert contract["active_module_first"] is True
+assert contract["pending_module_default"] is False
+assert contract["status_before_mutation"] is True
+baseline = obj["baseline"]
+assert baseline["command"] == "integrations baseline"
+assert baseline["overall_status"] == "baseline_ready_read_only"
+layers = {item["id"]: item for item in obj["ownership_layers"]}
+assert layers["nebula_apk"]["bundled_in"] == "apk"
+assert layers["nebula_apk"]["mutation_authority"] is False
+assert layers["nebula_core"]["bundled_in"] == "module"
+assert layers["nebula_core"]["mutation_authority"] is True
+assert layers["nebula_core"]["mutation_policy"] == "allowlisted_only"
+assert layers["waylandie"]["promotion_state"] == "display_proven_runtime_smoke_next"
+assert layers["droidspaces_anland"]["bundled_in"] == "external_container_assets"
+assert layers["droidspaces_anland"]["promotion_state"] == "preflight_or_copyable_config_only"
+assert layers["nubia_hooks"]["promotion_state"] == "status_only_scope_deferred"
+assert layers["redmagic_hardware"]["promotion_state"] == "read_only_nodes_preview"
+assert layers["powerdeck"]["promotion_state"] == "preview_snapshot_only"
+modes = {item["id"]: item for item in obj["compatibility_modes"]}
+assert modes["rm11pro_waylandie"]["rank"] == 1
+assert modes["anland_droidspaces"]["rank"] == 2
+assert modes["droidspaces_native_profiles"]["promotion"] == "per_profile_proof_required"
+assert "no_arbitrary_shell" in obj["standalone_guardrails"]
+assert "preserve_active_module_known_good_frontier" in obj["standalone_guardrails"]
+assert obj["next_engineering_action"] == "bounded_game_client_runtime_before_steam"
+PY
+
 active_baseline="$(
   NEBULA_TEST_PACKAGE_DIR="$package_dir" \
   NEBULA_MODULES_ROOT="$modules_root" \
@@ -1963,6 +2014,8 @@ display_dock_extra_arg="$(sh "$cli" display lane dock preflight --json /tmp/path
 display_dock_extra_code=$?
 baseline_extra_arg="$(sh "$cli" integrations baseline --json /tmp/path 2>/dev/null)"
 baseline_extra_code=$?
+standalone_extra_arg="$(sh "$cli" integrations standalone --json /tmp/path 2>/dev/null)"
+standalone_extra_code=$?
 set -e
 [[ "$extra_code" -ne 0 ]]
 [[ "$pump_extra_code" -ne 0 ]]
@@ -1980,6 +2033,7 @@ set -e
 [[ "$display_anland_extra_code" -ne 0 ]]
 [[ "$display_dock_extra_code" -ne 0 ]]
 [[ "$baseline_extra_code" -ne 0 ]]
+[[ "$standalone_extra_code" -ne 0 ]]
 [[ "$(json_field "$extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$pump_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$cooling_extra_arg" error)" == "USAGE" ]]
@@ -1996,6 +2050,7 @@ set -e
 [[ "$(json_field "$display_anland_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$display_dock_extra_arg" error)" == "USAGE" ]]
 [[ "$(json_field "$baseline_extra_arg" error)" == "USAGE" ]]
+[[ "$(json_field "$standalone_extra_arg" error)" == "USAGE" ]]
 
 logs="$(sh "$cli" logs tail --lines 10)"
 python3 - "$logs" <<'PY'
